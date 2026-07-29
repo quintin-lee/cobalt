@@ -1,0 +1,6 @@
+set(COBALT_VERSION "@PROJECT_VERSION@")
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(COBALT REQUIRED cobalt)
+
+include_directories(${COBALT_INCLUDE_DIRS})
+link_directories(${COBALT_LIBRARY_DIRS})

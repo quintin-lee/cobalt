@@ -1,0 +1,18 @@
+# Clang configuration for Cobalt project
+CompileCommands: build/compile_commands.json
+
+# Include paths
+- Iinclude
+- Iinclude/cobalt
+
+# Enable all warnings and treat as error
+Warnings:
+  -Wall
+  -Wextra
+  -Wpedantic
+  -Werror=implicit-function-declaration
+
+# Enable format on save (if using clang-format)
+Format:
+  Style: LLVM
+  SortIncludes: true
