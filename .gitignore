@@ -1,0 +1,109 @@
+# --- Build artifacts ---
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.dll.a
+*.exp
+*.def
+*.hex
+*.bin
+*.elf
+*.out
+*.exe
+*.app
+
+# --- Build output directories ---
+build/
+cmake-build-*/
+_build/
+out/
+target/
+
+# --- IDE / Editor ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.orig
+.vs/
+*.user
+*.suo
+.cproject
+.project
+.settings/
+.clangd/
+compile_commands.json
+
+# --- OS artifacts ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Documentation generated files ---
+docs/
+*.html
+*.pdf
+
+# --- Compiler / Toolchain ---
+*.d
+*.gcda
+*.gcno
+*.gcov
+*.ilk
+*.pdb
+*.idb
+*.pch
+*.sdf
+*.ipdb
+*.iobj
+
+# --- Dependency / Package managers ---
+conaninfo.txt
+conanbuildinfo.*
+vcpkg_installed/
+
+# --- Tags ---
+tags
+TAGS
+cscope.*
+GPATH
+GRTAGS
+GTAGS
+
+# --- Profiling & debugging ---
+*.prof
+*.profraw
+*.log
+*.trace
+callgrind.out.*
+perf.data*
+
+# --- AI coding tools ---
+.specstory/
+.opencode/
+.claude/
+.cursor/
+.windsurf/
+.codeium/
+.continue/
+.aider/
+.cline/
+.roo/
+.agent/
+.codegraph/
+.codebase-memory/
+.copibot/
+
+# --- Misc ---
+*.cache
+*.pyc
+__pycache__/
+*.bak
+*.tmp
+*.temp
