@@ -1,4 +1,4 @@
-#include "runtime/error.h"
+#include "cobalt/runtime/error.h"
 
 const char *cobalt_error_get_message(cobalt_error_t code) {
   switch (code) {

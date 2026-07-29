@@ -1,4 +1,4 @@
-#include "core/object.h"
+#include "cobalt/core/object.h"
 #include <stdlib.h>
 
 void cobalt_object_ref(cobalt_object_t *obj) {

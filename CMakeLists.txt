@@ -38,21 +38,21 @@ target_include_directories(cobalt PUBLIC
 # CTest testing enable
 enable_testing()
 
-# Add test executable (placeholder)
-# add_test(NAME CobaltTest COMMAND cobalt_test)
-
 # Export pkg-config
 configure_file(
     ${CMAKE_SOURCE_DIR}/cmake/cobalt.pc.in
     ${CMAKE_BINARY_DIR}/cobalt.pc
     @ONLY
 )
-install(FILES ${CMAKE_BINARY_DIR}/cobalt.pc DESTUFFIX lib/pkgconfig)
+install(FILES ${CMAKE_BINARY_DIR}/cobalt.pc DESTINATION lib/pkgconfig)
 
-export targets to config file
+# Export targets to config file
 configure_file(
     ${CMAKE_SOURCE_DIR}/cmake/cobaltConfig.cmake.in
     ${CMAKE_BINARY_DIR}/cobaltConfig.cmake
     @ONLY
 )
-install(FILES ${CMAKE_BINARY_DIR}/cobaltConfig.cmake DESTUFFIX cmake/Cobalt)
+install(FILES ${CMAKE_BINARY_DIR}/cobaltConfig.cmake DESTINATION cmake/Cobalt)
+
+# Testing - build test executable and register with CTest
+add_subdirectory(tests)

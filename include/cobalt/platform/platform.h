@@ -10,7 +10,14 @@
 #include <stddef.h>
 
 /* Platform types */
-typedef uint32_t cobalt_platform_id_t;
+typedef enum {
+    COBALT_PLATFORM_UNKNOWN = 0,
+    COBALT_PLATFORM_WINDOWS = 1,
+    COBALT_PLATFORM_MACOS = 2,
+    COBALT_PLATFORM_LINUX = 3,
+    COBALT_PLATFORM_OTHER = 99
+} cobalt_platform_id_t;
+
 typedef void *cobalt_platform_handle_t;
 
 /* Platform detection */

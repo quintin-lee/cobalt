@@ -1,13 +1,4 @@
-#include "platform/platform.h"
-#include <string.h>
-
-#ifdef _WIN32
-#define COBALT_PLATFORM_WINDOWS 1
-#elif __APPLE__
-#define COBALT_PLATFORM_MACOS 1
-#else
-#define COBALT_PLATFORM_LINUX 1
-#endif
+#include "cobalt/platform/platform.h"
 
 cobalt_platform_id_t cobalt_platform_get_id(void) {
 #ifdef COBALT_PLATFORM_WINDOWS

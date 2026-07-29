@@ -6,7 +6,7 @@
  * @brief Hash map (dictionary) container
  */
 
-#include "map.h"
+#include <stddef.h>
 
 typedef struct cobalt_hashmap_node cobalt_hashmap_node_t;
 
@@ -16,12 +16,11 @@ struct cobalt_hashmap_node {
   cobalt_hashmap_node_t *next; /* For collision chaining */
 };
 
-typedef struct {
-  cobalt_map_t base;
-  cobalt_hashmap_node_t **buckets;
-  size_t bucket_count;
-  size_t size;
-} cobalt_hashmap_t;
+/* 
+   Simplified implementation: no Map interface layer for now.
+   The actual impl is hidden in .c file.
+*/
+typedef struct cobalt_hashmap cobalt_hashmap_t;
 
 /* Create a new hash map */
 cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets);

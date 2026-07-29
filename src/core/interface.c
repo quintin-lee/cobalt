@@ -1,4 +1,4 @@
-#include "core/interface.h"
+#include "cobalt/core/interface.h"
 #include <stdlib.h>
 
 cobalt_interface_t *cobalt_interface_new(cobalt_interface_vtable_t *vtable) {

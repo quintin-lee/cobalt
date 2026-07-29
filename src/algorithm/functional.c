@@ -1,4 +1,4 @@
-#include "algorithm/functional.h"
+#include "cobalt/algorithm/functional.h"
 #include <stddef.h>
 
 int predicate_equal(const void *a, const void *b, compare_func_t comp) {

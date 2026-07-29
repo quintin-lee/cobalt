@@ -1,4 +1,4 @@
-#include "core/class.h"
+#include "cobalt/core/class.h"
 #include <stdlib.h>
 #include <string.h>
 

@@ -6,7 +6,7 @@
  * @brief Dynamic array (vector) container
  */
 
-#include "sequence.h"
+#include "cobalt/interface/sequence.h"
 
 /* Vector is a sequence implementation */
 typedef struct {

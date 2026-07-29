@@ -1,6 +1,7 @@
-#include "algorithm/sort.h"
+#include "cobalt/algorithm/sort.h"
 #include <stddef.h>
 #include <string.h>
+#include <stdlib.h>
 
 void cobalt_qsort(void *base, size_t nmemb, size_t size, compare_func_t compar) {
   qsort(base, nmemb, size, compar);

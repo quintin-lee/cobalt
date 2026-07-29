@@ -1,4 +1,4 @@
-#include "platform/atomic.h"
+#include "cobalt/platform/atomic.h"
 
 cobalt_atomic_t cobalt_atomic_create(int initial) {
   cobalt_atomic_t a = { .value = initial };

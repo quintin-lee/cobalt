@@ -6,7 +6,7 @@
  * @brief Doubly-linked list container
  */
 
-#include "sequence.h"
+#include "cobalt/interface/sequence.h"
 
 typedef struct cobalt_list_node cobalt_list_node_t;
 typedef struct cobalt_list cobalt_list_t;
