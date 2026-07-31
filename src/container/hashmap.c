@@ -68,7 +68,7 @@ void cobalt_hashmap_destroy(cobalt_hashmap_t *map) {
         while (node) {
             hashmap_node_t *next = node->next;
             free(node->key);
-            free(node->value);
+            
             free(node);
             node = next;
         }
@@ -90,7 +90,7 @@ int cobalt_hashmap_put(cobalt_hashmap_t *map, const char *key, void *value) {
     while (node) {
         if (strcmp(node->key, key) == 0) {
             /* Update existing */
-            free(node->value);
+            
             node->value = value;
             return 0;
         }
@@ -140,7 +140,7 @@ int cobalt_hashmap_remove(cobalt_hashmap_t *map, const char *key) {
         if (strcmp(node->key, key) == 0) {
             *prev = node->next;
             free(node->key);
-            free(node->value);
+            
             free(node);
             impl->size--;
             return 0;

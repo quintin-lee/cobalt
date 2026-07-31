@@ -3,12 +3,18 @@
 
 /**
  * @file atomic.h
- * @brief Platform-atomic operations
+ * @brief Platform-atomic operations using C11 stdatomic
  */
 
-/* Platform-independent atomics */
-typedef struct cobalt_atomic { int value; } cobalt_atomic_t;
+#include <stdint.h>
+#include <stdatomic.h>
 
+/* Platform-independent atomics using _Atomic */
+typedef struct cobalt_atomic {
+    _Atomic int value;
+} cobalt_atomic_t;
+
+/* Atomic operations - all use appropriate memory ordering */
 cobalt_atomic_t cobalt_atomic_create(int initial);
 int cobalt_atomic_get(cobalt_atomic_t *a);
 void cobalt_atomic_set(cobalt_atomic_t *a, int value);

@@ -24,6 +24,11 @@ add_executable(cobalt_test
 target_include_directories(cobalt_test PRIVATE ${CMAKE_SOURCE_DIR}/include)
 target_link_libraries(cobalt_test cobalt)
 
+# On Unix, link pthread for atomic thread-safety tests
+if(UNIX)
+    target_link_libraries(cobalt_test pthread)
+endif()
+
 # Register with CTest
 enable_testing()
 add_test(NAME CobaltPlatformTest COMMAND cobalt_test)
