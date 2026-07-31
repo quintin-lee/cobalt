@@ -40,7 +40,7 @@ void test_json_parse_simple(void) {
     /* Parse boolean true */
     json_node_t *t = json_parse("true");
     if (t) {
-        if (json_is_null(t) == 0) {  /* Not null */
+        if (!json_is_null(t)) {
             printf("  Parse boolean true: OK\n");
         }
         json_destroy(t);

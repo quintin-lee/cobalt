@@ -4,6 +4,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "cobalt/container/hashmap.h"
 
@@ -16,17 +17,24 @@ void test_hashmap_basic(void) {
         return;
     }
     
+    /* Allocate values on heap */
+    int *val1 = malloc(sizeof(int));
+    *val1 = 100;
+    int *val2 = malloc(sizeof(int));
+    *val2 = 200;
+    
     /* Insert key-value pairs */
-    int val1 = 100;
-    int ret = cobalt_hashmap_put(map, "name", &val1);
+    int ret = cobalt_hashmap_put(map, "name", val1);
     if (ret == 0) {
         printf("  Put 'name': OK\n");
     } else {
         fprintf(stderr, "ERROR: Put failed\n");
     }
     
-    int val2 = 200;
-    cobalt_hashmap_put(map, "age", &val2);
+    ret = cobalt_hashmap_put(map, "age", val2);
+    if (ret == 0) {
+        printf("  Put 'age': OK\n");
+    }
     
     /* Retrieve */
     int *got = (int *)cobalt_hashmap_get(map, "name");
@@ -65,6 +73,10 @@ void test_hashmap_basic(void) {
     if (got == NULL) {
         printf("  Removed key returns NULL: OK\n");
     }
+    
+    /* Free user values before destroy */
+    free(val1);
+    free(val2);
     
     cobalt_hashmap_destroy(map);
     printf("  Hashmap tests completed\n");
