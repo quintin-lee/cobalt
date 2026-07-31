@@ -1,6 +1,8 @@
 #include "cobalt/module/json.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
 #include <ctype.h>
 
 /* ============================================================
@@ -11,7 +13,7 @@ static json_node_t* json_node_create(json_type_t type) {
     json_node_t *node = malloc(sizeof(json_node_t));
     if (node) {
         node->type = type;
-        node->value = (json_value_t){0};
+        memset(&node->value, 0, sizeof(node->value));
         node->next = NULL;
         node->key = NULL;
     }
@@ -43,6 +45,138 @@ void json_destroy(json_node_t *node) {
 }
 
 /* ============================================================
+   SERIALIZATION
+   ============================================================ */
+
+/* Escape a string for JSON output */
+static char* json_escape_string(const char *str, size_t len) {
+    /* Count required buffer size */
+    size_t out_len = 0;
+    const char *p = str;
+    const char *end = str + len;
+    
+    while (p < end) {
+        char c = *p++;
+        switch (c) {
+            case '"': out_len += 2; break;
+            case '\\': out_len += 2; break;
+            case '\n': out_len += 2; break;
+            case '\r': out_len += 2; break;
+            case '\t': out_len += 2; break;
+            default:
+                if ((unsigned char)c < 0x20) {
+                    out_len += 6; /* \u00XX */
+                } else {
+                    out_len += 1;
+                }
+                break;
+        }
+    }
+    
+    char *result = malloc(out_len + 1);
+    if (!result) return NULL;
+    
+    p = str;
+    char *out = result;
+    while (p < end) {
+        char c = *p++;
+        switch (c) {
+            case '"': *out++ = '\\'; *out++ = '"'; break;
+            case '\\': *out++ = '\\'; *out++ = '\\'; break;
+            case '\n': *out++ = '\\'; *out++ = 'n'; break;
+            case '\r': *out++ = '\\'; *out++ = 'r'; break;
+            case '\t': *out++ = '\\'; *out++ = 't'; break;
+            default:
+                if ((unsigned char)c < 0x20) {
+                    out += sprintf(out, "\\u00%02x", (unsigned char)c);
+                } else {
+                    *out++ = c;
+                }
+                break;
+        }
+    }
+    *out = '\0';
+    return result;
+}
+
+/* Serialize a JSON node tree to string */
+char *json_serialize(json_node_t *node) {
+    if (!node) return strdup("null");
+    
+    char *result = NULL;
+    FILE *fp = open_memstream(&result, NULL);
+    if (!fp) return strdup("{}");
+    
+    switch (node->type) {
+        case JSON_NULL:
+            fprintf(fp, "null");
+            break;
+        case JSON_TRUE:
+            fprintf(fp, "true");
+            break;
+        case JSON_FALSE:
+            fprintf(fp, "false");
+            break;
+        case JSON_NUMBER:
+            fprintf(fp, "%.17g", node->value.number);
+            break;
+        case JSON_STRING:
+            if (node->value.string) {
+                char *escaped = json_escape_string(node->value.string, strlen(node->value.string));
+                if (escaped) {
+                    fprintf(fp, "\"%s\"", escaped);
+                    free(escaped);
+                } else {
+                    fprintf(fp, "\"\"");
+                }
+            } else {
+                fprintf(fp, "\"\"");
+            }
+            break;
+        case JSON_ARRAY:
+            fprintf(fp, "[");
+            json_node_t *child = node->next;
+            int first = 1;
+            while (child) {
+                if (!first) fprintf(fp, ",");
+                char *s = json_serialize(child);
+                if (s) {
+                    fprintf(fp, "%s", s);
+                    free(s);
+                }
+                first = 0;
+                child = child->next;
+            }
+            fprintf(fp, "]");
+            break;
+        case JSON_OBJECT:
+            fprintf(fp, "{");
+            json_node_t *kv = node->next;
+            first = 1;
+            while (kv) {
+                if (!first) fprintf(fp, ",");
+                char *key_escaped = json_escape_string(kv->key ? kv->key : "", strlen(kv->key ? kv->key : ""));
+                if (key_escaped) {
+                    fprintf(fp, "\"%s\":", key_escaped);
+                    free(key_escaped);
+                }
+                char *val = json_serialize(kv->next); /* value is in next */
+                if (val) {
+                    fprintf(fp, "%s", val);
+                    free(val);
+                }
+                first = 0;
+                kv = kv->next ? kv->next->next : NULL; /* skip to next key */
+            }
+            fprintf(fp, "}");
+            break;
+    }
+    
+    fclose(fp);
+    return result;
+}
+
+/* ============================================================
    PARSER CONTEXT
    ============================================================ */
 
@@ -53,7 +187,7 @@ typedef struct {
 } json_parse_ctx_t;
 
 static inline int is_space(int c) {
-    return c == ' ' || c == '\\t' || c == '\\n' || c == '\\r';
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
 static void json_skip_whitespace(json_parse_ctx_t *ctx) {
@@ -62,37 +196,32 @@ static void json_skip_whitespace(json_parse_ctx_t *ctx) {
     }
 }
 
-/* Parse string - simplistic but works for basic cases */
-static char* json_parse_string(json_parse_ctx_t *ctx, int consume_quote) {
-    if (consume_quote && ctx->pos >= ctx->len || ctx->str[ctx->pos] != '"') {
-        return NULL;
-    }
-    if (consume_quote) ctx->pos++; // skip opening quote
+/* Parse string value */
+static char* json_parse_string(json_parse_ctx_t *ctx) {
+    if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '"') return NULL;
+    ctx->pos++; /* skip opening quote */
     
+    /* Find closing quote (handle escapes) */
     int start = ctx->pos;
-    while (ctx->pos < ctx->len) {
-        char c = ctx->str[ctx->pos];
-        if (c == '"') {
+    while (ctx->pos < ctx->len && ctx->str[ctx->pos] != '"') {
+        if (ctx->str[ctx->pos] == '\\' && ctx->pos + 1 < ctx->len) {
+            ctx->pos += 2; /* skip escaped char */
+        } else {
             ctx->pos++;
-            break;
         }
-        if (c == '\\') {
-            ctx->pos += 2; // simple escape skip
-            continue;
-        }
-        ctx->pos++;
     }
     
-    if (ctx->pos > start) {
-        int len = ctx->pos - start;
-        char *result = malloc(len + 1);
-        if (result) {
-            strncpy(result, ctx->str + start, len);
-            result[len] = '\\0';
-            return result;
-        }
-    }
-    return NULL;
+    if (ctx->pos >= ctx->len) return NULL; /* unmatched quote */
+    
+    int len = ctx->pos - start;
+    char *result = malloc(len + 1);
+    if (!result) return NULL;
+    
+    strncpy(result, ctx->str + start, len);
+    result[len] = '\0';
+    ctx->pos++; /* skip closing quote */
+    
+    return result;
 }
 
 /* ============================================================
@@ -104,21 +233,21 @@ static json_node_t* json_parse_value(json_parse_ctx_t *ctx);
 static json_node_t* json_parse_object(json_parse_ctx_t *ctx) {
     json_skip_whitespace(ctx);
     if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '{') return NULL;
-    ctx->pos++; // skip {
+    ctx->pos++; /* skip { */
     
     json_node_t *root = json_node_create(JSON_OBJECT);
-    root->key = strdup("object");
+    
+    json_skip_whitespace(ctx);
+    if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
+        ctx->pos++;
+        return root;
+    }
     
     while (1) {
         json_skip_whitespace(ctx);
-        if (ctx->pos >= ctx->len) break;
-        if (ctx->str[ctx->pos] == '}') {
-            ctx->pos++;
-            break;
-        }
+        if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '"') break;
         
-        // Expect string key
-        char *key = json_parse_string(ctx, 1);
+        char *key = json_parse_string(ctx);
         if (!key) break;
         
         json_skip_whitespace(ctx);
@@ -126,22 +255,20 @@ static json_node_t* json_parse_object(json_parse_ctx_t *ctx) {
             free(key);
             break;
         }
-        ctx->pos++; // skip :
+        ctx->pos++; /* skip : */
         
-        json_node_t *val = json_parse_value(ctx);
-        if (!val) {
+        json_node_t *value = json_parse_value(ctx);
+        if (!value) {
             free(key);
             break;
         }
         
-        // Create a pair node
-        json_node_t *pair = json_node_create(JSON_OBJECT);
-        pair->key = key;
-        pair->value.number = 0; // marker
-        // We store the value in the 'next' chain of the object
-        // For simplicity, just append to root's next list
-        pair->next = root->next;
-        root->next = pair;
+        /* Add key-value pair to object */
+        json_node_t *kv = json_node_create(JSON_OBJECT);
+        kv->key = key;
+        kv->next = value; /* value stored as next */
+        kv->next->next = root->next; /* chain */
+        root->next = kv;
         
         json_skip_whitespace(ctx);
         if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ',') {
@@ -151,25 +278,28 @@ static json_node_t* json_parse_object(json_parse_ctx_t *ctx) {
         break;
     }
     
+    json_skip_whitespace(ctx);
+    if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
+        ctx->pos++;
+    }
+    
     return root;
 }
 
 static json_node_t* json_parse_array(json_parse_ctx_t *ctx) {
     json_skip_whitespace(ctx);
     if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '[') return NULL;
-    ctx->pos++; // skip [
+    ctx->pos++; /* skip [ */
     
     json_node_t *root = json_node_create(JSON_ARRAY);
-    root->key = strdup("array");
+    
+    json_skip_whitespace(ctx);
+    if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
+        ctx->pos++;
+        return root;
+    }
     
     while (1) {
-        json_skip_whitespace(ctx);
-        if (ctx->pos >= ctx->len) break;
-        if (ctx->str[ctx->pos] == ']') {
-            ctx->pos++;
-            break;
-        }
-        
         json_node_t *elem = json_parse_value(ctx);
         if (!elem) break;
         
@@ -184,6 +314,11 @@ static json_node_t* json_parse_array(json_parse_ctx_t *ctx) {
         break;
     }
     
+    json_skip_whitespace(ctx);
+    if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
+        ctx->pos++;
+    }
+    
     return root;
 }
 
@@ -196,14 +331,14 @@ static json_node_t* json_parse_value(json_parse_ctx_t *ctx) {
     if (c == '{') return json_parse_object(ctx);
     if (c == '[') return json_parse_array(ctx);
     if (c == '"') {
-        char *s = json_parse_string(ctx, 1);
+        char *s = json_parse_string(ctx);
         if (!s) return NULL;
         json_node_t *node = json_node_create(JSON_STRING);
         node->value.string = s;
         return node;
     }
     
-    // number: simple digit parse with optional decimal
+    /* number */
     if (c == '-' || isdigit((unsigned char)c)) {
         int start = ctx->pos;
         while (ctx->pos < ctx->len && (isdigit((unsigned char)ctx->str[ctx->pos]) || ctx->str[ctx->pos] == '.')) {
@@ -213,7 +348,7 @@ static json_node_t* json_parse_value(json_parse_ctx_t *ctx) {
         char *num_str = malloc(num_len + 1);
         if (!num_str) return NULL;
         strncpy(num_str, ctx->str + start, num_len);
-        num_str[num_len] = '\\0';
+        num_str[num_len] = '\0';
         double val = atof(num_str);
         free(num_str);
         
@@ -222,21 +357,18 @@ static json_node_t* json_parse_value(json_parse_ctx_t *ctx) {
         return node;
     }
     
-    // booleans and null
+    /* boolean and null */
     if (strncmp(ctx->str + ctx->pos, "true", 4) == 0) {
         ctx->pos += 4;
-        json_node_t *node = json_node_create(JSON_TRUE);
-        return node;
+        return json_node_create(JSON_TRUE);
     }
     if (strncmp(ctx->str + ctx->pos, "false", 5) == 0) {
         ctx->pos += 5;
-        json_node_t *node = json_node_create(JSON_FALSE);
-        return node;
+        return json_node_create(JSON_FALSE);
     }
     if (strncmp(ctx->str + ctx->pos, "null", 4) == 0) {
         ctx->pos += 4;
-        json_node_t *node = json_node_create(JSON_NULL);
-        return node;
+        return json_node_create(JSON_NULL);
     }
     
     return NULL;
@@ -252,20 +384,10 @@ json_node_t *json_parse(const char *text) {
     if (len == 0) return NULL;
     
     json_parse_ctx_t ctx = { .str = text, .pos = 0, .len = len };
+    json_skip_whitespace(&ctx);
+    if (ctx.pos >= ctx.len) return NULL;
+    
     return json_parse_value(&ctx);
-}
-
-char *json_serialize(json_node_t *node) {
-    // Placeholder: return "{}" for now
-    // Full implementation would traverse the tree and generate proper JSON
-    (void)node;
-    char *s = malloc(3);
-    if (s) {
-        s[0] = '{';
-        s[1] = '}';
-        s[2] = '\\0';
-    }
-    return s;
 }
 
 double json_get_number(json_node_t *node) {
@@ -283,7 +405,7 @@ int json_is_null(json_node_t *node) {
 }
 
 int json_is_object(json_node_t *node) {
-    return node && (node->type == JSON_OBJECT || node->type == JSON_ARRAY);
+    return node && node->type == JSON_OBJECT;
 }
 
 int json_is_array(json_node_t *node) {
