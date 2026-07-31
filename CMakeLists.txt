@@ -19,6 +19,7 @@ set(SOURCES
     src/core/class.c
     src/core/interface.c
     src/container/vector.c
+    src/interface/iterator.c
     src/container/list.c
     src/container/hashmap.c
     src/container/treemap.c
