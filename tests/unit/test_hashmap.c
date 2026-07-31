@@ -19,8 +19,15 @@ void test_hashmap_basic(void) {
     
     /* Allocate values on heap */
     int *val1 = malloc(sizeof(int));
-    *val1 = 100;
     int *val2 = malloc(sizeof(int));
+    if (!val1 || !val2) {
+        free(val1);
+        free(val2);
+        cobalt_hashmap_destroy(map);
+        fprintf(stderr, "ERROR: Memory allocation failed\n");
+        return;
+    }
+    *val1 = 100;
     *val2 = 200;
     
     /* Insert key-value pairs */
