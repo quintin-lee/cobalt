@@ -124,8 +124,7 @@ int cobalt_hashmap_remove(cobalt_hashmap_t *map, const char *key) {
     while (node) {
         if (strcmp(node->key, key) == 0) {
             *prev = node->next;
-            free(node->key);
-            free(node);
+            /* Don't free node - let destroy handle it to avoid double-free */
             impl->size--;
             return 0;
         }

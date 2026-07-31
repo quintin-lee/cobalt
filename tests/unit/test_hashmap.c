@@ -17,28 +17,19 @@ void test_hashmap_basic(void) {
         return;
     }
     
-    /* Allocate values on heap */
-    int *val1 = malloc(sizeof(int));
-    int *val2 = malloc(sizeof(int));
-    if (!val1 || !val2) {
-        free(val1);
-        free(val2);
-        cobalt_hashmap_destroy(map);
-        fprintf(stderr, "ERROR: Memory allocation failed\n");
-        return;
-    }
-    *val1 = 100;
-    *val2 = 200;
+    /* Values are stored as pointers - caller manages their lifetime */
+    int val1 = 100;
+    int val2 = 200;
     
     /* Insert key-value pairs */
-    int ret = cobalt_hashmap_put(map, "name", val1);
+    int ret = cobalt_hashmap_put(map, "name", &val1);
     if (ret == 0) {
         printf("  Put 'name': OK\n");
     } else {
         fprintf(stderr, "ERROR: Put failed\n");
     }
     
-    ret = cobalt_hashmap_put(map, "age", val2);
+    ret = cobalt_hashmap_put(map, "age", &val2);
     if (ret == 0) {
         printf("  Put 'age': OK\n");
     }
@@ -81,10 +72,7 @@ void test_hashmap_basic(void) {
         printf("  Removed key returns NULL: OK\n");
     }
     
-    /* Free user values before destroy */
-    free(val1);
-    free(val2);
-    
+    /* No need to free values - they're on stack */
     cobalt_hashmap_destroy(map);
     printf("  Hashmap tests completed\n");
 }
