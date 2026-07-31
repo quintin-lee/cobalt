@@ -4,23 +4,31 @@
 #include <stdlib.h>
 
 void cobalt_qsort(void *base, size_t nmemb, size_t size, compare_func_t compar) {
-  qsort(base, nmemb, size, compar);
+    qsort(base, nmemb, size, compar);
 }
 
 void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t compar) {
-  /* Simple insertion sort */
-  for (size_t i = 1; i < nmemb; i++) {
-    void *key = (char *)base + i * size;
-    int j = i - 1;
-    while (j >= 0 && compar((char *)base + j * size, key) > 0) {
-      *(void **)((char *)base + (j + 1) * size) = *(void **)((char *)base + j * size);
-      j--;
+    if (!base || nmemb <= 1) return;
+    
+    char *arr = (char *)base;
+    char *key = malloc(size);
+    if (!key) return;
+    
+    for (size_t i = 1; i < nmemb; i++) {
+        memcpy(key, arr + i * size, size);
+        int j = (int)i - 1;
+        
+        while (j >= 0 && compar(arr + j * size, key) > 0) {
+            memcpy(arr + (j + 1) * size, arr + j * size, size);
+            j--;
+        }
+        memcpy(arr + (j + 1) * size, key, size);
     }
-    *(void **)((char *)base + (j + 1) * size) = key;
-  }
+    
+    free(key);
 }
 
 void cobalt_list_sort(void **head, size_t *count, compare_func_t compar) {
-  (void)head; (void)count; (void)compar;
-  /* Merge sort on linked list - placeholder */
+    (void)head; (void)count; (void)compar;
+    /* Merge sort on linked list - placeholder */
 }
