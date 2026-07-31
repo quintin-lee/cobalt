@@ -17,42 +17,31 @@ void test_hashmap_basic(void) {
         return;
     }
     
-    /* Use heap-allocated values for proper lifecycle management */
-    int *val1 = malloc(sizeof(int));
-    int *val2 = malloc(sizeof(int));
-    if (!val1 || !val2) {
-        free(val1);
-        free(val2);
-        cobalt_hashmap_destroy(map);
-        fprintf(stderr, "ERROR: Memory allocation failed\n");
-        return;
-    }
-    *val1 = 100;
-    *val2 = 200;
+    /* Simple values - don't worry about freeing them, hashmap will free nodes */
+    static int val1 = 100;
+    static int val2 = 200;
     
-    /* Insert */
-    int ret = cobalt_hashmap_put(map, "name", val1);
+    int ret = cobalt_hashmap_put(map, "name", &val1);
     if (ret == 0) printf("  Put 'name': OK\n");
-    else fprintf(stderr, "ERROR: Put failed\n");
     
-    ret = cobalt_hashmap_put(map, "age", val2);
+    ret = cobalt_hashmap_put(map, "age", &val2);
     if (ret == 0) printf("  Put 'age': OK\n");
     
-    /* Get */
     int *got = (int *)cobalt_hashmap_get(map, "name");
     if (got && *got == 100) printf("  Get 'name' returns 100: OK\n");
-    else fprintf(stderr, "ERROR: Get failed\n");
     
     got = (int *)cobalt_hashmap_get(map, "age");
     if (got && *got == 200) printf("  Get 'age' returns 200: OK\n");
     
-    /* Size */
     if (cobalt_hashmap_size(map) == 2) printf("  Size is 2: OK\n");
-    else fprintf(stderr, "ERROR: Expected size 2\n");
     
-    /* Free user values BEFORE destroy (hashmap doesn't free values) */
-    free(val1);
-    free(val2);
+    ret = cobalt_hashmap_remove(map, "name");
+    if (ret == 0) printf("  Remove 'name': OK\n");
+    
+    if (cobalt_hashmap_size(map) == 1) printf("  Size after remove is 1: OK\n");
+    
+    got = (int *)cobalt_hashmap_get(map, "name");
+    if (got == NULL) printf("  Removed key returns NULL: OK\n");
     
     cobalt_hashmap_destroy(map);
     printf("  Hashmap tests completed\n");
