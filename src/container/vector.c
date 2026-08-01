@@ -29,7 +29,7 @@ static void vector_add_seq(cobalt_sequence_t* self, void* item)
     if (vec->size >= vec->capacity)
         {
             size_t new_cap = (vec->capacity == 0) ? 1 : vec->capacity * 2;
-            void** new_items = realloc(vec->items, new_cap * sizeof(void*));
+            void** new_items = (void**)realloc(vec->items, new_cap * sizeof(void*));
             if (!new_items)
                 return;
             vec->items = new_items;

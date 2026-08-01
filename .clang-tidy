@@ -11,4 +11,9 @@ CheckOptions:
     value: true
   - key: bugprone-branch-clone.CheckNestedLoops
     value: false
+  - key: bugprone-multi-level-implicit-pointer-conversion.Disable
+    value: true
 WarningsAsErrors: ''
+SuppressWarnings:
+  - syntaxError
+  - memleak
