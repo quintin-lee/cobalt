@@ -56,16 +56,6 @@ int main(void) {
     printf("  Pop: %d (LIFO)\n", *(int*)cobalt_stack_pop(stack));
     cobalt_stack_destroy(stack);
     
-    /* Queue */
-    cobalt_queue_t *queue = cobalt_queue_create();
-    cobalt_queue_enqueue(queue, &v1);
-    cobalt_queue_enqueue(queue, &v2);
-    cobalt_queue_enqueue(queue, &v3);
-    printf("\nQueue: size=%zu\n", cobalt_queue_size(queue));
-    int *deq = (int *)cobalt_queue_dequeue(queue);
-    if (deq) printf("  Dequeue: %d (FIFO)\n", *deq);
-    cobalt_queue_destroy(queue);
-    
     printf("\n=== Example completed ===\n");
     return 0;
 }
