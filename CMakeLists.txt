@@ -79,3 +79,13 @@ install(TARGETS cobalt
     RUNTIME DESTINATION bin
     INCLUDES DESTINATION include
 )
+
+# Additional examples
+add_executable(examples_object_oriented examples/object_oriented.c)
+target_link_libraries(examples_object_oriented cobalt)
+
+add_executable(examples_memory_management examples/memory_management.c)
+target_link_libraries(examples_memory_management cobalt)
+
+add_executable(examples_containers_demo examples/containers_demo.c)
+target_link_libraries(examples_containers_demo cobalt)
