@@ -47,7 +47,7 @@ int main(void) {
            cobalt_treemap_max_key(tree));
     cobalt_treemap_destroy(tree);
     
-    /* Stack */
+    /* Stack - simplified */
     cobalt_stack_t *stack = cobalt_stack_create();
     cobalt_stack_push(stack, &v1);
     cobalt_stack_push(stack, &v2);
@@ -55,6 +55,16 @@ int main(void) {
     printf("\nStack: size=%zu\n", cobalt_stack_size(stack));
     printf("  Pop: %d (LIFO)\n", *(int*)cobalt_stack_pop(stack));
     cobalt_stack_destroy(stack);
+    
+    /* Queue - simplified */
+    cobalt_queue_t *queue = cobalt_queue_create();
+    cobalt_queue_enqueue(queue, &v1);
+    cobalt_queue_enqueue(queue, &v2);
+    cobalt_queue_enqueue(queue, &v3);
+    printf("\nQueue: size=%zu\n", cobalt_queue_size(queue));
+    int *deq = (int *)cobalt_queue_dequeue(queue);
+    if (deq) printf("  Dequeue: %d (FIFO)\n", *deq);
+    cobalt_queue_destroy(queue);
     
     printf("\n=== Example completed ===\n");
     return 0;
