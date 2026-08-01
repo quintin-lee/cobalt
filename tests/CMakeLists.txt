@@ -19,6 +19,8 @@ add_executable(cobalt_test
     unit/test_functional.c
     unit/test_json.c
     unit/test_eventloop.c
+    unit/test_stack.c
+    unit/test_queue.c
 )
 
 target_include_directories(cobalt_test PRIVATE ${CMAKE_SOURCE_DIR}/include)

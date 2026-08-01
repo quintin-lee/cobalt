@@ -22,6 +22,8 @@ set(SOURCES
     src/interface/iterator.c
     src/container/list.c
     src/container/hashmap.c
+    src/container/stack.c
+    src/container/queue.c
     src/container/treemap.c
     src/algorithm/sort.c
     src/algorithm/functional.c
