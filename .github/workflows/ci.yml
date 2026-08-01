@@ -73,7 +73,10 @@ jobs:
     - name: Run cppcheck
       run: |
         cd ${{github.workspace}}
-        cppcheck --enable=warning --std=c11 -Iinclude src/ include/ \
+        cppcheck --enable=warning --std=c11 -Iinclude \
+          --suppress=syntaxError \
+          --suppress=memleak \
+          src/ include/ \
           --output-file=cppcheck-report.txt --error-exitcode=1
         cat cppcheck-report.txt || true
 

@@ -14,6 +14,3 @@ CheckOptions:
   - key: bugprone-multi-level-implicit-pointer-conversion.Disable
     value: true
 WarningsAsErrors: ''
-SuppressWarnings:
-  - syntaxError
-  - memleak
