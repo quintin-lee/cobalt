@@ -14,7 +14,9 @@ cobalt_arena_t* cobalt_arena_create(size_t initial_size)
 {
     cobalt_arena_t* arena = malloc(sizeof(cobalt_arena_t));
     if (!arena)
-        return NULL;
+        {
+            return NULL;
+        }
 
     arena->buffer = malloc(initial_size);
     if (!arena->buffer)
@@ -40,13 +42,19 @@ void cobalt_arena_destroy(cobalt_arena_t* arena)
 
 void* cobalt_arena_alloc(cobalt_arena_t* arena, size_t size)
 {
-    if (!arena || arena->used + size > arena->capacity)
+    if (!arena)
+        {
+            return NULL;
+        }
+    if (arena->used + size > arena->capacity)
         {
             /* Grow buffer if needed */
             size_t new_capacity = arena->capacity * 2;
             void* new_buffer = realloc(arena->buffer, new_capacity);
             if (!new_buffer)
-                return NULL;
+                {
+                    return NULL;
+                }
             arena->buffer = new_buffer;
             arena->capacity = new_capacity;
         }

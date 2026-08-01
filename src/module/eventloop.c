@@ -1,4 +1,7 @@
 #define _POSIX_C_SOURCE 200112L
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE
+#endif
 #include "cobalt/module/eventloop.h"
 #include <errno.h>
 #include <stdio.h>
@@ -13,13 +16,20 @@
 #include <sys/event.h>
 #endif
 
+#define COBALT_EVENTLOOP_DEFAULT_CAPACITY 16
+#define COBALT_EVENTLOOP_TIMEOUT_MS 10
+#define COBALT_EVENTLOOP_TIMEOUT_MAX 100
+#define COBALT_MILLIS_PER_SEC 1000ULL
+#define COBALT_NANOS_PER_MILLI 1000000ULL
+#define COBALT_NANOS_PER_SEC 1000000000ULL
+
 /* Internal timer entry */
 typedef struct timer_entry
 {
-    uint64_t id;
+    uint64_t timer_id;
     uint64_t timeout_ms;
     uint64_t interval_ms;
-    timer_handler_t cb;
+    timer_handler_t callback;
     void* user_data;
     int active;
     struct timespec next_fire;
@@ -31,7 +41,7 @@ typedef struct fd_entry
 {
     int fd;
     short events;
-    fd_handler_t cb;
+    fd_handler_t callback;
     void* user_data;
     struct fd_entry* next;
 } fd_entry_t;
@@ -58,16 +68,103 @@ struct cobalt_eventloop
    HELPERS
    ============================================================ */
 
-static void get_time_now(struct timespec* ts)
+static void get_time_now(struct timespec* timepoint)
 {
-    clock_gettime(CLOCK_MONOTONIC, ts);
+    clock_gettime(CLOCK_MONOTONIC, timepoint);
 }
 
-static int timer_expired(const struct timespec* a, const struct timespec* b)
+static int timer_expired(const struct timespec* lhs, const struct timespec* rhs)
 {
-    long secs = a->tv_sec - b->tv_sec;
-    long nsecs = a->tv_nsec - b->tv_nsec;
+    long secs = lhs->tv_sec - rhs->tv_sec;
+    long nsecs = lhs->tv_nsec - rhs->tv_nsec;
     return (secs > 0) || (secs == 0 && nsecs >= 0);
+}
+
+/* ============================================================
+   PRIVATE HELPERS
+   ============================================================ */
+
+static void add_timer_to_list(cobalt_eventloop_t* loop, timer_entry_t* entry)
+{
+    if (loop->timer_head == NULL)
+        {
+            loop->timer_head = entry;
+        }
+    else
+        {
+            /* Insert in sorted order by next_fire time */
+            timer_entry_t* prev = NULL;
+            timer_entry_t* curr = loop->timer_head;
+            while (curr != NULL && curr->next_fire.tv_sec < entry->next_fire.tv_sec)
+                {
+                    prev = curr;
+                    curr = curr->next;
+                }
+            if (prev == NULL)
+                {
+                    entry->next = loop->timer_head;
+                    loop->timer_head = entry;
+                }
+            else
+                {
+                    prev->next = entry;
+                    entry->next = curr;
+                }
+        }
+}
+
+static void process_expired_timers(cobalt_eventloop_t* loop, const struct timespec* now)
+{
+    timer_entry_t* timer = loop->timer_head;
+    while (timer != NULL && timer->active)
+        {
+            if (timer->next_fire.tv_sec < now->tv_sec || (timer->next_fire.tv_sec == now->tv_sec &&
+                                                          timer->next_fire.tv_nsec <= now->tv_nsec))
+                {
+                    if (timer->callback != NULL)
+                        {
+                            timer->callback(timer->timer_id, timer->user_data);
+                        }
+                    if (timer->interval_ms > 0)
+                        {
+                            timer->next_fire.tv_sec +=
+                                (long)(timer->interval_ms / COBALT_MILLIS_PER_SEC);
+                            timer->next_fire.tv_nsec +=
+                                (long)((timer->interval_ms % COBALT_MILLIS_PER_SEC) *
+                                       COBALT_NANOS_PER_MILLI);
+                            if (timer->next_fire.tv_nsec >= COBALT_NANOS_PER_SEC)
+                                {
+                                    timer->next_fire.tv_sec++;
+                                    timer->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
+                                }
+                        }
+                    else
+                        {
+                            timer->active = 0;
+                        }
+                }
+            timer = timer->next;
+        }
+}
+
+static int calculate_timeout_ms(const timer_entry_t* next_timer, const struct timespec* now)
+{
+    int timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
+    if (next_timer != NULL)
+        {
+            long secs = next_timer->next_fire.tv_sec - now->tv_sec;
+            long nsecs = next_timer->next_fire.tv_nsec - now->tv_nsec;
+            timeout_ms = (int)((secs * COBALT_MILLIS_PER_SEC) + (nsecs / COBALT_NANOS_PER_MILLI));
+            if (timeout_ms < 0)
+                {
+                    timeout_ms = 0;
+                }
+            if (timeout_ms > COBALT_EVENTLOOP_TIMEOUT_MAX)
+                {
+                    timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MAX;
+                }
+        }
+    return timeout_ms;
 }
 
 /* ============================================================
@@ -77,8 +174,10 @@ static int timer_expired(const struct timespec* a, const struct timespec* b)
 cobalt_eventloop_t* cobalt_eventloop_create(void)
 {
     cobalt_eventloop_t* loop = calloc(1, sizeof(cobalt_eventloop_t));
-    if (!loop)
-        return NULL;
+    if (loop == NULL)
+        {
+            return NULL;
+        }
 
 #ifdef __linux__
     loop->epoll_fd = epoll_create1(0);
@@ -87,9 +186,9 @@ cobalt_eventloop_t* cobalt_eventloop_create(void)
             free(loop);
             return NULL;
         }
-    loop->epoll_capacity = 16;
+    loop->epoll_capacity = COBALT_EVENTLOOP_DEFAULT_CAPACITY;
     loop->epoll_events = malloc(sizeof(struct epoll_event) * loop->epoll_capacity);
-    if (!loop->epoll_events)
+    if (loop->epoll_events == NULL)
         {
             close(loop->epoll_fd);
             free(loop);
@@ -109,54 +208,64 @@ cobalt_eventloop_t* cobalt_eventloop_create(void)
 
 void cobalt_eventloop_destroy(cobalt_eventloop_t* loop)
 {
-    if (!loop)
-        return;
+    if (loop == NULL)
+        {
+            return;
+        }
 
 #ifdef __linux__
     if (loop->epoll_fd >= 0)
-        close(loop->epoll_fd);
+        {
+            close(loop->epoll_fd);
+        }
     free(loop->epoll_events);
 #elif __APPLE__
     if (loop->kq >= 0)
-        close(loop->kq);
+        {
+            close(loop->kq);
+        }
 #endif
 
-    fd_entry_t* f = loop->fd_head;
-    while (f)
+    fd_entry_t* current_fd = loop->fd_head;
+    while (current_fd != NULL)
         {
-            fd_entry_t* next = f->next;
-            free(f);
-            f = next;
+            fd_entry_t* next = current_fd->next;
+            free(current_fd);
+            current_fd = next;
         }
 
-    timer_entry_t* t = loop->timer_head;
-    while (t)
+    timer_entry_t* current_timer = loop->timer_head;
+    while (current_timer != NULL)
         {
-            timer_entry_t* next = t->next;
-            free(t);
-            t = next;
+            timer_entry_t* next = current_timer->next;
+            free(current_timer);
+            current_timer = next;
         }
 
     free(loop);
 }
 
-int cobalt_eventloop_add_fd(cobalt_eventloop_t* loop, int fd, short events, fd_handler_t cb,
-                            void* user_data)
+int cobalt_eventloop_add_fd(
+    cobalt_eventloop_t* loop,
+    cobalt_fd_t file_descriptor, // NOLINT(bugprone-easily-swappable-parameters)
+    cobalt_events_t events, fd_handler_t callback, void* user_data)
 {
-    if (!loop || fd < 0 || !cb)
-        return -1;
+    if (loop == NULL || file_descriptor < 0 || callback == NULL)
+        {
+            return -1;
+        }
 
 #ifdef __linux__
-    struct epoll_event ev = {0};
-    ev.events = events;
-    ev.data.fd = fd;
-    if (epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, fd, &ev) < 0)
+    struct epoll_event ev_data = {0};
+    ev_data.events = events;
+    ev_data.data.fd = file_descriptor;
+    if (epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, file_descriptor, &ev_data) < 0)
         {
             return -1;
         }
 #elif __APPLE__
     struct kevent kev;
-    EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
+    EV_SET(&kev, file_descriptor, EVFILT_READ, EV_ADD, 0, 0, NULL);
     if (kevent(loop->kq, &kev, 1, NULL, 0, NULL) < 0)
         {
             return -1;
@@ -164,14 +273,16 @@ int cobalt_eventloop_add_fd(cobalt_eventloop_t* loop, int fd, short events, fd_h
 #endif
 
     fd_entry_t* entry = calloc(1, sizeof(fd_entry_t));
-    if (!entry)
-        return -1;
-    entry->fd = fd;
+    if (entry == NULL)
+        {
+            return -1;
+        }
+    entry->fd = file_descriptor;
     entry->events = events;
-    entry->cb = cb;
+    entry->callback = callback;
     entry->user_data = user_data;
 
-    if (!loop->fd_head)
+    if (loop->fd_head == NULL)
         {
             loop->fd_head = loop->fd_tail = entry;
         }
@@ -184,219 +295,181 @@ int cobalt_eventloop_add_fd(cobalt_eventloop_t* loop, int fd, short events, fd_h
     return 0;
 }
 
-int cobalt_eventloop_mod_fd(cobalt_eventloop_t* loop, int fd, short events, fd_handler_t cb,
-                            void* user_data)
+int cobalt_eventloop_mod_fd(cobalt_eventloop_t* loop, cobalt_fd_t file_descriptor,
+                            cobalt_events_t events, fd_handler_t callback, void* user_data)
 {
-    if (!loop || fd < 0)
-        return -1;
-    cobalt_eventloop_del_fd(loop, fd);
-    return cobalt_eventloop_add_fd(loop, fd, events, cb, user_data);
+    if (loop == NULL || file_descriptor < 0)
+        {
+            return -1;
+        }
+    cobalt_eventloop_del_fd(loop, file_descriptor);
+    return cobalt_eventloop_add_fd(loop, file_descriptor, events, callback, user_data);
 }
 
-int cobalt_eventloop_del_fd(cobalt_eventloop_t* loop, int fd)
+int cobalt_eventloop_del_fd(cobalt_eventloop_t* loop, cobalt_fd_t file_descriptor)
 {
-    if (!loop || fd < 0)
-        return -1;
+    if (loop == NULL || file_descriptor < 0)
+        {
+            return -1;
+        }
 
 #ifdef __linux__
-    epoll_ctl(loop->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+    epoll_ctl(loop->epoll_fd, EPOLL_CTL_DEL, file_descriptor, NULL);
 #elif __APPLE__
     struct kevent kev;
-    EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
+    EV_SET(&kev, file_descriptor, EVFILT_READ, EV_DELETE, 0, 0, NULL);
     kevent(loop->kq, &kev, 1, NULL, 0, NULL);
 #endif
 
-    fd_entry_t** pp = &loop->fd_head;
-    fd_entry_t* curr = *pp;
-    while (curr)
+    fd_entry_t** prev_ptr = &loop->fd_head;
+    fd_entry_t* current = *prev_ptr;
+    while (current != NULL)
         {
-            if (curr->fd == fd)
+            if (current->fd == file_descriptor)
                 {
-                    *pp = curr->next;
-                    free(curr);
+                    *prev_ptr = current->next;
+                    free(current);
                     return 0;
                 }
-            pp = &curr->next;
-            curr = curr->next;
+            prev_ptr = &current->next;
+            current = current->next;
         }
     return -1;
 }
 
-uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t* loop, uint64_t timeout_ms,
-                                    uint64_t interval_ms, timer_handler_t cb, void* user_data)
+uint64_t cobalt_eventloop_add_timer(
+    cobalt_eventloop_t* loop,
+    cobalt_timeout_ms_t timeout_ms, // NOLINT(bugprone-easily-swappable-parameters)
+    cobalt_interval_ms_t interval_ms, timer_handler_t callback, void* user_data)
 {
-    if (!loop || !cb)
-        return 0;
+    if (loop == NULL || callback == NULL)
+        {
+            return 0;
+        }
 
-    uint64_t id = ++loop->next_timer_id;
+    uint64_t timer_id = ++loop->next_timer_id;
     timer_entry_t* entry = calloc(1, sizeof(timer_entry_t));
-    if (!entry)
-        return 0;
+    if (entry == NULL)
+        {
+            return 0;
+        }
 
-    entry->id = id;
+    entry->timer_id = timer_id;
     entry->timeout_ms = timeout_ms;
     entry->interval_ms = interval_ms;
-    entry->cb = cb;
+    entry->callback = callback;
     entry->user_data = user_data;
     entry->active = 1;
 
     struct timespec now;
     get_time_now(&now);
-    entry->next_fire.tv_sec = now.tv_sec + timeout_ms / 1000;
-    entry->next_fire.tv_nsec = now.tv_nsec + (timeout_ms % 1000) * 1000000L;
-    if (entry->next_fire.tv_nsec >= 1000000000L)
+    entry->next_fire.tv_sec = now.tv_sec + (long)(timeout_ms / COBALT_MILLIS_PER_SEC);
+    entry->next_fire.tv_nsec =
+        (long)(now.tv_nsec + ((timeout_ms % COBALT_MILLIS_PER_SEC) * COBALT_NANOS_PER_MILLI));
+    if (entry->next_fire.tv_nsec >= COBALT_NANOS_PER_SEC)
         {
             entry->next_fire.tv_sec++;
-            entry->next_fire.tv_nsec -= 1000000000L;
+            entry->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
         }
 
-    if (!loop->timer_head)
-        {
-            loop->timer_head = entry;
-        }
-    else
-        {
-            /* Insert in sorted order by next_fire time */
-            timer_entry_t *prev = NULL, *curr = loop->timer_head;
-            while (curr && curr->next_fire.tv_sec < entry->next_fire.tv_sec)
-                {
-                    prev = curr;
-                    curr = curr->next;
-                }
-            if (!prev)
-                {
-                    entry->next = loop->timer_head;
-                    loop->timer_head = entry;
-                }
-            else
-                {
-                    prev->next = entry;
-                    entry->next = curr;
-                }
-        }
+    add_timer_to_list(loop, entry);
 
-    return id;
+    return timer_id;
 }
 
 int cobalt_eventloop_del_timer(cobalt_eventloop_t* loop, uint64_t timer_id)
 {
-    if (!loop)
-        return -1;
-
-    timer_entry_t** pp = &loop->timer_head;
-    timer_entry_t* curr = *pp;
-    while (curr)
+    if (loop == NULL)
         {
-            if (curr->id == timer_id)
+            return -1;
+        }
+
+    timer_entry_t** prev_ptr = &loop->timer_head;
+    timer_entry_t* current = *prev_ptr;
+    while (current != NULL)
+        {
+            if (current->timer_id == timer_id)
                 {
-                    *pp = curr->next;
-                    free(curr);
+                    *prev_ptr = current->next;
+                    free(current);
                     return 0;
                 }
-            pp = &curr->next;
-            curr = curr->next;
+            prev_ptr = &current->next;
+            current = current->next;
         }
     return -1;
 }
 
 void cobalt_eventloop_run(cobalt_eventloop_t* loop)
 {
-    if (!loop)
-        return;
+    if (loop == NULL)
+        {
+            return;
+        }
     loop->running = 1;
     loop->stop_flag = 0;
 
     while (loop->running && !loop->stop_flag)
         {
             cobalt_eventloop_iteration(loop);
-            usleep(1000);
+            usleep(COBALT_MILLIS_PER_SEC);
         }
     loop->running = 0;
 }
 
 void cobalt_eventloop_stop(cobalt_eventloop_t* loop)
 {
-    if (loop)
-        loop->stop_flag = 1;
+    if (loop != NULL)
+        {
+            loop->stop_flag = 1;
+        }
 }
 
 int cobalt_eventloop_iteration(cobalt_eventloop_t* loop)
 {
-    if (!loop)
-        return -1;
+    if (loop == NULL)
+        {
+            return -1;
+        }
 
     struct timespec now;
     get_time_now(&now);
 
     /* Process expired timers */
-    timer_entry_t* timer = loop->timer_head;
-    while (timer && timer->active)
-        {
-            if (timer->next_fire.tv_sec < now.tv_sec ||
-                (timer->next_fire.tv_sec == now.tv_sec && timer->next_fire.tv_nsec <= now.tv_nsec))
-                {
-                    if (timer->cb)
-                        {
-                            timer->cb(timer->id, timer->user_data);
-                        }
-                    if (timer->interval_ms > 0)
-                        {
-                            timer->next_fire.tv_sec += timer->interval_ms / 1000;
-                            timer->next_fire.tv_nsec += (timer->interval_ms % 1000) * 1000000L;
-                            if (timer->next_fire.tv_nsec >= 1000000000L)
-                                {
-                                    timer->next_fire.tv_sec++;
-                                    timer->next_fire.tv_nsec -= 1000000000L;
-                                }
-                        }
-                    else
-                        {
-                            timer->active = 0;
-                        }
-                }
-            timer = timer->next;
-        }
+    process_expired_timers(loop, &now);
 
 #ifdef __linux__
     /* Wait for FD events using epoll */
     /* Use a short timeout so tests don't hang when no timers/FDs are registered */
-    int timeout_ms = 10;
-    timer_entry_t* next_timer = loop->timer_head;
-    if (next_timer)
-        {
-            long secs = next_timer->next_fire.tv_sec - now.tv_sec;
-            long nsecs = next_timer->next_fire.tv_nsec - now.tv_nsec;
-            timeout_ms = (int)(secs * 1000 + nsecs / 1000000L);
-            if (timeout_ms < 0)
-                timeout_ms = 0;
-            if (timeout_ms > 100)
-                timeout_ms = 100;
-        }
-
-    int n = epoll_wait(loop->epoll_fd, loop->epoll_events, loop->epoll_capacity, timeout_ms);
-    for (int i = 0; i < n; i++)
+    int timeout_ms = calculate_timeout_ms(loop->timer_head, &now);
+    int event_count =
+        epoll_wait(loop->epoll_fd, loop->epoll_events, loop->epoll_capacity, timeout_ms);
+    for (int i = 0; i < event_count; i++)
         {
             fd_entry_t* entry = (fd_entry_t*)loop->epoll_events[i].data.ptr;
-            if (entry && entry->cb)
+            if (entry != NULL && entry->callback != NULL)
                 {
-                    entry->cb(entry->fd, loop->epoll_events[i].events, entry->user_data);
+                    entry->callback(entry->fd, (short)loop->epoll_events[i].events,
+                                    entry->user_data);
                 }
         }
 #elif __APPLE__
     /* kqueue implementation */
-    struct timespec ts = {0, 1000000}; /* 1ms timeout */
-    struct kevent events[16];
-    int n = kevent(loop->kq, NULL, 0, events, 16, &ts);
-    for (int i = 0; i < n; i++)
+    struct timespec ts = {0, COBALT_NANOS_PER_MILLI}; /* 1ms timeout */
+    struct kevent events[COBALT_EVENTLOOP_DEFAULT_CAPACITY];
+    int event_count = kevent(loop->kq, NULL, 0, events, COBALT_EVENTLOOP_DEFAULT_CAPACITY, &ts);
+    for (int i = 0; i < event_count; i++)
         {
             int fd = (int)events[i].ident;
             fd_entry_t* entry = loop->fd_head;
-            while (entry && entry->fd != fd)
-                entry = entry->next;
-            if (entry && entry->cb)
+            while (entry != NULL && entry->fd != fd)
+                {
+                    entry = entry->next;
+                }
+            if (entry != NULL && entry->callback != NULL)
                 {
                     short ev = (events[i].filter == EVFILT_READ) ? POLLIN : POLLOUT;
-                    entry->cb(fd, ev, entry->user_data);
+                    entry->callback(fd, ev, entry->user_data);
                 }
         }
 #endif
