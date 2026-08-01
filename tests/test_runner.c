@@ -1,11 +1,5 @@
-/**
- * @file test_runner.c
- * Test runner for Cobalt unit tests.
- */
-
 #include <stdio.h>
 
-/* Forward declarations */
 void test_platform(void);
 void test_atomic(void);
 void test_allocator(void);
@@ -27,7 +21,7 @@ void test_stack(void);
 void test_queue(void);
 
 int main(void) {
-    printf("=== Cobalt Unit Test Suite (v2.0.0) ===\n\n");
+    printf("=== Cobalt Unit Test Suite ===\n\n");
     
     test_platform();
     test_atomic();
