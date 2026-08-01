@@ -3,25 +3,27 @@
  * @Unit test for platform detection functions.
  */
 
-#include <stdio.h>
 #include "cobalt/platform/platform.h"
 #include <stdio.h>
 
-void test_platform(void) {
+void test_platform(void)
+{
     printf("Testing platform detection...\n");
 
     /* Test: Platform ID should be non-zero and valid */
     cobalt_platform_id_t pid = cobalt_platform_get_id();
-    if (pid == 0) {
-        fprintf(stderr, "ERROR: Platform ID is unknown/unset\n");
-    }
+    if (pid == 0)
+        {
+            fprintf(stderr, "ERROR: Platform ID is unknown/unset\n");
+        }
     printf("  Platform ID detected: %d\n", pid);
 
     /* Test: Platform handle returns NULL */
-    void *handle = cobalt_platform_get_handle();
-    if (handle != NULL) {
-        fprintf(stderr, "ERROR: Platform handle is not NULL\n");
-    }
+    void* handle = cobalt_platform_get_handle();
+    if (handle != NULL)
+        {
+            fprintf(stderr, "ERROR: Platform handle is not NULL\n");
+        }
     printf("  Platform handle is NULL (as expected)\n");
 
 #ifdef COBALT_PLATFORM_WINDOWS

@@ -1,0 +1,13 @@
+---
+Checks: 'clang-diagnostic-*,clang-analyzer-*,readability-*,bugprone-*,performance-*'
+HeaderFilterRegex: '.*'
+FormatStyle: file
+CheckOptions:
+  - key: readability-braces-around-statements.MinSize
+    value: 3
+  - key: readability-identifier-length.LocalVariableMinLength
+    value: 2
+  - key: readability-magic-numbers.IgnoreHex
+    value: true
+  - key: bugprone-branch-clone.CheckNestedLoops
+    value: false

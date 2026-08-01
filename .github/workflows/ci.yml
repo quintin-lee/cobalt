@@ -46,3 +46,50 @@ jobs:
         export PKG_CONFIG_PATH=${{github.workspace}}/install/lib/pkgconfig
         pkg-config --cflags cobalt
         pkg-config --libs cobalt
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install clang-tidy and cppcheck
+      run: sudo apt-get update && sudo apt-get install -y clang-tidy cppcheck
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug
+
+    - name: Build with compilation database
+      run: cmake --build ${{github.workspace}}/build --parallel
+
+    - name: Run clang-tidy
+      run: |
+        cd ${{github.workspace}}
+        find src include -name '*.c' -o -name '*.h' | while read f; do
+          clang-tidy "$f" -- -Iinclude -std=c11 -D_POSIX_C_SOURCE=200112L \
+            --config-file=${{github.workspace}}/.clang-tidy \
+            --warnings-as-errors='*' || exit 1
+        done
+
+    - name: Run cppcheck
+      run: |
+        cd ${{github.workspace}}
+        cppcheck --enable=warning --std=c11 -Iinclude src/ include/ \
+          --output-file=cppcheck-report.txt --error-exitcode=1
+        cat cppcheck-report.txt || true
+
+  format:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install clang-format
+      run: sudo apt-get update && sudo apt-get install -y clang-format
+
+    - name: Check code formatting
+      run: |
+        find . -name '*.c' -o -name '*.h' | grep -v '\./build/' | while read file; do
+          clang-format --dry-run --Werror --style=file "$file" || {
+            echo "Format error in: $file"
+            exit 1
+          }
+        done

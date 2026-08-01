@@ -6,32 +6,34 @@
  * @brief Simple logging framework
  */
 
-#include <stdio.h>
 #include <stdint.h>
+#include <stdio.h>
 
 /* Log levels */
-typedef enum {
-  LOG_LEVEL_TRACE = 0,
-  LOG_LEVEL_DEBUG,
-  LOG_LEVEL_INFO,
-  LOG_LEVEL_WARNING,
-  LOG_LEVEL_ERROR,
-  LOG_LEVEL_FATAL,
+typedef enum
+{
+    LOG_LEVEL_TRACE = 0,
+    LOG_LEVEL_DEBUG,
+    LOG_LEVEL_INFO,
+    LOG_LEVEL_WARNING,
+    LOG_LEVEL_ERROR,
+    LOG_LEVEL_FATAL,
 } log_level_t;
 
 /* Log message structure */
-typedef struct {
-  log_level_t level;
-  const char *file;
-  int line;
-  const char *message;
+typedef struct
+{
+    log_level_t level;
+    const char* file;
+    int line;
+    const char* message;
 } log_msg_t;
 
 /* Initialize logger */
-void cobalt_logger_init(FILE *output_file, log_level_t min_level);
+void cobalt_logger_init(FILE* output_file, log_level_t min_level);
 
 /* Log a message */
-void cobalt_logger_log(log_level_t level, const char *file, int line, const char *format, ...);
+void cobalt_logger_log(log_level_t level, const char* file, int line, const char* format, ...);
 
 /* Convenience macros */
 #define cobalt_trace(...) cobalt_logger_log(LOG_LEVEL_TRACE, __FILE__, __LINE__, __VA_ARGS__)

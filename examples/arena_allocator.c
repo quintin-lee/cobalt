@@ -6,32 +6,35 @@
  * where all allocations in a scope can be freed at once.
  */
 
+#include <cobalt/cobalt.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <cobalt/cobalt.h>
 
-int main(void) {
+int main(void)
+{
     cobalt_logger_init(stdout, LOG_LEVEL_INFO);
 
     /* Create a 64KB arena */
-    cobalt_arena_t *arena = cobalt_arena_create(64 * 1024);
-    if (!arena) {
-        fprintf(stderr, "Failed to create arena\n");
-        return 1;
-    }
+    cobalt_arena_t* arena = cobalt_arena_create(64 * 1024);
+    if (!arena)
+        {
+            fprintf(stderr, "Failed to create arena\n");
+            return 1;
+        }
 
     cobalt_info("Created arena with 64KB buffer\n");
 
     /* Allocate several objects from the arena */
-    int *a = (int *)cobalt_arena_alloc(arena, sizeof(int));
-    int *b = (int *)cobalt_arena_alloc(arena, sizeof(int));
-    int *c = (int *)cobalt_arena_alloc(arena, sizeof(int));
+    int* a = (int*)cobalt_arena_alloc(arena, sizeof(int));
+    int* b = (int*)cobalt_arena_alloc(arena, sizeof(int));
+    int* c = (int*)cobalt_arena_alloc(arena, sizeof(int));
 
-    if (!a || !b || !c) {
-        fprintf(stderr, "Arena allocation failed\n");
-        cobalt_arena_destroy(arena);
-        return 1;
-    }
+    if (!a || !b || !c)
+        {
+            fprintf(stderr, "Arena allocation failed\n");
+            cobalt_arena_destroy(arena);
+            return 1;
+        }
 
     *a = 100;
     *b = 200;
@@ -44,7 +47,7 @@ int main(void) {
     cobalt_info("Arena reset - all memory freed instantly!\n");
 
     /* The arena can now be reused for another batch of allocations */
-    int *d = (int *)cobalt_arena_alloc(arena, sizeof(int));
+    int* d = (int*)cobalt_arena_alloc(arena, sizeof(int));
     *d = 400;
     cobalt_info("Reused arena, allocated new int: %d\n", *d);
 
