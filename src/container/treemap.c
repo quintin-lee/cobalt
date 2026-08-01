@@ -2,127 +2,353 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Internal BST node (unbalanced - placeholder for red-black) */
-typedef struct treemap_node {
+/* Red-black tree colors */
+#define RB_RED   0
+#define RB_BLACK 1
+
+/* Tree node */
+typedef struct rb_node {
     char *key;
     void *value;
-    struct treemap_node *left;
-    struct treemap_node *right;
-} treemap_node_t;
+    int color;
+    struct rb_node *left;
+    struct rb_node *right;
+    struct rb_node *parent;
+} rb_node_t;
 
-/* Internal implementation structure */
+/* Tree implementation */
 typedef struct {
-    treemap_node_t *root;
+    rb_node_t *root;
     size_t size;
 } treemap_impl_t;
 
-/* Helper: create a new node */
-static treemap_node_t* create_node(const char *key, void *value) {
-    treemap_node_t *node = malloc(sizeof(treemap_node_t));
-    if (node) {
-        node->key = strdup(key);
-        node->value = value;
-        node->left = node->right = NULL;
+struct cobalt_treemap {
+    treemap_impl_t impl;
+};
+
+/* Helper: create new node */
+static rb_node_t* rb_node_create(const char *key, void *value) {
+    rb_node_t *node = malloc(sizeof(rb_node_t));
+    if (!node) return NULL;
+    node->key = strdup(key);
+    if (!node->key) {
+        free(node);
+        return NULL;
     }
+    node->value = value;
+    node->color = RB_RED;
+    node->left = NULL;
+    node->right = NULL;
+    node->parent = NULL;
     return node;
 }
 
-/* Simple BST insert (not balanced) */
-static treemap_node_t* insert(treemap_node_t **root, const char *key, void *value) {
-    if (*root == NULL) {
-        return create_node(key, value);
+/* Helper: left rotate */
+static void rb_rotate_left(rb_node_t **root, rb_node_t *node) {
+    rb_node_t *right = node->right;
+    if (!right) return;
+    
+    node->right = right->left;
+    if (right->left) right->left->parent = node;
+    right->parent = node->parent;
+    
+    if (!node->parent) *root = right;
+    else if (node == node->parent->left) node->parent->left = right;
+    else node->parent->right = right;
+    
+    right->left = node;
+    node->parent = right;
+}
+
+/* Helper: right rotate */
+static void rb_rotate_right(rb_node_t **root, rb_node_t *node) {
+    rb_node_t *left = node->left;
+    if (!left) return;
+    
+    node->left = left->right;
+    if (left->right) left->right->parent = node;
+    left->parent = node->parent;
+    
+    if (!node->parent) *root = left;
+    else if (node == node->parent->right) node->parent->right = left;
+    else node->parent->left = left;
+    
+    left->right = node;
+    node->parent = left;
+}
+
+/* Helper: fix insert */
+static void rb_insert_fixup(rb_node_t **root, rb_node_t *node) {
+    rb_node_t *parent, *grandparent;
+    
+    while (node != *root && node->color == RB_RED) {
+        parent = node->parent;
+        grandparent = node->parent->parent;
+        
+        if (parent == grandparent->left) {
+            rb_node_t *uncle = grandparent->right;
+            
+            if (uncle && uncle->color == RB_RED) {
+                /* Case 1: uncle is red - recolor */
+                parent->color = RB_BLACK;
+                uncle->color = RB_BLACK;
+                grandparent->color = RB_RED;
+                node = grandparent;
+            } else {
+                if (node == parent->right) {
+                    /* Case 2: node is right child - rotate left */
+                    node = parent;
+                    rb_rotate_left(root, node);
+                    parent = node->parent;
+                    grandparent = node->parent->parent;
+                }
+                /* Case 3: node is left child - rotate right */
+                parent->color = RB_BLACK;
+                grandparent->color = RB_RED;
+                rb_rotate_right(root, grandparent);
+            }
+        } else {
+            rb_node_t *uncle = grandparent->left;
+            
+            if (uncle && uncle->color == RB_RED) {
+                parent->color = RB_BLACK;
+                uncle->color = RB_BLACK;
+                grandparent->color = RB_RED;
+                node = grandparent;
+            } else {
+                if (node == parent->left) {
+                    node = parent;
+                    rb_rotate_right(root, node);
+                    parent = node->parent;
+                    grandparent = node->parent->parent;
+                }
+                parent->color = RB_BLACK;
+                grandparent->color = RB_RED;
+                rb_rotate_left(root, grandparent);
+            }
+        }
     }
-    int cmp = strcmp(key, (*root)->key);
-    if (cmp < 0) {
-        (*root)->left = insert(&(*root)->left, key, value);
-    } else if (cmp > 0) {
-        (*root)->right = insert(&(*root)->right, key, value);
-    } else {
-        (*root)->value = value;
+    (*root)->color = RB_BLACK;
+}
+
+/* Helper: find minimum node */
+static rb_node_t* rb_min_node(rb_node_t *node) {
+    while (node->left) node = node->left;
+    return node;
+}
+
+/* Helper: find maximum node */
+static rb_node_t* rb_max_node(rb_node_t *node) {
+    while (node->right) node = node->right;
+    return node;
+}
+
+/* Helper: find successor */
+static rb_node_t* rb_successor(rb_node_t *node) {
+    if (node->right) return rb_min_node(node->right);
+    rb_node_t *parent = node->parent;
+    while (parent && node == parent->right) {
+        node = parent;
+        parent = parent->parent;
     }
-    return *root;
+    return parent;
 }
 
-/* Simple BST search */
-static treemap_node_t* search(treemap_node_t *root, const char *key) {
-    if (!root || strcmp(root->key, key) == 0) {
-        return root;
+/* Helper: transplant - replace u with v */
+static void rb_transplant(rb_node_t **root, rb_node_t *u, rb_node_t *v) {
+    if (!u->parent) *root = v;
+    else if (u == u->parent->left) u->parent->left = v;
+    else u->parent->right = v;
+    if (v) v->parent = u->parent;
+}
+
+/* Helper: fix delete */
+static void rb_delete_fixup(rb_node_t **root, rb_node_t *node) {
+    rb_node_t *w;
+    
+    while (node != *root && node->color == RB_BLACK) {
+        if (node == node->parent->left) {
+            w = node->parent->right;
+            if (w->color == RB_RED) {
+                w->color = RB_BLACK;
+                node->parent->color = RB_RED;
+                rb_rotate_left(root, node->parent);
+                w = node->parent->right;
+            }
+            if ((!w->left || w->left->color == RB_BLACK) &&
+                (!w->right || w->right->color == RB_BLACK)) {
+                w->color = RB_RED;
+                node = node->parent;
+            } else {
+                if (!w->right || w->right->color == RB_BLACK) {
+                    if (w->left) w->left->color = RB_BLACK;
+                    w->color = RB_RED;
+                    rb_rotate_right(root, w);
+                    w = node->parent->right;
+                }
+                w->color = node->parent->color;
+                node->parent->color = RB_BLACK;
+                if (w->right) w->right->color = RB_BLACK;
+                rb_rotate_left(root, node->parent);
+                node = *root;
+            }
+        } else {
+            w = node->parent->left;
+            if (w->color == RB_RED) {
+                w->color = RB_BLACK;
+                node->parent->color = RB_RED;
+                rb_rotate_right(root, node->parent);
+                w = node->parent->left;
+            }
+            if ((!w->right || w->right->color == RB_BLACK) &&
+                (!w->left || w->left->color == RB_BLACK)) {
+                w->color = RB_RED;
+                node = node->parent;
+            } else {
+                if (!w->left || w->left->color == RB_BLACK) {
+                    if (w->right) w->right->color = RB_BLACK;
+                    w->color = RB_RED;
+                    rb_rotate_left(root, w);
+                    w = node->parent->left;
+                }
+                w->color = node->parent->color;
+                node->parent->color = RB_BLACK;
+                if (w->left) w->left->color = RB_BLACK;
+                rb_rotate_right(root, node->parent);
+                node = *root;
+            }
+        }
     }
-    int cmp = strcmp(key, root->key);
-    if (cmp < 0) return search(root->left, key);
-    return search(root->right, key);
+    node->color = RB_BLACK;
 }
 
-/* Find minimum key (leftmost) */
-static const char* find_min(treemap_node_t *node) {
-    while (node && node->left) node = node->left;
-    return node ? node->key : NULL;
+/* Public API */
+cobalt_treemap_t *cobalt_treemap_create(void) {
+    cobalt_treemap_t *map = malloc(sizeof(cobalt_treemap_t));
+    if (!map) return NULL;
+    map->impl.root = NULL;
+    map->impl.size = 0;
+    return map;
 }
 
-/* Find maximum key (rightmost) */
-static const char* find_max(treemap_node_t *node) {
-    while (node && node->right) node = node->right;
-    return node ? node->key : NULL;
-}
-
-/* Create a new treemap */
-cobalt_treemap_t cobalt_treemap_create(void) {
-    treemap_impl_t *impl = malloc(sizeof(treemap_impl_t));
-    if (!impl) return NULL;
-    impl->root = NULL;
-    impl->size = 0;
-    return (cobalt_treemap_t)impl;
-}
-
-/* Destroy the treemap */
-void cobalt_treemap_destroy(cobalt_treemap_t map) {
+void cobalt_treemap_destroy(cobalt_treemap_t *map) {
     if (!map) return;
-    treemap_impl_t *impl = (treemap_impl_t *)map;
-    free(impl);
+    
+    /* Destroy all nodes (in-order traversal) */
+    rb_node_t *node = map->impl.root;
+    rb_node_t *to_free;
+    
+    while (node) {
+        if (node->left) {
+            node = node->left;
+        } else if (node->right) {
+            node = node->right;
+        } else {
+            to_free = node;
+            node = node->parent;
+            free(to_free->key);
+            free(to_free);
+        }
+    }
+    
+    free(map);
 }
 
-/* Set value for key */
-int cobalt_treemap_put(cobalt_treemap_t map, const char *key, void *value) {
+int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value) {
     if (!map || !key) return -1;
-    treemap_impl_t *impl = (treemap_impl_t *)map;
-    impl->root = insert(&(impl->root), key, value);
-    impl->size++;
+    
+    rb_node_t *y = NULL;
+    rb_node_t *x = map->impl.root;
+    
+    /* Find insertion point */
+    while (x) {
+        y = x;
+        int cmp = strcmp(key, x->key);
+        if (cmp < 0) x = x->left;
+        else if (cmp > 0) x = x->right;
+        else {
+            /* Key exists, update value */
+            x->value = value;
+            return 0;
+        }
+    }
+    
+    rb_node_t *new_node = rb_node_create(key, value);
+    if (!new_node) return -1;
+    
+    new_node->parent = y;
+    if (!y) map->impl.root = new_node;
+    else if (strcmp(key, y->key) < 0) y->left = new_node;
+    else y->right = new_node;
+    
+    rb_insert_fixup(&map->impl.root, new_node);
+    map->impl.size++;
+    
     return 0;
 }
 
-/* Get value by key */
-void *cobalt_treemap_get(cobalt_treemap_t map, const char *key) {
+void *cobalt_treemap_get(cobalt_treemap_t *map, const char *key) {
     if (!map || !key) return NULL;
-    treemap_impl_t *impl = (treemap_impl_t *)map;
-    treemap_node_t *node = search(impl->root, key);
-    return node ? node->value : NULL;
+    
+    rb_node_t *node = map->impl.root;
+    while (node) {
+        int cmp = strcmp(key, node->key);
+        if (cmp < 0) node = node->left;
+        else if (cmp > 0) node = node->right;
+        else return node->value;
+    }
+    return NULL;
 }
 
-/* Remove key from map (stub) */
-int cobalt_treemap_remove(cobalt_treemap_t map, const char *key) {
-    (void)map; (void)key;
+int cobalt_treemap_remove(cobalt_treemap_t *map, const char *key) {
+    if (!map || !key) return -1;
+    
+    rb_node_t *node = map->impl.root;
+    while (node) {
+        int cmp = strcmp(key, node->key);
+        if (cmp < 0) node = node->left;
+        else if (cmp > 0) node = node->right;
+        else break;
+    }
+    
+    if (!node) return -1;
+    
+    rb_node_t *y = (node->left && node->right) ? rb_successor(node) : node;
+    rb_node_t *x = y->left ? y->left : y->right;
+    
+    if (x) x->parent = y->parent;
+    if (!y->parent) map->impl.root = x;
+    else if (y == y->parent->left) y->parent->left = x;
+    else y->parent->right = x;
+    
+    if (y != node) {
+        node->key = y->key;
+        node->value = y->value;
+        y = node;
+    }
+    
+    if (y->color == RB_BLACK) {
+        rb_delete_fixup(&map->impl.root, x);
+    }
+    
+    free(y->key);
+    free(y);
+    map->impl.size--;
+    
     return 0;
 }
 
-/* Get minimum key */
-const char *cobalt_treemap_min_key(cobalt_treemap_t map) {
-    if (!map) return NULL;
-    treemap_impl_t *impl = (treemap_impl_t *)map;
-    if (!impl || !impl->root) return NULL;
-    return find_min(impl->root);
+const char *cobalt_treemap_min_key(cobalt_treemap_t *map) {
+    if (!map || !map->impl.root) return NULL;
+    return rb_min_node(map->impl.root)->key;
 }
 
-/* Get maximum key */
-const char *cobalt_treemap_max_key(cobalt_treemap_t map) {
-    if (!map) return NULL;
-    treemap_impl_t *impl = (treemap_impl_t *)map;
-    if (!impl || !impl->root) return NULL;
-    return find_max(impl->root);
+const char *cobalt_treemap_max_key(cobalt_treemap_t *map) {
+    if (!map || !map->impl.root) return NULL;
+    return rb_max_node(map->impl.root)->key;
 }
 
-/* Map size */
-size_t cobalt_treemap_size(cobalt_treemap_t map) {
+size_t cobalt_treemap_size(cobalt_treemap_t *map) {
     if (!map) return 0;
-    treemap_impl_t *impl = (treemap_impl_t *)map;
-    return impl ? impl->size : 0;
+    return map->impl.size;
 }
