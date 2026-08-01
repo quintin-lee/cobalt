@@ -14,3 +14,4 @@ CheckOptions:
   - key: bugprone-multi-level-implicit-pointer-conversion.Disable
     value: true
 WarningsAsErrors: ''
+DisabledChecks: 'bugprone-reserved-identifier'
