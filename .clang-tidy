@@ -1,5 +1,5 @@
 ---
-Checks: 'clang-diagnostic-*,clang-analyzer-*,readability-*,bugprone-*,performance-*'
+Checks: 'clang-diagnostic-*,clang-analyzer-*,readability-*,bugprone-*,performance-*,-bugprone-reserved-identifier'
 HeaderFilterRegex: '.*'
 FormatStyle: file
 CheckOptions:
@@ -14,4 +14,3 @@ CheckOptions:
   - key: bugprone-multi-level-implicit-pointer-conversion.Disable
     value: true
 WarningsAsErrors: ''
-DisabledChecks: 'bugprone-reserved-identifier'
