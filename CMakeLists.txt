@@ -89,3 +89,9 @@ target_link_libraries(examples_memory_management cobalt)
 
 add_executable(examples_containers_demo examples/containers_demo.c)
 target_link_libraries(examples_containers_demo cobalt)
+
+add_executable(examples_advanced_usage examples/advanced_usage.c)
+target_link_libraries(examples_advanced_usage cobalt)
+if(UNIX)
+    target_link_libraries(examples_advanced_usage pthread)
+endif()
