@@ -7,6 +7,7 @@
  */
 
 #include <stddef.h>
+#include "sequence.h"
 
 typedef struct cobalt_iterator cobalt_iterator_t;
 

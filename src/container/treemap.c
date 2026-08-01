@@ -37,9 +37,7 @@ static rb_node_t* rb_node_create(const char *key, void *value) {
     }
     node->value = value;
     node->color = RB_RED;
-    node->left = NULL;
-    node->right = NULL;
-    node->parent = NULL;
+    node->left = node->right = node->parent = NULL;
     return node;
 }
 
@@ -89,20 +87,17 @@ static void rb_insert_fixup(rb_node_t **root, rb_node_t *node) {
             rb_node_t *uncle = grandparent->right;
             
             if (uncle && uncle->color == RB_RED) {
-                /* Case 1: uncle is red - recolor */
                 parent->color = RB_BLACK;
                 uncle->color = RB_BLACK;
                 grandparent->color = RB_RED;
                 node = grandparent;
             } else {
                 if (node == parent->right) {
-                    /* Case 2: node is right child - rotate left */
                     node = parent;
                     rb_rotate_left(root, node);
                     parent = node->parent;
                     grandparent = node->parent->parent;
                 }
-                /* Case 3: node is left child - rotate right */
                 parent->color = RB_BLACK;
                 grandparent->color = RB_RED;
                 rb_rotate_right(root, grandparent);
@@ -131,13 +126,13 @@ static void rb_insert_fixup(rb_node_t **root, rb_node_t *node) {
     (*root)->color = RB_BLACK;
 }
 
-/* Helper: find minimum node */
+/* Helper: find minimum */
 static rb_node_t* rb_min_node(rb_node_t *node) {
     while (node->left) node = node->left;
     return node;
 }
 
-/* Helper: find maximum node */
+/* Helper: find maximum */
 static rb_node_t* rb_max_node(rb_node_t *node) {
     while (node->right) node = node->right;
     return node;
@@ -154,7 +149,7 @@ static rb_node_t* rb_successor(rb_node_t *node) {
     return parent;
 }
 
-/* Helper: transplant - replace u with v */
+/* Helper: transplant */
 static void rb_transplant(rb_node_t **root, rb_node_t *u, rb_node_t *v) {
     if (!u->parent) *root = v;
     else if (u == u->parent->left) u->parent->left = v;
@@ -234,7 +229,6 @@ cobalt_treemap_t *cobalt_treemap_create(void) {
 void cobalt_treemap_destroy(cobalt_treemap_t *map) {
     if (!map) return;
     
-    /* Destroy all nodes (in-order traversal) */
     rb_node_t *node = map->impl.root;
     rb_node_t *to_free;
     
@@ -257,18 +251,16 @@ void cobalt_treemap_destroy(cobalt_treemap_t *map) {
 int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value) {
     if (!map || !key) return -1;
     
-    rb_node_t *y = NULL;
-    rb_node_t *x = map->impl.root;
+    rb_node_t **px = &map->impl.root;
+    rb_node_t *parent = NULL;
     
-    /* Find insertion point */
-    while (x) {
-        y = x;
-        int cmp = strcmp(key, x->key);
-        if (cmp < 0) x = x->left;
-        else if (cmp > 0) x = x->right;
+    while (*px) {
+        parent = *px;
+        int cmp = strcmp(key, parent->key);
+        if (cmp < 0) px = &parent->left;
+        else if (cmp > 0) px = &parent->right;
         else {
-            /* Key exists, update value */
-            x->value = value;
+            parent->value = value;
             return 0;
         }
     }
@@ -276,10 +268,10 @@ int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value) {
     rb_node_t *new_node = rb_node_create(key, value);
     if (!new_node) return -1;
     
-    new_node->parent = y;
-    if (!y) map->impl.root = new_node;
-    else if (strcmp(key, y->key) < 0) y->left = new_node;
-    else y->right = new_node;
+    new_node->parent = parent;
+    if (!parent) map->impl.root = new_node;
+    else if (strcmp(key, parent->key) < 0) parent->left = new_node;
+    else parent->right = new_node;
     
     rb_insert_fixup(&map->impl.root, new_node);
     map->impl.size++;
