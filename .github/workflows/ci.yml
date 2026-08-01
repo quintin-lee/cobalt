@@ -10,17 +10,39 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        build_type: [Release, Debug]
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Release
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
+      run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}} --parallel
 
     - name: Run tests
-      run: cmake --build ${{github.workspace}}/build --config Release --target test
+      working-directory: ${{github.workspace}}/build
+      run: ctest --output-on-failure --parallel
+
+    - name: Run examples
+      working-directory: ${{github.workspace}}/build
+      run: |
+        for exe in examples_*; do
+          if [ -f "$exe" ]; then
+            echo "Running $exe..."
+            ./$exe || exit 1
+          fi
+        done
+      timeout-minutes: 5
 
     - name: Install
-      run: sudo cmake --install ${{github.workspace}}/build
+      run: cmake --install ${{github.workspace}}/build --prefix ${{github.workspace}}/install
+
+    - name: Verify pkg-config
+      run: |
+        export PKG_CONFIG_PATH=${{github.workspace}}/install/lib/pkgconfig
+        pkg-config --cflags cobalt
+        pkg-config --libs cobalt
