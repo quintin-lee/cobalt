@@ -5,6 +5,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Portable strdup for C11 */
+static char* my_strdup(const char* s)
+{
+    if (!s)
+        return NULL;
+    size_t len = strlen(s) + 1;
+    char* dup = malloc(len);
+    if (dup)
+        memcpy(dup, s, len);
+    return dup;
+}
+
 /* ============================================================
    JSON NODE HELPERS
    ============================================================ */
@@ -164,14 +176,14 @@ static char* json_escape_string(const char* str, size_t len)
 char* json_serialize(json_node_t* node)
 {
     if (!node)
-        return strdup("null");
+        return my_strdup("null");
 
     /* Use a dynamically resized buffer instead of open_memstream for portability */
     size_t capacity = 256;
     size_t length = 0;
     char* buffer = malloc(capacity);
     if (!buffer)
-        return strdup("{}");
+        return my_strdup("{}");
 
     switch (node->type)
         {
@@ -183,7 +195,7 @@ char* json_serialize(json_node_t* node)
                         if (!tmp)
                             {
                                 free(buffer);
-                                return strdup("{}");
+                                return my_strdup("{}");
                             }
                         buffer = tmp;
                     }
@@ -198,7 +210,7 @@ char* json_serialize(json_node_t* node)
                         if (!tmp)
                             {
                                 free(buffer);
-                                return strdup("{}");
+                                return my_strdup("{}");
                             }
                         buffer = tmp;
                     }
@@ -213,7 +225,7 @@ char* json_serialize(json_node_t* node)
                         if (!tmp)
                             {
                                 free(buffer);
-                                return strdup("{}");
+                                return my_strdup("{}");
                             }
                         buffer = tmp;
                     }
@@ -229,7 +241,7 @@ char* json_serialize(json_node_t* node)
                         if (!tmp)
                             {
                                 free(buffer);
-                                return strdup("{}");
+                                return my_strdup("{}");
                             }
                         buffer = tmp;
                         length += snprintf(buffer + length, capacity - length, "%.17g",
@@ -253,7 +265,7 @@ char* json_serialize(json_node_t* node)
                                             {
                                                 free(escaped);
                                                 free(buffer);
-                                                return strdup("{}");
+                                                return my_strdup("{}");
                                             }
                                         buffer = tmp;
                                         length += snprintf(buffer + length, capacity - length,
@@ -270,7 +282,7 @@ char* json_serialize(json_node_t* node)
                                         if (!tmp)
                                             {
                                                 free(buffer);
-                                                return strdup("{}");
+                                                return my_strdup("{}");
                                             }
                                         buffer = tmp;
                                     }
@@ -287,7 +299,7 @@ char* json_serialize(json_node_t* node)
                                 if (!tmp)
                                     {
                                         free(buffer);
-                                        return strdup("{}");
+                                        return my_strdup("{}");
                                     }
                                 buffer = tmp;
                             }
@@ -304,7 +316,7 @@ char* json_serialize(json_node_t* node)
                             if (!tmp)
                                 {
                                     free(buffer);
-                                    return strdup("{}");
+                                    return my_strdup("{}");
                                 }
                             buffer = tmp;
                         }
@@ -323,7 +335,7 @@ char* json_serialize(json_node_t* node)
                                             if (!tmp)
                                                 {
                                                     free(buffer);
-                                                    return strdup("{}");
+                                                    return my_strdup("{}");
                                                 }
                                             buffer = tmp;
                                         }
@@ -342,7 +354,7 @@ char* json_serialize(json_node_t* node)
                                                 {
                                                     free(s);
                                                     free(buffer);
-                                                    return strdup("{}");
+                                                    return my_strdup("{}");
                                                 }
                                             buffer = tmp;
                                         }
@@ -359,7 +371,7 @@ char* json_serialize(json_node_t* node)
                             if (!tmp)
                                 {
                                     free(buffer);
-                                    return strdup("{}");
+                                    return my_strdup("{}");
                                 }
                             buffer = tmp;
                         }
@@ -375,7 +387,7 @@ char* json_serialize(json_node_t* node)
                             if (!tmp)
                                 {
                                     free(buffer);
-                                    return strdup("{}");
+                                    return my_strdup("{}");
                                 }
                             buffer = tmp;
                         }
@@ -394,7 +406,7 @@ char* json_serialize(json_node_t* node)
                                             if (!tmp)
                                                 {
                                                     free(buffer);
-                                                    return strdup("{}");
+                                                    return my_strdup("{}");
                                                 }
                                             buffer = tmp;
                                         }
@@ -414,7 +426,7 @@ char* json_serialize(json_node_t* node)
                                                 {
                                                     free(key_escaped);
                                                     free(buffer);
-                                                    return strdup("{}");
+                                                    return my_strdup("{}");
                                                 }
                                             buffer = tmp;
                                         }
@@ -434,7 +446,7 @@ char* json_serialize(json_node_t* node)
                                                 {
                                                     free(val);
                                                     free(buffer);
-                                                    return strdup("{}");
+                                                    return my_strdup("{}");
                                                 }
                                             buffer = tmp;
                                         }
@@ -451,7 +463,7 @@ char* json_serialize(json_node_t* node)
                             if (!tmp)
                                 {
                                     free(buffer);
-                                    return strdup("{}");
+                                    return my_strdup("{}");
                                 }
                             buffer = tmp;
                         }

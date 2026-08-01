@@ -2,13 +2,25 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Portable strdup for C11 */
+static char* my_strdup(const char* s)
+{
+    if (!s)
+        return NULL;
+    size_t len = strlen(s) + 1;
+    char* dup = malloc(len);
+    if (dup)
+        memcpy(dup, s, len);
+    return dup;
+}
+
 cobalt_class_t* cobalt_class_create(const char* name, cobalt_class_t* base_class)
 {
     cobalt_class_t* cls = malloc(sizeof(cobalt_class_t));
     if (!cls)
         return NULL;
 
-    cls->name = strdup(name);
+    cls->name = my_strdup(name);
     cls->method_count = 0;
     cls->methods = NULL;
     cls->property_count = 0;

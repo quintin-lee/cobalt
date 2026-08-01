@@ -11,3 +11,4 @@ CheckOptions:
     value: true
   - key: bugprone-branch-clone.CheckNestedLoops
     value: false
+WarningsAsErrors: ''

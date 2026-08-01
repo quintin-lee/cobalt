@@ -2,6 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Portable strdup for C11 */
+static char* my_strdup(const char* s)
+{
+    if (!s)
+        return NULL;
+    size_t len = strlen(s) + 1;
+    char* dup = malloc(len);
+    if (dup)
+        memcpy(dup, s, len);
+    return dup;
+}
+
 typedef struct hashmap_node
 {
     char* key;
@@ -93,7 +105,7 @@ int cobalt_hashmap_put(cobalt_hashmap_t* map, const char* key, void* value)
     hashmap_node_t* new_node = malloc(sizeof(hashmap_node_t));
     if (!new_node)
         return -1;
-    new_node->key = strdup(key);
+    new_node->key = my_strdup(key);
     new_node->value = value;
     new_node->next = impl->buckets[idx];
     impl->buckets[idx] = new_node;

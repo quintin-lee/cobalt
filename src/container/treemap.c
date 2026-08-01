@@ -2,6 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Portable strdup for C11 */
+static char* my_strdup(const char* s)
+{
+    if (!s)
+        return NULL;
+    size_t len = strlen(s) + 1;
+    char* dup = malloc(len);
+    if (dup)
+        memcpy(dup, s, len);
+    return dup;
+}
+
 typedef struct treemap_node
 {
     char* key;
@@ -26,7 +38,7 @@ static treemap_node_t* create_node(const char* key, void* value)
     treemap_node_t* node = malloc(sizeof(treemap_node_t));
     if (!node)
         return NULL;
-    node->key = strdup(key);
+    node->key = my_strdup(key);
     if (!node->key)
         {
             free(node);
