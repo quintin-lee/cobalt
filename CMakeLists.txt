@@ -50,6 +50,7 @@ endif()
 if(COBALT_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
+    add_test(NAME CobaltTest COMMAND cobalt_test)
 endif()
 
 # Export pkg-config

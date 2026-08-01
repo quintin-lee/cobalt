@@ -31,6 +31,4 @@ if(UNIX)
     target_link_libraries(cobalt_test pthread)
 endif()
 
-# Register with CTest
-enable_testing()
-add_test(NAME CobaltTest COMMAND cobalt_test)
+# Register with CTest (done in main CMakeLists.txt)
