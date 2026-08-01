@@ -58,6 +58,5 @@ typedef void (*test_func_t)(void);
     void name(void) { __register_##name(); } /* placeholder */
 
 /* Declare a test function - the actual registration will be done in runner */
-DECLARE_TEST(name);
 
 #endif /* TEST_FRAMEWORK_H */

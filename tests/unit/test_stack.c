@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include "cobalt/container/stack.h"
+#include "test_framework.h"
 
 void test_stack_basic(void) {
     printf("Testing stack basic operations...\n");
@@ -60,7 +61,29 @@ void test_stack_basic(void) {
     printf("  Stack tests completed\n");
 }
 
+void test_stack_edge_cases(void) {
+    printf("Testing stack edge cases...\n");
+    
+    /* Pop from empty stack */
+    cobalt_stack_t *stack = cobalt_stack_create();
+    TEST_ASSERT(stack != NULL);
+    TEST_ASSERT(cobalt_stack_peek(stack) == NULL);
+    TEST_ASSERT(cobalt_stack_pop(stack) == NULL);
+    TEST_ASSERT(cobalt_stack_is_empty(stack));
+    TEST_ASSERT(cobalt_stack_size(stack) == 0);
+    
+    /* Push to NULL stack */
+    TEST_ASSERT(cobalt_stack_push(NULL, NULL) == -1);
+    
+    /* Destroy NULL stack */
+    cobalt_stack_destroy(NULL); /* should not crash */
+    
+    cobalt_stack_destroy(stack);
+    printf("  Stack edge cases OK\n");
+}
+
 void test_stack(void) {
     printf("Testing stack...\n");
     test_stack_basic();
+    test_stack_edge_cases();
 }

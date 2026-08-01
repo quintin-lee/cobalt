@@ -96,3 +96,31 @@ target_link_libraries(examples_advanced_usage cobalt)
 if(UNIX)
     target_link_libraries(examples_advanced_usage pthread)
 endif()
+
+# Additional example programs from docs/EXAMPLES
+add_executable(examples_hello_world examples/hello_world.c)
+target_link_libraries(examples_hello_world cobalt)
+
+add_executable(examples_vector_demo examples/vector_demo.c)
+target_link_libraries(examples_vector_demo cobalt)
+
+add_executable(examples_hashmap_demo examples/hashmap_demo.c)
+target_link_libraries(examples_hashmap_demo cobalt)
+
+add_executable(examples_arena_allocator examples/arena_allocator.c)
+target_link_libraries(examples_arena_allocator cobalt)
+
+add_executable(examples_class_hierarchy examples/class_hierarchy.c)
+target_link_libraries(examples_class_hierarchy cobalt)
+
+add_executable(examples_sort_example examples/sort_example.c)
+target_link_libraries(examples_sort_example cobalt)
+
+add_executable(examples_json_example examples/json_example.c)
+target_link_libraries(examples_json_example cobalt)
+
+add_executable(examples_refcount_demo examples/refcount_demo.c)
+target_link_libraries(examples_refcount_demo cobalt pthread)
+
+add_executable(examples_simple_server examples/simple_server.c)
+target_link_libraries(examples_simple_server cobalt)

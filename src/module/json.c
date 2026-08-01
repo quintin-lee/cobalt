@@ -375,6 +375,24 @@ static json_node_t* json_parse_value(json_parse_ctx_t *ctx) {
 }
 
 /* ============================================================
+   CHILD LOOKUP
+   ============================================================ */
+
+json_node_t *json_tree_get_child(json_node_t *parent, const char *key) {
+    if (!parent || !key || parent->type != JSON_OBJECT) return NULL;
+    
+    /* Children are stored as key-value pairs: kv->next = value */
+    json_node_t *kv = parent->next;
+    while (kv) {
+        if (kv->key && strcmp(kv->key, key) == 0) {
+            return kv->next; /* return the value node */
+        }
+        kv = kv->next ? kv->next->next : NULL; /* skip to next key */
+    }
+    return NULL;
+}
+
+/* ============================================================
    PUBLIC API
    ============================================================ */
 

@@ -40,6 +40,9 @@ json_node_t *json_parse(const char *text);
 char *json_serialize(json_node_t *node);
 void json_destroy(json_node_t *node);
 
+/* Child/lookup helpers */
+json_node_t *json_tree_get_child(json_node_t *parent, const char *key);
+
 /* Value accessors */
 double json_get_number(json_node_t *node);
 const char *json_get_string(json_node_t *node);

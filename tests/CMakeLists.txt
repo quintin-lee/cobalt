@@ -23,7 +23,10 @@ add_executable(cobalt_test
     unit/test_queue.c
 )
 
-target_include_directories(cobalt_test PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_include_directories(cobalt_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${CMAKE_SOURCE_DIR}/tests
+)
 target_link_libraries(cobalt_test cobalt)
 
 # On Unix, link pthread for atomic thread-safety tests

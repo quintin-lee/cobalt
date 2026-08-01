@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include "cobalt/container/queue.h"
+#include "test_framework.h"
 
 void test_queue_basic(void) {
     printf("Testing queue basic operations...\n");
@@ -60,7 +61,29 @@ void test_queue_basic(void) {
     printf("  Queue tests completed\n");
 }
 
+void test_queue_edge_cases(void) {
+    printf("Testing queue edge cases...\n");
+    
+    /* Dequeue from empty queue */
+    cobalt_queue_t *queue = cobalt_queue_create();
+    TEST_ASSERT(queue != NULL);
+    TEST_ASSERT(cobalt_queue_peek(queue) == NULL);
+    TEST_ASSERT(cobalt_queue_dequeue(queue) == NULL);
+    TEST_ASSERT(cobalt_queue_is_empty(queue));
+    TEST_ASSERT(cobalt_queue_size(queue) == 0);
+    
+    /* Enqueue to NULL queue */
+    TEST_ASSERT(cobalt_queue_enqueue(NULL, NULL) == -1);
+    
+    /* Destroy NULL queue */
+    cobalt_queue_destroy(NULL); /* should not crash */
+    
+    cobalt_queue_destroy(queue);
+    printf("  Queue edge cases OK\n");
+}
+
 void test_queue(void) {
     printf("Testing queue...\n");
     test_queue_basic();
+    test_queue_edge_cases();
 }
