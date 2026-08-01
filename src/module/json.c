@@ -263,12 +263,16 @@ static json_node_t* json_parse_object(json_parse_ctx_t *ctx) {
             break;
         }
         
-        /* Add key-value pair to object */
         json_node_t *kv = json_node_create(JSON_OBJECT);
         kv->key = key;
-        kv->next = value; /* value stored as next */
-        kv->next->next = root->next; /* chain */
-        root->next = kv;
+        kv->next = value;
+        if (!root->next) {
+            root->next = kv;
+        } else {
+            json_node_t *tail = root->next;
+            while (tail->next) tail = tail->next;
+            tail->next = kv;
+        }
         
         json_skip_whitespace(ctx);
         if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ',') {
