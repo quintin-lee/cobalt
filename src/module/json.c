@@ -22,16 +22,30 @@ static json_node_t* json_node_create(json_type_t type) {
 
 void json_destroy(json_node_t *node) {
     if (!node) return;
-    
-    /* Destroy children first */
-    json_node_t *child = node->next;
-    while (child) {
-        json_node_t *next = child->next;
-        json_destroy(child);
-        child = next;
+
+    if (node->type == JSON_OBJECT || node->type == JSON_ARRAY) {
+        json_node_t *child = node->next;
+        while (child) {
+            json_node_t *value = child->next;
+            json_node_t *next_kv = value ? value->next : NULL;
+
+            if (value && value->type == JSON_STRING && value->value.string) {
+                free(value->value.string);
+                value->value.string = NULL;
+            }
+            free(value);
+            value = NULL;
+
+            if (child->key) {
+                free(child->key);
+                child->key = NULL;
+            }
+            free(child);
+            child = next_kv;
+        }
+        node->next = NULL;
     }
-    
-    /* Clean up this node's string values */
+
     if (node->type == JSON_STRING && node->value.string) {
         free(node->value.string);
         node->value.string = NULL;
@@ -40,7 +54,7 @@ void json_destroy(json_node_t *node) {
         free(node->key);
         node->key = NULL;
     }
-    
+
     free(node);
 }
 
@@ -273,11 +287,14 @@ static json_node_t* json_parse_object(json_parse_ctx_t *ctx) {
             while (tail->next) tail = tail->next;
             tail->next = kv;
         }
-        
+
         json_skip_whitespace(ctx);
         if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ',') {
             ctx->pos++;
             continue;
+        }
+        if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
+            ctx->pos++;
         }
         break;
     }
