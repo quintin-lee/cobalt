@@ -21,6 +21,7 @@ void test_json(void);
 void test_eventloop(void);
 void test_stack(void);
 void test_queue(void);
+void test_iterator(void);
 
 /* Test function registry */
 typedef struct {
@@ -48,6 +49,7 @@ static const TestEntry test_registry[] = {
     {"eventloop", test_eventloop},
     {"stack", test_stack},
     {"queue", test_queue},
+    {"iterator", test_iterator},
 };
 
 static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);

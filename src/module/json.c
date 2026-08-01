@@ -116,78 +116,196 @@ static char* json_escape_string(const char *str, size_t len) {
 /* Serialize a JSON node tree to string */
 char *json_serialize(json_node_t *node) {
     if (!node) return strdup("null");
-    
-    char *result = NULL;
-    FILE *fp = open_memstream(&result, NULL);
-    if (!fp) return strdup("{}");
-    
+
+    /* Use a dynamically resized buffer instead of open_memstream for portability */
+    size_t capacity = 256;
+    size_t length = 0;
+    char *buffer = malloc(capacity);
+    if (!buffer) return strdup("{}");
+
     switch (node->type) {
         case JSON_NULL:
-            fprintf(fp, "null");
+            if (length + 5 > capacity) {
+                capacity = 512;
+                char *tmp = realloc(buffer, capacity);
+                if (!tmp) { free(buffer); return strdup("{}"); }
+                buffer = tmp;
+            }
+            memcpy(buffer + length, "null", 5);
+            length += 4;
             break;
         case JSON_TRUE:
-            fprintf(fp, "true");
+            if (length + 5 > capacity) {
+                capacity = 512;
+                char *tmp = realloc(buffer, capacity);
+                if (!tmp) { free(buffer); return strdup("{}"); }
+                buffer = tmp;
+            }
+            memcpy(buffer + length, "true", 5);
+            length += 4;
             break;
         case JSON_FALSE:
-            fprintf(fp, "false");
+            if (length + 6 > capacity) {
+                capacity = 512;
+                char *tmp = realloc(buffer, capacity);
+                if (!tmp) { free(buffer); return strdup("{}"); }
+                buffer = tmp;
+            }
+            memcpy(buffer + length, "false", 6);
+            length += 5;
             break;
         case JSON_NUMBER:
-            fprintf(fp, "%.17g", node->value.number);
+            length += snprintf(buffer + length, capacity - length, "%.17g", node->value.number);
+            if (length >= capacity) {
+                capacity = length + 64;
+                char *tmp = realloc(buffer, capacity);
+                if (!tmp) { free(buffer); return strdup("{}"); }
+                buffer = tmp;
+                length += snprintf(buffer + length, capacity - length, "%.17g", node->value.number);
+            }
             break;
         case JSON_STRING:
             if (node->value.string) {
                 char *escaped = json_escape_string(node->value.string, strlen(node->value.string));
                 if (escaped) {
-                    fprintf(fp, "\"%s\"", escaped);
+                    length += snprintf(buffer + length, capacity - length, "\"%s\"", escaped);
+                    if (length >= capacity) {
+                        capacity = length + 128;
+                        char *tmp = realloc(buffer, capacity);
+                        if (!tmp) { free(escaped); free(buffer); return strdup("{}"); }
+                        buffer = tmp;
+                        length += snprintf(buffer + length, capacity - length, "\"%s\"", escaped);
+                    }
                     free(escaped);
                 } else {
-                    fprintf(fp, "\"\"");
+                    if (length + 3 > capacity) {
+                        capacity = 512;
+                        char *tmp = realloc(buffer, capacity);
+                        if (!tmp) { free(buffer); return strdup("{}"); }
+                        buffer = tmp;
+                    }
+                    memcpy(buffer + length, "\"\"", 3);
+                    length += 2;
                 }
             } else {
-                fprintf(fp, "\"\"");
+                if (length + 3 > capacity) {
+                    capacity = 512;
+                    char *tmp = realloc(buffer, capacity);
+                    if (!tmp) { free(buffer); return strdup("{}"); }
+                    buffer = tmp;
+                }
+                memcpy(buffer + length, "\"\"", 3);
+                length += 2;
             }
             break;
-        case JSON_ARRAY:
-            fprintf(fp, "[");
+        case JSON_ARRAY: {
+            if (length + 2 > capacity) {
+                capacity = 512;
+                char *tmp = realloc(buffer, capacity);
+                if (!tmp) { free(buffer); return strdup("{}"); }
+                buffer = tmp;
+            }
+            memcpy(buffer + length, "[", 2);
+            length += 1;
             json_node_t *child = node->next;
             int first = 1;
             while (child) {
-                if (!first) fprintf(fp, ",");
+                if (!first) {
+                    if (length + 2 > capacity) {
+                        capacity *= 2;
+                        char *tmp = realloc(buffer, capacity);
+                        if (!tmp) { free(buffer); return strdup("{}"); }
+                        buffer = tmp;
+                    }
+                    buffer[length++] = ',';
+                }
+                first = 0;
                 char *s = json_serialize(child);
                 if (s) {
-                    fprintf(fp, "%s", s);
+                    size_t slen = strlen(s);
+                    if (length + slen + 1 > capacity) {
+                        capacity = length + slen + 64;
+                        char *tmp = realloc(buffer, capacity);
+                        if (!tmp) { free(s); free(buffer); return strdup("{}"); }
+                        buffer = tmp;
+                    }
+                    memcpy(buffer + length, s, slen);
+                    length += slen;
                     free(s);
                 }
-                first = 0;
                 child = child->next;
             }
-            fprintf(fp, "]");
+            if (length + 2 > capacity) {
+                capacity = 512;
+                char *tmp = realloc(buffer, capacity);
+                if (!tmp) { free(buffer); return strdup("{}"); }
+                buffer = tmp;
+            }
+            buffer[length++] = ']';
             break;
-        case JSON_OBJECT:
-            fprintf(fp, "{");
+        }
+        case JSON_OBJECT: {
+            if (length + 2 > capacity) {
+                capacity = 512;
+                char *tmp = realloc(buffer, capacity);
+                if (!tmp) { free(buffer); return strdup("{}"); }
+                buffer = tmp;
+            }
+            memcpy(buffer + length, "{", 2);
+            length += 1;
             json_node_t *kv = node->next;
-            first = 1;
+            int first = 1;
             while (kv) {
-                if (!first) fprintf(fp, ",");
-                char *key_escaped = json_escape_string(kv->key ? kv->key : "", strlen(kv->key ? kv->key : ""));
-                if (key_escaped) {
-                    fprintf(fp, "\"%s\":", key_escaped);
-                    free(key_escaped);
-                }
-                char *val = json_serialize(kv->next); /* value is in next */
-                if (val) {
-                    fprintf(fp, "%s", val);
-                    free(val);
+                if (!first) {
+                    if (length + 2 > capacity) {
+                        capacity *= 2;
+                        char *tmp = realloc(buffer, capacity);
+                        if (!tmp) { free(buffer); return strdup("{}"); }
+                        buffer = tmp;
+                    }
+                    buffer[length++] = ',';
                 }
                 first = 0;
-                kv = kv->next ? kv->next->next : NULL; /* skip to next key */
+                char *key_escaped = json_escape_string(kv->key ? kv->key : "", strlen(kv->key ? kv->key : ""));
+                if (key_escaped) {
+                    size_t klen = strlen(key_escaped);
+                    if (length + klen + 3 > capacity) {
+                        capacity = length + klen + 128;
+                        char *tmp = realloc(buffer, capacity);
+                        if (!tmp) { free(key_escaped); free(buffer); return strdup("{}"); }
+                        buffer = tmp;
+                    }
+                    length += snprintf(buffer + length, capacity - length, "\"%s\":", key_escaped);
+                    free(key_escaped);
+                }
+                char *val = json_serialize(kv->next);
+                if (val) {
+                    size_t vlen = strlen(val);
+                    if (length + vlen + 1 > capacity) {
+                        capacity = length + vlen + 64;
+                        char *tmp = realloc(buffer, capacity);
+                        if (!tmp) { free(val); free(buffer); return strdup("{}"); }
+                        buffer = tmp;
+                    }
+                    memcpy(buffer + length, val, vlen);
+                    length += vlen;
+                    free(val);
+                }
+                kv = kv->next ? kv->next->next : NULL;
             }
-            fprintf(fp, "}");
+            if (length + 2 > capacity) {
+                capacity = 512;
+                char *tmp = realloc(buffer, capacity);
+                if (!tmp) { free(buffer); return strdup("{}"); }
+                buffer = tmp;
+            }
+            buffer[length++] = '}';
             break;
+        }
     }
-    
-    fclose(fp);
-    return result;
+
+    buffer[length] = '\0';
+    return buffer;
 }
 
 /* ============================================================

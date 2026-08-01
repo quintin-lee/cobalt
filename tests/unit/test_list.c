@@ -1,11 +1,13 @@
 /**
  * @file test_list.c
- * @Unit test for doubly-linked list container.
+ * @brief Unit test for doubly-linked list container.
  */
 
 #include <stdio.h>
-#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 #include "cobalt/container/list.h"
+#include "cobalt/interface/iterator.h"
 
 void test_list_basic(void) {
     printf("Testing list basic operations...\n");
@@ -29,16 +31,18 @@ void test_list_basic(void) {
     
     /* Push front */
     int val1 = 10;
-    cobalt_list_push_front(list, &val1);
-    if (cobalt_list_size(list) == 1) {
-        printf("  Push front size=1: OK\n");
+    int ret = cobalt_list_push_front(list, &val1);
+    if (ret == 0) {
+        printf("  Push front: OK\n");
+    } else {
+        fprintf(stderr, "ERROR: Push front failed\n");
     }
     
     /* Push back */
     int val2 = 20;
-    cobalt_list_push_back(list, &val2);
-    if (cobalt_list_size(list) == 2) {
-        printf("  Push back size=2: OK\n");
+    ret = cobalt_list_push_back(list, &val2);
+    if (ret == 0) {
+        printf("  Push back: OK\n");
     }
     
     /* Pop front */
@@ -50,12 +54,25 @@ void test_list_basic(void) {
     }
     
     if (cobalt_list_size(list) == 1) {
-        printf("  Size after pop=1: OK\n");
+        printf("  Size after pop front: OK\n");
     }
     
-    /* Clean up */
+    /* Pop back */
+    item = cobalt_list_pop_back(list);
+    if (item && *((int*)item) == 20) {
+        printf("  Pop back returns 20: OK\n");
+    }
+    
+    if (cobalt_list_size(list) == 0) {
+        printf("  Size after pop back: OK\n");
+    }
+    
+    /* Should be empty again */
+    if (cobalt_list_is_empty(list)) {
+        printf("  List is empty after pops: OK\n");
+    }
+    
     cobalt_list_destroy(list);
-    printf("  List tests completed\n");
 }
 
 void test_list_edge_cases(void) {
@@ -69,13 +86,29 @@ void test_list_edge_cases(void) {
         printf("  Pop empty list returns NULL: OK\n");
     }
     
+    item = cobalt_list_pop_back(list);
+    if (item == NULL) {
+        printf("  Pop back empty list returns NULL: OK\n");
+    }
+    
+    /* Get from empty list */
+    item = cobalt_list_get(list, 0);
+    if (item == NULL) {
+        printf("  Get from empty list returns NULL: OK\n");
+    }
+    
     /* Push to NULL list should fail safely */
-    int ret = cobalt_list_push_front(NULL, &item);
+    int val = 42;
+    int ret = cobalt_list_push_front(NULL, &val);
     if (ret == -1) {
         printf("  Push to NULL list fails gracefully: OK\n");
     }
     
     cobalt_list_destroy(list);
+    
+    /* Test NULL destroy */
+    cobalt_list_destroy(NULL);
+    printf("  Destroy NULL list: OK\n");
 }
 
 void test_list(void) {

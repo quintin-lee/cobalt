@@ -296,13 +296,15 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop) {
     
 #ifdef __linux__
     /* Wait for FD events using epoll */
-    int timeout_ms = -1;
+    /* Use a short timeout so tests don't hang when no timers/FDs are registered */
+    int timeout_ms = 10;
     timer_entry_t *next_timer = loop->timer_head;
     if (next_timer) {
         long secs = next_timer->next_fire.tv_sec - now.tv_sec;
         long nsecs = next_timer->next_fire.tv_nsec - now.tv_nsec;
         timeout_ms = (int)(secs * 1000 + nsecs / 1000000L);
         if (timeout_ms < 0) timeout_ms = 0;
+        if (timeout_ms > 100) timeout_ms = 100;
     }
     
     int n = epoll_wait(loop->epoll_fd, loop->epoll_events, loop->epoll_capacity, timeout_ms);

@@ -1,17 +1,21 @@
 /**
  * @file test_eventloop.c
- * @Unit test for event loop module.
+ * @brief Unit test for event loop module.
  */
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "cobalt/module/eventloop.h"
 
 static int timer_called = 0;
 static int fd_called = 0;
 
 static void on_timer(uint64_t id, void *user_data) {
-    (void)id; (void)user_data;
+    (void)id;
     timer_called++;
+    int *counter = (int *)user_data;
+    if (counter) (*counter)++;
     printf("  Timer %lu fired (call #%d)\n", (unsigned long)id, timer_called);
 }
 
@@ -112,9 +116,46 @@ void test_eventloop_run_stop(void) {
         return;
     }
     
+    /* Stop NULL should not crash */
+    cobalt_eventloop_stop(NULL);
+    printf("  Stop NULL loop: OK\n");
+    
     /* Stop immediately - shouldn't block */
     cobalt_eventloop_stop(loop);
     printf("  Stop called on new loop: OK\n");
+    
+    /* Run should not block forever (stub implementation) */
+    /* We use iteration instead for testing */
+    int ret = cobalt_eventloop_iteration(loop);
+    printf("  Iteration on empty loop: ret=%d\n", ret);
+    
+    cobalt_eventloop_destroy(loop);
+}
+
+void test_eventloop_multiple_timers(void) {
+    printf("Testing eventloop with multiple timers...\n");
+    
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    if (!loop) {
+        fprintf(stderr, "ERROR: Failed to create eventloop\n");
+        return;
+    }
+    
+    int counter1 = 0;
+    int counter2 = 0;
+    
+    uint64_t id1 = cobalt_eventloop_add_timer(loop, 1, 0, on_timer, &counter1);
+    uint64_t id2 = cobalt_eventloop_add_timer(loop, 1, 0, on_timer, &counter2);
+    
+    printf("  Added 2 timers: id1=%lu, id2=%lu\n", 
+           (unsigned long)id1, (unsigned long)id2);
+    
+    cobalt_eventloop_iteration(loop);
+    
+    printf("  Timer1 counter: %d, Timer2 counter: %d\n", counter1, counter2);
+    
+    cobalt_eventloop_del_timer(loop, id1);
+    cobalt_eventloop_del_timer(loop, id2);
     
     cobalt_eventloop_destroy(loop);
 }
@@ -125,5 +166,6 @@ void test_eventloop(void) {
     test_eventloop_fd();
     test_eventloop_timer();
     test_eventloop_run_stop();
+    test_eventloop_multiple_timers();
     printf("  Eventloop tests completed\n");
 }

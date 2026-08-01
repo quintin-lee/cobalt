@@ -1,1 +1,1 @@
-genhtml coverage.info --output-directory coverage_report --title 'Cobalt C Framework Coverage'
+genhtml coverage.info --output-directory coverage_report

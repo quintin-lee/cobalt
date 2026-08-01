@@ -35,14 +35,29 @@ void test_interface_create_destroy(void) {
 void test_interface_implements(void) {
     printf("Testing interface implements check...\n");
     
-    /* Create a minimal object */
-    /* Note: full object requires class which we'd need to set up properly */
-    /* This test validates the interface query mechanism exists */
-    
     cobalt_interface_t *iface = cobalt_interface_new(&dummy_vtable);
     if (iface) {
         printf("  Interface created for testing\n");
+        
+        /* NULL checks */
+        int result = cobalt_object_implements(NULL, NULL);
+        if (result == 0) {
+            printf("  implements(NULL, NULL) returns 0: OK\n");
+        }
+        
         cobalt_interface_destroy(iface);
+    }
+}
+
+void test_interface_null_vtable(void) {
+    printf("Testing interface with NULL vtable...\n");
+    
+    cobalt_interface_t *iface = cobalt_interface_new(NULL);
+    if (iface) {
+        printf("  Interface with NULL vtable created\n");
+        cobalt_interface_destroy(iface);
+    } else {
+        printf("  Interface with NULL vtable returns NULL: OK\n");
     }
 }
 
@@ -50,5 +65,6 @@ void test_interface(void) {
     printf("Testing interface...\n");
     test_interface_create_destroy();
     test_interface_implements();
+    test_interface_null_vtable();
     printf("  Interface tests completed\n");
 }
