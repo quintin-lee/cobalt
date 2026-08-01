@@ -4,6 +4,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include "cobalt/cobalt.h"
 
 int main(void) {
