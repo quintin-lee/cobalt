@@ -62,7 +62,8 @@ int main(void) {
     cobalt_queue_enqueue(queue, &v2);
     cobalt_queue_enqueue(queue, &v3);
     printf("\nQueue: size=%zu\n", cobalt_queue_size(queue));
-    printf("  Dequeue: %d (FIFO)\n", *(int*)cobalt_queue_dequeue(queue));
+    int *deq = (int *)cobalt_queue_dequeue(queue);
+    if (deq) printf("  Dequeue: %d (FIFO)\n", *deq);
     cobalt_queue_destroy(queue);
     
     printf("\n=== Example completed ===\n");
