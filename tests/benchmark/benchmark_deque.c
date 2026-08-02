@@ -15,7 +15,7 @@ int main(void)
     printf("Deque Benchmark\n");
     printf("===============\n");
 
-    cobalt_deque_t* dq = cobalt_deque_create();
+    cobalt_deque_t *dq = cobalt_deque_create();
     if (!dq) {
         fprintf(stderr, "Failed to create deque\n");
         return 1;

@@ -16,14 +16,14 @@ int main(void)
     printf("Set Benchmark\n");
     printf("=============\n");
 
-    cobalt_set_t* set = cobalt_set_create(1024);
+    cobalt_set_t *set = cobalt_set_create(1024);
     if (!set) {
         fprintf(stderr, "Failed to create set\n");
         return 1;
     }
 
     /* Test 1: Insert 10K strings */
-    char key[64];
+    char   key[64];
     double start = current_time_ms();
     for (int i = 0; i < 10000; i++) {
         snprintf(key, 64, "item_%d", i);
@@ -33,7 +33,7 @@ int main(void)
     printf("Insert 10K strings: %.2f ms (size=%zu)\n", insert_time, cobalt_set_size(set));
 
     /* Test 2: Contains 10K lookups */
-    start = current_time_ms();
+    start    = current_time_ms();
     int hits = 0;
     for (int i = 0; i < 10000; i++) {
         snprintf(key, 64, "item_%d", i);
