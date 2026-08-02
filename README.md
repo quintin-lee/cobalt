@@ -140,7 +140,7 @@ cd build
 
 | Category | Count |
 |----------|-------|
-| Source files (.c) | 27 |
+| Source files (.c) | 25 |
 | Header files (.h) | 26 |
 | Test files (.c) | 22 |
 | Example files (.c) | 14 |
@@ -149,7 +149,7 @@ cd build
 | Metric | Value |
 |--------|-------|
 | Total lines of code | 6,627 |
-| Git commits | 82 |
+| Git commits | 83 |
 | Tests passing | 22/22 |
 
 ## License
