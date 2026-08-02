@@ -50,10 +50,14 @@ typedef struct fd_entry
 /* Heap helpers for timer entries */
 static int timer_compare(const timer_entry_t* a, const timer_entry_t* b)
 {
-    if (a->next_fire.tv_sec < b->next_fire.tv_sec) return -1;
-    if (a->next_fire.tv_sec > b->next_fire.tv_sec) return 1;
-    if (a->next_fire.tv_nsec < b->next_fire.tv_nsec) return -1;
-    if (a->next_fire.tv_nsec > b->next_fire.tv_nsec) return 1;
+    if (a->next_fire.tv_sec < b->next_fire.tv_sec)
+        return -1;
+    if (a->next_fire.tv_sec > b->next_fire.tv_sec)
+        return 1;
+    if (a->next_fire.tv_nsec < b->next_fire.tv_nsec)
+        return -1;
+    if (a->next_fire.tv_nsec > b->next_fire.tv_nsec)
+        return 1;
     return 0;
 }
 
@@ -184,8 +188,7 @@ static void process_expired_timers(cobalt_eventloop_t* loop, const struct timesp
                 }
             if (timer->interval_ms > 0)
                 {
-                    timer->next_fire.tv_sec +=
-                        (long)(timer->interval_ms / COBALT_MILLIS_PER_SEC);
+                    timer->next_fire.tv_sec += (long)(timer->interval_ms / COBALT_MILLIS_PER_SEC);
                     timer->next_fire.tv_nsec +=
                         (long)((timer->interval_ms % COBALT_MILLIS_PER_SEC) *
                                COBALT_NANOS_PER_MILLI);

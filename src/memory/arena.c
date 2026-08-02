@@ -1,7 +1,7 @@
 #include "cobalt/memory/arena.h"
+#include <stdalign.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdalign.h>
 
 struct cobalt_arena
 {
