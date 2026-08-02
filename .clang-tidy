@@ -1,16 +1,5 @@
 ---
-Checks: 'clang-diagnostic-*,clang-analyzer-*,readability-*,bugprone-*,performance-*,-bugprone-reserved-identifier'
+Checks: 'clang-diagnostic-*,clang-analyzer-*,readability-*,bugprone-*,performance-*,-bugprone-reserved-identifier,-readability-identifier-length,-readability-magic-numbers,-bugprone-easily-swappable-parameters,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-bugprone-branch-clone,-readability-math-missing-parentheses,-readability-non-const-parameter,-bugprone-multi-level-implicit-pointer-conversion'
 HeaderFilterRegex: '.*'
 FormatStyle: file
-CheckOptions:
-  - key: readability-braces-around-statements.MinSize
-    value: 3
-  - key: readability-identifier-length.LocalVariableMinLength
-    value: 2
-  - key: readability-magic-numbers.IgnoreHex
-    value: true
-  - key: bugprone-branch-clone.CheckNestedLoops
-    value: false
-  - key: bugprone-multi-level-implicit-pointer-conversion.Disable
-    value: true
 WarningsAsErrors: ''

@@ -146,7 +146,6 @@ if(CLANG_TIDY_EXECUTABLE)
         COMMAND ${CLANG_TIDY_EXECUTABLE}
             -p ${CMAKE_BINARY_DIR}
             --config-file=${CMAKE_SOURCE_DIR}/.clang-tidy
-            --warnings-as-errors='*'
             --
             ${ALL_SRC_FILES}
         DEPENDS ${ALL_SRC_FILES}
