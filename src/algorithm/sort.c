@@ -9,7 +9,7 @@
 
 /*
  * @brief Perform quicksort
- * 
+ *
  * A direct wrapper around the standard library's qsort function.
  */
 void cobalt_qsort(void *base, size_t nmemb, size_t size, compare_func_t compar)
@@ -19,10 +19,11 @@ void cobalt_qsort(void *base, size_t nmemb, size_t size, compare_func_t compar)
 
 /*
  * @brief Perform insertion sort
- * 
- * Iterates through the elements in the array, inserting them into their correct positions in the already sorted sub-sequence.
- * For general data types, memcpy is used to copy and move elements.
- * Note: Since it requires temporarily caching an element, if malloc fails, the function will return directly without sorting.
+ *
+ * Iterates through the elements in the array, inserting them into their correct positions in the
+ * already sorted sub-sequence. For general data types, memcpy is used to copy and move elements.
+ * Note: Since it requires temporarily caching an element, if malloc fails, the function will return
+ * directly without sorting.
  */
 void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t compar)
 {
@@ -44,7 +45,8 @@ void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t
         memcpy(key, arr + i * size, size);
         int j = (int)i - 1;
 
-        // If the preceding element is greater than the key, move the preceding element one position back
+        // If the preceding element is greater than the key, move the preceding element one position
+        // back
         while (j >= 0 && compar(arr + j * size, key) > 0) {
             memcpy(arr + (j + 1) * size, arr + j * size, size);
             j--;
@@ -59,7 +61,7 @@ void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t
 
 /*
  * @brief Sort a linked list
- * 
+ *
  * Plans to use merge sort to sort the linked list. Currently an unimplemented placeholder.
  */
 void cobalt_list_sort(void **head, size_t *count, compare_func_t compar)

@@ -1,7 +1,8 @@
 /**
  * @file allocator.c
  * @brief Implementation of the memory allocator interface
- * @details Implements the default allocator based on standard library `malloc`, `free`, and `realloc`, providing unified invocation wrappers.
+ * @details Implements the default allocator based on standard library `malloc`, `free`, and
+ * `realloc`, providing unified invocation wrappers.
  */
 
 #include "cobalt/memory/allocator.h"
@@ -45,7 +46,8 @@ static const cobalt_allocator_t system_allocator = {
 
 /*
  * @brief Get the system allocator instance
- * @details Returns a statically initialized system allocator pointer. The cast removes the const qualifier to adapt to the interface specification.
+ * @details Returns a statically initialized system allocator pointer. The cast removes the const
+ * qualifier to adapt to the interface specification.
  */
 cobalt_allocator_t *cobalt_allocator_get_system(void)
 {

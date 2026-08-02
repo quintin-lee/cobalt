@@ -9,15 +9,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Internal log output file pointer, undefined by default before initialization, set via the init function */
-static FILE       *log_output; 
+/* Internal log output file pointer, undefined by default before initialization, set via the init
+ * function */
+static FILE *log_output;
 /* Global minimum log level, logs below this level will not be output, default is INFO */
 static log_level_t min_log_level = LOG_LEVEL_INFO;
 
 /**
  * @brief Initialize the logging system
- * 
- * @param output_file Specifies the file stream for log output; if NULL is passed, standard output stdout is used by default
+ *
+ * @param output_file Specifies the file stream for log output; if NULL is passed, standard output
+ * stdout is used by default
  * @param min_level   Specifies the minimum log filtering level
  */
 void cobalt_logger_init(FILE *output_file, log_level_t min_level)
@@ -28,7 +30,7 @@ void cobalt_logger_init(FILE *output_file, log_level_t min_level)
 
 /**
  * @brief Convert the log level enumeration value to its corresponding string name
- * 
+ *
  * @param level Log level enumeration
  * @return Corresponding all-uppercase string name, or "UNKNOWN" if the level is unknown
  */
@@ -55,8 +57,9 @@ static const char *level_name(log_level_t level)
 /**
  * @brief Log and output formatted logs
  * @details If the current log level is lower than the set minimum level, return immediately.
- *          After formatting the output, if the log level is FATAL, exit(1) will be automatically called to terminate the program.
- * 
+ *          After formatting the output, if the log level is FATAL, exit(1) will be automatically
+ * called to terminate the program.
+ *
  * @param level  Current log level
  * @param file   Source code filename
  * @param line   Line number in the source code

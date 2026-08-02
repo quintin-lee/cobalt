@@ -5,7 +5,8 @@
  * @file map.h
  * @brief Key-value map interface
  *
- * Defines an abstract interface for storage structures based on key-value pairs (such as hash tables, tree maps, etc.).
+ * Defines an abstract interface for storage structures based on key-value pairs (such as hash
+ * tables, tree maps, etc.).
  */
 
 #include <stddef.h>

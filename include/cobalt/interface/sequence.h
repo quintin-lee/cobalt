@@ -5,7 +5,8 @@
  * @file sequence.h
  * @brief Sequence (ordered collection) interface
  *
- * Defines a generic abstract interface for collections with ordered characteristics (such as lists, vectors, etc.).
+ * Defines a generic abstract interface for collections with ordered characteristics (such as lists,
+ * vectors, etc.).
  */
 
 #include <stddef.h>
@@ -27,7 +28,8 @@ typedef struct cobalt_iterator cobalt_iterator_t;
 
 /**
  * @brief Sequence structure definition (interface polymorphism)
- * @details Defines standard operations such as size query, element addition/removal, and iterator retrieval
+ * @details Defines standard operations such as size query, element addition/removal, and iterator
+ * retrieval
  */
 struct cobalt_sequence {
     /**

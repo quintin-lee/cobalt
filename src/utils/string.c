@@ -9,7 +9,8 @@
 
 /**
  * @brief String duplication implementation
- * @details Calculates the length of the original string, allocates the corresponding memory, and safely copies the contents into the new memory.
+ * @details Calculates the length of the original string, allocates the corresponding memory, and
+ * safely copies the contents into the new memory.
  */
 char *cobalt_strdup(const char *s)
 {
@@ -20,9 +21,9 @@ char *cobalt_strdup(const char *s)
 
     // Calculate required length (including the terminating '\0')
     size_t len = strlen(s) + 1;
-    
+
     // Allocate new memory
-    char  *dup = malloc(len);
+    char *dup = malloc(len);
     if (dup) {
         // Copy all contents if allocation is successful
         memcpy(dup, s, len);

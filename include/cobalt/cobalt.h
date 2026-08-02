@@ -3,7 +3,8 @@
  * @brief Cobalt framework main header file
  *
  * This file includes all the core module header files of the Cobalt framework.
- * Users only need to include this single header file to use all features provided by the framework (e.g., containers, memory management, runtime, etc.).
+ * Users only need to include this single header file to use all features provided by the framework
+ * (e.g., containers, memory management, runtime, etc.).
  */
 
 #ifndef COBALT_H

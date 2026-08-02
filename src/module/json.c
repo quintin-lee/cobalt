@@ -20,7 +20,8 @@ double json_get_number(json_node_t *node)
 
 /*
  * @brief Safely get the string content of a JSON node
- * @return Returns the corresponding C string pointer if it's JSON_STRING, otherwise returns an empty string ""
+ * @return Returns the corresponding C string pointer if it's JSON_STRING, otherwise returns an
+ * empty string ""
  */
 const char *json_get_string(json_node_t *node)
 {
@@ -56,13 +57,14 @@ int json_is_array(json_node_t *node)
 
 /*
  * @brief Get the child node of the specified key in a JSON object
- * 
- * Iterates through the key-value pair linked list under the object. Since each key-value pair uses a dummy node,
- * its actual structure is: Object Node -> Key Node -> Value Node -> Next Key Node...
+ *
+ * Iterates through the key-value pair linked list under the object. Since each key-value pair uses
+ * a dummy node, its actual structure is: Object Node -> Key Node -> Value Node -> Next Key Node...
  */
 json_node_t *json_tree_get_child(json_node_t *parent, const char *key)
 {
-    // If the parent node is invalid, the key to query is null, or the parent node is not an object, return NULL directly
+    // If the parent node is invalid, the key to query is null, or the parent node is not an object,
+    // return NULL directly
     if (!parent || !key || parent->type != JSON_OBJECT) {
         return NULL;
     }

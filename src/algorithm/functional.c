@@ -7,9 +7,9 @@
 
 /*
  * @brief Check if two elements are equal
- * 
- * Combined with a null pointer check, if either a or b is NULL, it falls back to direct pointer comparison;
- * otherwise, it calls the provided comparison function comp to compare.
+ *
+ * Combined with a null pointer check, if either a or b is NULL, it falls back to direct pointer
+ * comparison; otherwise, it calls the provided comparison function comp to compare.
  */
 int predicate_equal(const void *a, const void *b, compare_func_t comp)
 {
@@ -21,7 +21,7 @@ int predicate_equal(const void *a, const void *b, compare_func_t comp)
 
 /*
  * @brief Check if two elements are not equal
- * 
+ *
  * Based on predicate_equal to implement logical negation.
  */
 int predicate_not_equal(const void *a, const void *b, compare_func_t comp)
@@ -47,7 +47,7 @@ int predicate_nonnull(const void *item)
 
 /*
  * @brief Binary search implementation to find a target key in a sorted array
- * 
+ *
  * Uses a method of continuously halving the partition to reduce the search range by half each time.
  * The array must be sorted in ascending order beforehand.
  */
@@ -86,8 +86,9 @@ cobalt_bsearch(const void *key, const void *base, size_t nmemb, size_t size, com
 
 /*
  * @brief Linear search for the first element satisfying the specified condition
- * 
- * Iterates through each element in the array and returns the pointer to the first element that causes the pred predicate function to return true (non-zero).
+ *
+ * Iterates through each element in the array and returns the pointer to the first element that
+ * causes the pred predicate function to return true (non-zero).
  */
 void *cobalt_find_if(const void *base, size_t nmemb, size_t size, predicate_func_t pred)
 {
@@ -108,7 +109,7 @@ void *cobalt_find_if(const void *base, size_t nmemb, size_t size, predicate_func
 
 /*
  * @brief Execute a uniform operation on all elements in the array
- * 
+ *
  * Iterates through every element in the array and executes the passed op function on it.
  */
 void cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func_t op)

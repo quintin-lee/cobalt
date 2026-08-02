@@ -1,9 +1,9 @@
 /**
  * @file list.c
  * @brief Implementation file of the doubly-linked list (List) container
- * 
- * Implements the doubly-linked list interfaces in list.h and the cobalt_sequence_t polymorphic sequence interface.
- * Additionally, provides a specific iterator implementation for the list.
+ *
+ * Implements the doubly-linked list interfaces in list.h and the cobalt_sequence_t polymorphic
+ * sequence interface. Additionally, provides a specific iterator implementation for the list.
  */
 
 #include "cobalt/container/list.h"
@@ -57,7 +57,8 @@ static int list_is_empty_seq(cobalt_sequence_t *self)
 }
 
 /**
- * @brief Add element to sequence, appends to the tail by default (Sequence interface implementation)
+ * @brief Add element to sequence, appends to the tail by default (Sequence interface
+ * implementation)
  * @param self Sequence base class pointer
  * @param item Pointer to the element to be added
  */
@@ -141,7 +142,7 @@ void cobalt_list_destroy(cobalt_list_t *list)
     }
     cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
     list_node_t        *node = impl->head;
-    
+
     // Iterate through the list and free nodes one by one
     while (node) {
         list_node_t *next = node->next;
@@ -168,13 +169,13 @@ int cobalt_list_push_front(cobalt_list_t *list, void *item)
     node->data = item;
     node->next = impl->head;
     node->prev = NULL;
-    
+
     // Modify the previous pointer of the original head node
     if (impl->head) {
         impl->head->prev = node;
     }
     impl->head = node;
-    
+
     // If the list was originally empty, the tail node also points to the new node
     if (!impl->tail) {
         impl->tail = node;
@@ -224,7 +225,7 @@ void *cobalt_list_pop_front(cobalt_list_t *list)
     cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
     list_node_t        *node = impl->head;
     void               *data = node->data;
-    
+
     // Move the head pointer forward
     impl->head = node->next;
     if (impl->head) {
@@ -249,7 +250,7 @@ void *cobalt_list_pop_back(cobalt_list_t *list)
     cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
     list_node_t        *node = impl->tail;
     void               *data = node->data;
-    
+
     // Move the tail pointer backward
     impl->tail = node->prev;
     if (impl->tail) {
@@ -265,9 +266,10 @@ void *cobalt_list_pop_back(cobalt_list_t *list)
 
 /**
  * @brief Get the element at the specified index
- * 
- * Adopts a bidirectionally optimized traversal method, deciding whether to traverse from the head or the tail
- * based on whether the index is in the first or second half, with a maximum time complexity of O(N/2).
+ *
+ * Adopts a bidirectionally optimized traversal method, deciding whether to traverse from the head
+ * or the tail based on whether the index is in the first or second half, with a maximum time
+ * complexity of O(N/2).
  */
 void *cobalt_list_get(cobalt_list_t *list, size_t index)
 {
@@ -320,8 +322,9 @@ int cobalt_list_is_empty(cobalt_list_t *list)
  * @brief Iterator internal context structure, saves iteration progress
  */
 typedef struct {
-    cobalt_list_impl_t *list;    /**< The iterated list itself (currently unused, can be used for modification validation etc.) */
-    list_node_t        *current; /**< Node currently pointed to */
+    cobalt_list_impl_t *list; /**< The iterated list itself (currently unused, can be used for
+                                 modification validation etc.) */
+    list_node_t *current;     /**< Node currently pointed to */
 } list_iterator_impl_t;
 
 /**
@@ -361,11 +364,9 @@ static void list_iterator_destroy(void *ctx)
 /**
  * @brief List-specific iterator virtual function table
  */
-static const cobalt_iterator_vtable_t list_vtable = {
-    .has_next = list_iterator_has_next,
-    .next     = list_iterator_next,
-    .destroy  = list_iterator_destroy
-};
+static const cobalt_iterator_vtable_t list_vtable = {.has_next = list_iterator_has_next,
+                                                     .next     = list_iterator_next,
+                                                     .destroy  = list_iterator_destroy};
 
 /**
  * @brief Create an exclusive iterator for traversing the doubly-linked list

@@ -1,7 +1,7 @@
 /**
  * @file vector.c
  * @brief Implementation file of the dynamic array (Vector) container
- * 
+ *
  * Implements the dynamic array interfaces defined in vector.h, including basic operation functions
  * as well as the implementation of its base class interface cobalt_sequence_t.
  */
@@ -16,10 +16,11 @@
  * @brief Internal dynamic array structure, used to hide specific implementation details
  */
 typedef struct {
-    cobalt_sequence_t base; /**< Base sequence interface, must be placed at the beginning of the structure to support polymorphic conversion */
-    void            **items;
-    size_t            capacity;
-    size_t            size;
+    cobalt_sequence_t base; /**< Base sequence interface, must be placed at the beginning of the
+                               structure to support polymorphic conversion */
+    void **items;
+    size_t capacity;
+    size_t size;
 } cobalt_vector_impl_t;
 
 /* ========================================================================= */
@@ -52,7 +53,7 @@ static int vector_is_empty_seq(cobalt_sequence_t *self)
  * @brief Add an element to the sequence (Sequence interface implementation)
  * @param self Sequence base class pointer
  * @param item Pointer to the element to be added
- * 
+ *
  * When the capacity is insufficient, it will automatically expand using a 2x strategy.
  * If memory allocation fails, the COBALT_ERROR_OUT_OF_MEMORY error will be set.
  */
@@ -79,9 +80,9 @@ static void vector_add_seq(cobalt_sequence_t *self, void *item)
  * @brief Remove the specified element from the sequence (Sequence interface implementation)
  * @param self Sequence base class pointer
  * @param item Pointer to the element to be removed
- * 
- * Linearly searches for the element to remove. If found, shifts all elements after it forward by one position.
- * Only removes the first matching element.
+ *
+ * Linearly searches for the element to remove. If found, shifts all elements after it forward by
+ * one position. Only removes the first matching element.
  */
 static void vector_remove_seq(cobalt_sequence_t *self, void *item)
 {

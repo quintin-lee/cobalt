@@ -14,8 +14,9 @@
  * @param str The original string to escape
  * @param len The length of the string
  * @return Dynamically allocated, escaped string (must be manually freed), returns NULL on failure
- * 
- * Two passes: the first pass calculates the required length after escaping, and the second pass performs the actual escaping and writing.
+ *
+ * Two passes: the first pass calculates the required length after escaping, and the second pass
+ * performs the actual escaping and writing.
  */
 static char *json_escape_string(const char *str, size_t len)
 {
@@ -97,9 +98,11 @@ static char *json_escape_string(const char *str, size_t len)
 /*
  * @brief Recursively serialize a JSON node tree to a JSON string
  * @param node The JSON node to serialize
- * @return Dynamically allocated serialized string (caller must free manually), returns "{}" or "null" on failure
- * 
- * Converts nodes of different types to strings according to the JSON format specification, using a dynamically expanding buffer for storage.
+ * @return Dynamically allocated serialized string (caller must free manually), returns "{}" or
+ * "null" on failure
+ *
+ * Converts nodes of different types to strings according to the JSON format specification, using a
+ * dynamically expanding buffer for storage.
  */
 char *json_serialize(json_node_t *node)
 {

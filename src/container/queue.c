@@ -1,9 +1,10 @@
 /**
  * @file queue.c
  * @brief Implementation file of the Queue (FIFO) container
- * 
- * Implements the queue interfaces defined in queue.h. Internally implemented using a singly-linked list,
- * supporting enqueue (add to tail) and dequeue (remove from head) operations with O(1) time complexity.
+ *
+ * Implements the queue interfaces defined in queue.h. Internally implemented using a singly-linked
+ * list, supporting enqueue (add to tail) and dequeue (remove from head) operations with O(1) time
+ * complexity.
  */
 
 #include "cobalt/container/queue.h"
@@ -103,9 +104,9 @@ void *cobalt_queue_dequeue(cobalt_queue_t *queue)
 
     queue_node_t *node = queue->head;
     void         *data = node->data;
-    
+
     // Move head pointer backward
-    queue->head        = node->next;
+    queue->head = node->next;
     // If the queue is empty after removal, the tail pointer must also be nullified
     if (!queue->head) {
         queue->tail = NULL;

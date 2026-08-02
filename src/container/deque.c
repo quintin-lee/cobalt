@@ -1,9 +1,10 @@
 /**
  * @file deque.c
  * @brief Implementation file of the double-ended queue (Deque) container
- * 
- * Implements the double-ended queue interfaces defined in deque.h. Internally implemented using a doubly-linked list,
- * supporting insertion and deletion operations with O(1) time complexity at both the head and tail.
+ *
+ * Implements the double-ended queue interfaces defined in deque.h. Internally implemented using a
+ * doubly-linked list, supporting insertion and deletion operations with O(1) time complexity at
+ * both the head and tail.
  */
 
 #include "cobalt/container/deque.h"

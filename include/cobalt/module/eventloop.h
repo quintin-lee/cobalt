@@ -4,7 +4,8 @@
 /**
  * @file eventloop.h
  * @brief Event-driven I/O loop module
- * @details Provides a single-threaded non-blocking event loop mechanism, supporting timers and listening to file descriptor (FD) events.
+ * @details Provides a single-threaded non-blocking event loop mechanism, supporting timers and
+ * listening to file descriptor (FD) events.
  */
 
 #include <stddef.h>
@@ -116,7 +117,8 @@ int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id);
 
 /**
  * @brief Run the event loop (blocking)
- * @details Will block the current thread, continuously handling ready events, until cobalt_eventloop_stop is called.
+ * @details Will block the current thread, continuously handling ready events, until
+ * cobalt_eventloop_stop is called.
  * @param loop Event loop object to run
  */
 void cobalt_eventloop_run(cobalt_eventloop_t *loop);
@@ -129,7 +131,8 @@ void cobalt_eventloop_stop(cobalt_eventloop_t *loop);
 
 /**
  * @brief Execute a single iteration of the event loop (non-blocking or short-time blocking)
- * @details Checks and processes currently ready timer and FD events, suitable for integration into other loops.
+ * @details Checks and processes currently ready timer and FD events, suitable for integration into
+ * other loops.
  * @param loop Event loop object
  * @return Returns 0 on success, -1 on failure
  */

@@ -1,7 +1,8 @@
 /**
  * @file atomic.c
  * @brief Implementation of atomic operations encapsulation
- * @details Implements basic functionalities such as atomic read/write, increment, and decrement based on the C11 standard `stdatomic.h`.
+ * @details Implements basic functionalities such as atomic read/write, increment, and decrement
+ * based on the C11 standard `stdatomic.h`.
  */
 
 #include "cobalt/platform/atomic.h"
@@ -9,7 +10,8 @@
 
 /*
  * @brief Create an atomic variable with an initial value
- * @details Assigns the provided initial value to the `value` field of `cobalt_atomic_t` and returns the structure.
+ * @details Assigns the provided initial value to the `value` field of `cobalt_atomic_t` and returns
+ * the structure.
  */
 cobalt_atomic_t cobalt_atomic_create(int initial)
 {
@@ -20,7 +22,8 @@ cobalt_atomic_t cobalt_atomic_create(int initial)
 
 /*
  * @brief Get the current value of the atomic variable (with acquire memory order)
- * @details Uses `atomic_load_explicit` and `memory_order_acquire` to ensure that memory reads and writes after this read operation are not reordered before it.
+ * @details Uses `atomic_load_explicit` and `memory_order_acquire` to ensure that memory reads and
+ * writes after this read operation are not reordered before it.
  */
 int cobalt_atomic_get(cobalt_atomic_t *a)
 {
@@ -29,7 +32,8 @@ int cobalt_atomic_get(cobalt_atomic_t *a)
 
 /*
  * @brief Set the value of the atomic variable (with release memory order)
- * @details Uses `atomic_store_explicit` and `memory_order_release` to ensure that all memory reads and writes before this write operation are completed before it.
+ * @details Uses `atomic_store_explicit` and `memory_order_release` to ensure that all memory reads
+ * and writes before this write operation are completed before it.
  */
 void cobalt_atomic_set(cobalt_atomic_t *a, int value)
 {
@@ -38,7 +42,9 @@ void cobalt_atomic_set(cobalt_atomic_t *a, int value)
 
 /*
  * @brief Atomic increment (add 1)
- * @details Uses `atomic_fetch_add_explicit` and the `memory_order_relaxed` memory order. Relaxed memory order is sufficient for counter scenarios that only care about atomicity and do not require strict memory barriers.
+ * @details Uses `atomic_fetch_add_explicit` and the `memory_order_relaxed` memory order. Relaxed
+ * memory order is sufficient for counter scenarios that only care about atomicity and do not
+ * require strict memory barriers.
  */
 void cobalt_atomic_increment(cobalt_atomic_t *a)
 {
@@ -47,7 +53,8 @@ void cobalt_atomic_increment(cobalt_atomic_t *a)
 
 /*
  * @brief Atomic decrement (subtract 1)
- * @details Also uses `atomic_fetch_sub_explicit` with relaxed memory order to perform the subtraction.
+ * @details Also uses `atomic_fetch_sub_explicit` with relaxed memory order to perform the
+ * subtraction.
  */
 void cobalt_atomic_decrement(cobalt_atomic_t *a)
 {

@@ -37,14 +37,15 @@
  * Records timer trigger time, callback, and status information.
  */
 typedef struct timer_entry {
-    uint64_t            timer_id;       /**< Unique timer ID */
-    uint64_t            timeout_ms;     /**< Delay time for the first trigger (milliseconds) */
-    uint64_t            interval_ms;    /**< Interval time for repeating timer (milliseconds), 0 means one-shot */
-    timer_handler_t     callback;       /**< Timer callback function */
-    void               *user_data;      /**< User data for the callback function */
-    int                 active;         /**< Whether the timer is currently active */
-    struct timespec     next_fire;      /**< Absolute time for the next trigger */
-    struct timer_entry *next;           /**< Next pointer for linked list structure (currently mainly maintained by array heap) */
+    uint64_t timer_id;    /**< Unique timer ID */
+    uint64_t timeout_ms;  /**< Delay time for the first trigger (milliseconds) */
+    uint64_t interval_ms; /**< Interval time for repeating timer (milliseconds), 0 means one-shot */
+    timer_handler_t     callback;  /**< Timer callback function */
+    void               *user_data; /**< User data for the callback function */
+    int                 active;    /**< Whether the timer is currently active */
+    struct timespec     next_fire; /**< Absolute time for the next trigger */
+    struct timer_entry *next;      /**< Next pointer for linked list structure (currently mainly
+                                      maintained by array heap) */
 } timer_entry_t;
 
 /**
@@ -52,11 +53,11 @@ typedef struct timer_entry {
  * Saves listened FDs and their callbacks in a linked list form.
  */
 typedef struct fd_entry {
-    int              fd;                /**< The file descriptor being listened to */
-    short            events;            /**< Mask of events to listen for */
-    fd_handler_t     callback;          /**< Callback function when event occurs */
-    void            *user_data;         /**< User data for the callback function */
-    struct fd_entry *next;              /**< The next entry in the linked list */
+    int              fd;        /**< The file descriptor being listened to */
+    short            events;    /**< Mask of events to listen for */
+    fd_handler_t     callback;  /**< Callback function when event occurs */
+    void            *user_data; /**< User data for the callback function */
+    struct fd_entry *next;      /**< The next entry in the linked list */
 } fd_entry_t;
 
 /* ============================================================
@@ -128,16 +129,16 @@ struct cobalt_eventloop {
     struct epoll_event *epoll_events;   /**< Array to store epoll_wait results */
     int                 epoll_capacity; /**< Capacity of the epoll events array */
 #elif __APPLE__
-    int kq;                             /**< kqueue file descriptor */
+    int kq; /**< kqueue file descriptor */
 #endif
-    fd_entry_t     *fd_head;            /**< Head pointer of the FD listening linked list */
-    fd_entry_t     *fd_tail;            /**< Tail pointer of the FD listening linked list */
-    timer_entry_t **timer_heap;         /**< Min-heap array managing timers */
-    int             timer_count;        /**< Current number of timers in the heap */
-    int             timer_capacity;     /**< Capacity of the heap */
-    uint64_t        next_timer_id;      /**< The next allocated timer ID */
-    int             running;            /**< Flag indicating if the event loop is running */
-    int             stop_flag;          /**< Flag requesting to stop the event loop */
+    fd_entry_t     *fd_head;        /**< Head pointer of the FD listening linked list */
+    fd_entry_t     *fd_tail;        /**< Tail pointer of the FD listening linked list */
+    timer_entry_t **timer_heap;     /**< Min-heap array managing timers */
+    int             timer_count;    /**< Current number of timers in the heap */
+    int             timer_capacity; /**< Capacity of the heap */
+    uint64_t        next_timer_id;  /**< The next allocated timer ID */
+    int             running;        /**< Flag indicating if the event loop is running */
+    int             stop_flag;      /**< Flag requesting to stop the event loop */
 };
 
 /* Heap operation helper functions bound to the event loop object */
@@ -192,7 +193,8 @@ static void get_time_now(struct timespec *timepoint)
     clock_gettime(CLOCK_MONOTONIC, timepoint);
 }
 
-/* Check if the time represented by lhs is later than or equal to the time represented by rhs (now) */
+/* Check if the time represented by lhs is later than or equal to the time represented by rhs (now)
+ */
 static int timer_expired(const struct timespec *lhs, const struct timespec *rhs)
 {
     long secs  = lhs->tv_sec - rhs->tv_sec;
@@ -311,7 +313,8 @@ cobalt_eventloop_t *cobalt_eventloop_create(void)
 
 /*
  * @brief Destroy the event loop
- * Closes the underlying file descriptors, frees all entries in the FD linked list and timer heap, as well as the loop's own memory.
+ * Closes the underlying file descriptors, frees all entries in the FD linked list and timer heap,
+ * as well as the loop's own memory.
  */
 void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
 {
@@ -347,7 +350,8 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
 
 /*
  * @brief Add a file descriptor to the event loop's listeners
- * Wraps and calls the underlying epoll_ctl or kevent, and saves the related state to the internal linked list.
+ * Wraps and calls the underlying epoll_ctl or kevent, and saves the related state to the internal
+ * linked list.
  */
 int cobalt_eventloop_add_fd(
     cobalt_eventloop_t *loop,
@@ -413,7 +417,8 @@ int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
 
 /*
  * @brief Remove a file descriptor from the event loop's listeners
- * Removes it from both the underlying epoll/kqueue and the internal listening linked list simultaneously.
+ * Removes it from both the underlying epoll/kqueue and the internal listening linked list
+ * simultaneously.
  */
 int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t file_descriptor)
 {
@@ -445,7 +450,8 @@ int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t file_descripto
 
 /*
  * @brief Add a new timer task
- * Creates a new timer structure based on the given parameters, calculates its absolute trigger time, and puts it in the min-heap for management.
+ * Creates a new timer structure based on the given parameters, calculates its absolute trigger
+ * time, and puts it in the min-heap for management.
  */
 uint64_t cobalt_eventloop_add_timer(
     cobalt_eventloop_t  *loop,
@@ -488,7 +494,8 @@ uint64_t cobalt_eventloop_add_timer(
 
 /*
  * @brief Delete the specified timer
- * Finds the matching ID in the heap, removes it, and readapts the heap to maintain the min-heap property.
+ * Finds the matching ID in the heap, removes it, and readapts the heap to maintain the min-heap
+ * property.
  */
 int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
 {
@@ -510,7 +517,8 @@ int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
 
 /*
  * @brief Run the event loop until the stop flag is received
- * In the internal loop, it continuously calls cobalt_eventloop_iteration to process expired tasks and IO events.
+ * In the internal loop, it continuously calls cobalt_eventloop_iteration to process expired tasks
+ * and IO events.
  */
 void cobalt_eventloop_run(cobalt_eventloop_t *loop)
 {

@@ -2,7 +2,8 @@
  * @file iterator.c
  * @brief Iterator interface implementation
  *
- * Provides a generic implementation of a sequence iterator and standard methods for operating iterators.
+ * Provides a generic implementation of a sequence iterator and standard methods for operating
+ * iterators.
  */
 
 #include "cobalt/interface/iterator.h"
@@ -35,8 +36,10 @@ static int generic_has_next(void *ctx)
 /**
  * @brief Get the next element of the generic iterator
  * @param ctx Iterator context (cobalt_iterator_impl_t pointer)
- * @return The current implementation does not support directly returning an element pointer, always returns NULL, but advances the index
- * @note This provides a skeleton implementation, actual containers should provide their own specific iterator implementation
+ * @return The current implementation does not support directly returning an element pointer, always
+ * returns NULL, but advances the index
+ * @note This provides a skeleton implementation, actual containers should provide their own
+ * specific iterator implementation
  */
 static void *generic_next(void *ctx)
 {
@@ -45,7 +48,8 @@ static void *generic_next(void *ctx)
         return NULL; /* End reached */
     }
     impl->index++; /* Advance iterator state */
-    return NULL; /* The generic iterator does not support direct element access, it needs to be overridden by a specific sequence implementation */
+    return NULL;   /* The generic iterator does not support direct element access, it needs to be
+                      overridden by a specific sequence implementation */
 }
 
 /**
@@ -128,7 +132,8 @@ void *cobalt_iterator_next(cobalt_iterator_t *iter)
 
 /**
  * @brief Destroy the iterator
- * @details First calls the virtual function table to destroy the internal context, then frees the iterator shell
+ * @details First calls the virtual function table to destroy the internal context, then frees the
+ * iterator shell
  */
 void cobalt_iterator_destroy(cobalt_iterator_t *iter)
 {

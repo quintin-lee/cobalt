@@ -2,7 +2,8 @@
  * @file set.c
  * @brief Set container implementation
  * @details Set data structure implemented by wrapping cobalt_hashmap.
- * Note: Because the string key processing logic of the hash map is used underlyingly, the item here is actually treated as a C string (const char*).
+ * Note: Because the string key processing logic of the hash map is used underlyingly, the item here
+ * is actually treated as a C string (const char*).
  */
 
 #include "cobalt/container/set.h"
@@ -14,13 +15,14 @@
  * @brief Internal set structure
  */
 struct cobalt_set {
-    cobalt_hashmap_t *map; /* Uses a hash map to store set elements, elements serve as both key and value */
+    cobalt_hashmap_t
+        *map; /* Uses a hash map to store set elements, elements serve as both key and value */
 };
 
 /**
  * @brief Create a set
  * @details Internally calls the hash map creation logic.
- * 
+ *
  * @param initial_capacity Initial capacity
  * @return Newly allocated set pointer, NULL if out of memory
  */
@@ -43,7 +45,7 @@ cobalt_set_t *cobalt_set_create(size_t initial_capacity)
 /**
  * @brief Destroy the set
  * @details Frees the underlying hash map and the set structure itself.
- * 
+ *
  * @param set Pointer to the set
  */
 void cobalt_set_destroy(cobalt_set_t *set)
@@ -57,7 +59,7 @@ void cobalt_set_destroy(cobalt_set_t *set)
 /**
  * @brief Insert an element into the set
  * @details Stores the item as both the key and value of the hash map.
- * 
+ *
  * @param set Pointer to the set
  * @param item Element (treated as a string)
  * @return Returns 0 on success, -1 on failure
@@ -73,7 +75,7 @@ int cobalt_set_insert(cobalt_set_t *set, void *item)
 
 /**
  * @brief Remove an element from the set
- * 
+ *
  * @param set Pointer to the set
  * @param item Element (treated as a string)
  * @return Returns 0 on success, -1 on failure
@@ -88,7 +90,7 @@ int cobalt_set_remove(cobalt_set_t *set, void *item)
 
 /**
  * @brief Determine if an element is in the set
- * 
+ *
  * @param set Pointer to the set
  * @param item Element to look for
  * @return Returns 1 if present, 0 if not present or on parameter error
@@ -103,7 +105,7 @@ int cobalt_set_contains(cobalt_set_t *set, void *item)
 
 /**
  * @brief Get the set size
- * 
+ *
  * @param set Pointer to the set
  * @return Number of elements
  */
@@ -117,7 +119,7 @@ size_t cobalt_set_size(cobalt_set_t *set)
 
 /**
  * @brief Determine if the set is empty
- * 
+ *
  * @param set Pointer to the set
  * @return Returns 1 if empty, 0 if not empty
  */

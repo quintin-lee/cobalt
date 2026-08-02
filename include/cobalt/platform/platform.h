@@ -4,7 +4,8 @@
 /**
  * @file platform.h
  * @brief Platform abstraction layer
- * @details Provides OS platform identification and basic handle abstraction for cross-platform compatibility.
+ * @details Provides OS platform identification and basic handle abstraction for cross-platform
+ * compatibility.
  *
  * @defgroup Platform Platform abstraction module
  * @{
@@ -18,16 +19,17 @@
  * @details Used to distinguish the current operating system platform at compile time or runtime.
  */
 typedef enum {
-    COBALT_PLATFORM_UNKNOWN = 0,    /**< Unknown platform */
-    COBALT_PLATFORM_WINDOWS = 1,    /**< Windows platform */
-    COBALT_PLATFORM_MACOS   = 2,    /**< macOS platform */
-    COBALT_PLATFORM_LINUX   = 3,    /**< Linux platform */
-    COBALT_PLATFORM_OTHER   = 99    /**< Other platform */
+    COBALT_PLATFORM_UNKNOWN = 0, /**< Unknown platform */
+    COBALT_PLATFORM_WINDOWS = 1, /**< Windows platform */
+    COBALT_PLATFORM_MACOS   = 2, /**< macOS platform */
+    COBALT_PLATFORM_LINUX   = 3, /**< Linux platform */
+    COBALT_PLATFORM_OTHER   = 99 /**< Other platform */
 } cobalt_platform_id_t;
 
 /**
  * @brief Platform-related generic handle type
- * @details This is an opaque pointer that can be cast to a specific platform's native handle (such as HWND, Window, etc.).
+ * @details This is an opaque pointer that can be cast to a specific platform's native handle (such
+ * as HWND, Window, etc.).
  */
 typedef void *cobalt_platform_handle_t;
 
@@ -48,12 +50,14 @@ typedef void *cobalt_platform_handle_t;
  * @return cobalt_platform_id_t Enumeration value of the current platform
  * @note This function returns the platform identifier determined at compile time during runtime.
  */
-cobalt_platform_id_t     cobalt_platform_get_id(void);
+cobalt_platform_id_t cobalt_platform_get_id(void);
 
 /**
  * @brief Get the main handle of the current platform
- * @return cobalt_platform_handle_t The generic handle for the current platform, or NULL if it does not exist.
- * @note The specific handle type returned depends on the underlying operating system and application context.
+ * @return cobalt_platform_handle_t The generic handle for the current platform, or NULL if it does
+ * not exist.
+ * @note The specific handle type returned depends on the underlying operating system and
+ * application context.
  */
 cobalt_platform_handle_t cobalt_platform_get_handle(void);
 

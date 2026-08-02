@@ -4,7 +4,8 @@
 /**
  * @file functional.h
  * @brief Functional programming and algorithm helper interfaces
- * @details Defines predicates, operation function types, and common search and traversal algorithm declarations required by generic algorithms.
+ * @details Defines predicates, operation function types, and common search and traversal algorithm
+ * declarations required by generic algorithms.
  */
 
 #include "cobalt/algorithm/sort.h"
@@ -33,7 +34,9 @@ typedef void (*operation_func_t)(void *item);
  */
 typedef struct {
     void *context; /**< Additional context environment required for function execution */
-    void (*apply)(void *context, const void *item); /**< Pointer to the function that actually executes the application */
+    void (*apply)(
+        void       *context,
+        const void *item); /**< Pointer to the function that actually executes the application */
 } function_obj_t;
 
 /* -----------------------------------------------------------------------------

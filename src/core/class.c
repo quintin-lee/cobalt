@@ -1,7 +1,8 @@
 /**
  * @file class.c
  * @brief Implementation of the object-oriented class system
- * @details Implements the runtime class creation, method addition, property addition, and class destruction functions defined in class.h.
+ * @details Implements the runtime class creation, method addition, property addition, and class
+ * destruction functions defined in class.h.
  */
 #include "cobalt/core/class.h"
 #include "cobalt/utils/string.h"
@@ -10,7 +11,7 @@
 
 /**
  * @brief Create a new runtime class
- * 
+ *
  * @param name Name of the class
  * @param base_class Base class pointer, can be NULL
  * @return cobalt_class_t* Created class object pointer, returns NULL on failure
@@ -38,7 +39,7 @@ cobalt_class_t *cobalt_class_create(const char *name, cobalt_class_t *base_class
 /**
  * @brief Add a new method to the class
  * @details Currently a stub implementation, only performs parameter validation.
- * 
+ *
  * @param cls Target class
  * @param name Method name
  * @param invoke Method invocation pointer
@@ -61,7 +62,7 @@ int cobalt_class_add_method(cobalt_class_t *cls,
 /**
  * @brief Add a new property to the class
  * @details Currently a stub implementation, only performs parameter validation.
- * 
+ *
  * @param cls Target class
  * @param name Property name
  * @param get Function pointer to get the property value
@@ -73,7 +74,8 @@ int cobalt_class_add_property(cobalt_class_t *cls,
                               void *(*get)(cobalt_object_t *self),
                               void (*set)(cobalt_object_t *self, void *value))
 {
-    /* Check the validity of the input parameters, note that get and set might be optional, but class and property name must exist */
+    /* Check the validity of the input parameters, note that get and set might be optional, but
+     * class and property name must exist */
     if (!cls || !name) {
         return -1;
     }
@@ -85,9 +87,10 @@ int cobalt_class_add_property(cobalt_class_t *cls,
 
 /**
  * @brief Check whether the class is an abstract class
- * 
+ *
  * @param cls Target class
- * @return int Returns non-zero value if it is an abstract class, 0 otherwise (including the case of passing a null pointer)
+ * @return int Returns non-zero value if it is an abstract class, 0 otherwise (including the case of
+ * passing a null pointer)
  */
 int cobalt_class_is_abstract(cobalt_class_t *cls)
 {
@@ -97,7 +100,7 @@ int cobalt_class_is_abstract(cobalt_class_t *cls)
 /**
  * @brief Destroy the class information object and free memory
  * @details Frees the class name string and the class structure itself.
- * 
+ *
  * @param cls Target class
  */
 void cobalt_class_destroy(cobalt_class_t *cls)

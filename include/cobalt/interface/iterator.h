@@ -5,7 +5,8 @@
  * @file iterator.h
  * @brief Iterator interface definition
  *
- * Defines the generic iterator interface and related virtual function table for traversing collections (such as sequences, maps, etc.).
+ * Defines the generic iterator interface and related virtual function table for traversing
+ * collections (such as sequences, maps, etc.).
  */
 
 #include "sequence.h"
@@ -18,7 +19,8 @@
 
 /**
  * @brief Iterator virtual function table
- * @details A collection of function pointers used to implement polymorphism. Specific iterators need to implement these methods.
+ * @details A collection of function pointers used to implement polymorphism. Specific iterators
+ * need to implement these methods.
  */
 typedef struct cobalt_iterator_vtable {
     /**
@@ -51,8 +53,9 @@ typedef struct cobalt_iterator cobalt_iterator_t;
  * @brief Iterator structure definition
  */
 struct cobalt_iterator {
-    const cobalt_iterator_vtable_t *vtable; /**< Virtual function table pointer, pointing to specific implementation methods */
-    void                           *data;   /**< Iterator private data/context */
+    const cobalt_iterator_vtable_t
+        *vtable; /**< Virtual function table pointer, pointing to specific implementation methods */
+    void *data;  /**< Iterator private data/context */
 };
 
 /**
@@ -68,20 +71,20 @@ cobalt_iterator_t *cobalt_iterator_new(cobalt_sequence_t *seq);
  * @param iter Iterator pointer
  * @return 1 if there is a next element, 0 otherwise
  */
-int                cobalt_iterator_has_next(cobalt_iterator_t *iter);
+int cobalt_iterator_has_next(cobalt_iterator_t *iter);
 
 /**
  * @brief Get the next element from the iterator
  * @param iter Iterator pointer
  * @return A pointer to the next element, or NULL if the end has been reached
  */
-void              *cobalt_iterator_next(cobalt_iterator_t *iter);
+void *cobalt_iterator_next(cobalt_iterator_t *iter);
 
 /**
  * @brief Destroy and free iterator resources
  * @param iter Pointer to the iterator to be destroyed
  */
-void               cobalt_iterator_destroy(cobalt_iterator_t *iter);
+void cobalt_iterator_destroy(cobalt_iterator_t *iter);
 
 /** @} */
 

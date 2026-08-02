@@ -4,7 +4,9 @@
 /**
  * @file allocator.h
  * @brief Memory allocator interface
- * @details Provides an abstract set of function pointer interfaces for memory allocation, deallocation, and reallocation to enable custom memory management strategies (such as using the default system allocator, memory pools, etc.).
+ * @details Provides an abstract set of function pointer interfaces for memory allocation,
+ * deallocation, and reallocation to enable custom memory management strategies (such as using the
+ * default system allocator, memory pools, etc.).
  *
  * @defgroup Allocator Memory allocator module
  * @ingroup Memory
@@ -15,7 +17,8 @@
 
 /**
  * @brief Memory allocator virtual table interface
- * @details Contains function pointers for basic memory operations. Allows passing custom allocator instances through object-oriented design.
+ * @details Contains function pointers for basic memory operations. Allows passing custom allocator
+ * instances through object-oriented design.
  */
 typedef struct cobalt_allocator {
     /**
@@ -45,7 +48,8 @@ typedef struct cobalt_allocator {
 
 /**
  * @brief Get the default system memory allocator
- * @return cobalt_allocator_t* The system's default allocator instance (encapsulates malloc/free/realloc)
+ * @return cobalt_allocator_t* The system's default allocator instance (encapsulates
+ * malloc/free/realloc)
  */
 cobalt_allocator_t *cobalt_allocator_get_system(void);
 
@@ -62,7 +66,7 @@ void *cobalt_allocator_alloc(cobalt_allocator_t *self, size_t size);
  * @param self The allocator instance to use
  * @param ptr Pointer to the memory block to free
  */
-void  cobalt_allocator_free(cobalt_allocator_t *self, void *ptr);
+void cobalt_allocator_free(cobalt_allocator_t *self, void *ptr);
 
 /**
  * @brief Reallocate memory using the specified allocator

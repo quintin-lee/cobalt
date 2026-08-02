@@ -4,7 +4,9 @@
 /**
  * @file set.h
  * @brief Set container
- * @details A set implementation based on a hash map, used to store unique elements. The current implementation casts void* to const char* as the key for the underlying hash map, making it more suitable for storing strings.
+ * @details A set implementation based on a hash map, used to store unique elements. The current
+ * implementation casts void* to const char* as the key for the underlying hash map, making it more
+ * suitable for storing strings.
  */
 
 #include <stddef.h>
@@ -31,7 +33,7 @@ cobalt_set_t *cobalt_set_create(size_t initial_capacity);
  * @brief Destroy the set and free memory
  * @param set Pointer to the set to be destroyed
  */
-void          cobalt_set_destroy(cobalt_set_t *set);
+void cobalt_set_destroy(cobalt_set_t *set);
 
 /**
  * @brief Insert an element into the set
@@ -39,7 +41,7 @@ void          cobalt_set_destroy(cobalt_set_t *set);
  * @param item Element to insert (currently treated as const char* underlyingly)
  * @return Returns 0 on successful insertion or if the element already exists, -1 on failure
  */
-int           cobalt_set_insert(cobalt_set_t *set, void *item);
+int cobalt_set_insert(cobalt_set_t *set, void *item);
 
 /**
  * @brief Remove an element from the set
@@ -47,7 +49,7 @@ int           cobalt_set_insert(cobalt_set_t *set, void *item);
  * @param item Element to remove
  * @return Returns 0 on successful removal, -1 if not found or on failure
  */
-int           cobalt_set_remove(cobalt_set_t *set, void *item);
+int cobalt_set_remove(cobalt_set_t *set, void *item);
 
 /**
  * @brief Check if the set contains a certain element
@@ -55,21 +57,21 @@ int           cobalt_set_remove(cobalt_set_t *set, void *item);
  * @param item Element to check
  * @return Returns a non-zero value (1) if the element is contained, 0 otherwise
  */
-int           cobalt_set_contains(cobalt_set_t *set, void *item);
+int cobalt_set_contains(cobalt_set_t *set, void *item);
 
 /**
  * @brief Get the number of elements in the set
  * @param set Pointer to the set
  * @return Set size
  */
-size_t        cobalt_set_size(cobalt_set_t *set);
+size_t cobalt_set_size(cobalt_set_t *set);
 
 /**
  * @brief Check if the set is empty
  * @param set Pointer to the set
  * @return Returns 1 if empty or if set is NULL, 0 otherwise
  */
-int           cobalt_set_is_empty(cobalt_set_t *set);
+int cobalt_set_is_empty(cobalt_set_t *set);
 
 /** @} */
 

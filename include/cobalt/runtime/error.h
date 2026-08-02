@@ -4,7 +4,8 @@
 /**
  * @file error.h
  * @brief Error handling framework module
- * @details Provides the definition of base error codes, error message retrieval, and thread-local error state management in the Cobalt framework.
+ * @details Provides the definition of base error codes, error message retrieval, and thread-local
+ * error state management in the Cobalt framework.
  *
  * @defgroup RuntimeError Runtime error handling
  * @{
@@ -14,7 +15,8 @@
 
 /**
  * @brief Global error code enumeration for the Cobalt framework
- * @details Defines various error states that may occur, such as system operations, parameter validation, memory allocation, etc.
+ * @details Defines various error states that may occur, such as system operations, parameter
+ * validation, memory allocation, etc.
  */
 typedef enum {
     COBALT_SUCCESS                 = 0,  /**< Success */
@@ -30,7 +32,7 @@ typedef enum {
 
 /**
  * @brief Get the readable error message string corresponding to the error code
- * 
+ *
  * @param code The error code to query
  * @return The corresponding error message description string
  */
@@ -40,7 +42,7 @@ const char *cobalt_error_get_message(cobalt_error_t code);
  * @brief Set the current error state, and optionally write it to a pointer variable
  * @details This function not only assigns the error code to the variable pointed to by `error_ptr`,
  *          but also updates the thread-local error state of the current thread.
- * 
+ *
  * @param error_ptr Pointer to receive the error code; ignored if NULL
  * @param code The error code to set
  */
@@ -48,7 +50,7 @@ void cobalt_error_set(cobalt_error_t *error_ptr, cobalt_error_t code);
 
 /**
  * @brief Get the last error code set by the current thread
- * 
+ *
  * @return The last error code of the current thread
  */
 cobalt_error_t cobalt_error_get_current(void);

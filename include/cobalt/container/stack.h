@@ -4,7 +4,8 @@
 /**
  * @file stack.h
  * @brief Stack (Last-In, First-Out, LIFO) container
- * @details Provides a generic stack data structure implementation, based on a singly linked list, storing void* type pointer data.
+ * @details Provides a generic stack data structure implementation, based on a singly linked list,
+ * storing void* type pointer data.
  */
 
 #include <stddef.h>
@@ -29,7 +30,8 @@ cobalt_stack_t *cobalt_stack_create(void);
 /**
  * @brief Destroy the stack and free memory
  * @param stack Pointer to the stack to be destroyed
- * @note Will free all stack nodes, but will not free the memory pointed to by the data pointers (void *item) stored in the stack.
+ * @note Will free all stack nodes, but will not free the memory pointed to by the data pointers
+ * (void *item) stored in the stack.
  */
 void cobalt_stack_destroy(cobalt_stack_t *stack);
 
@@ -44,14 +46,16 @@ int cobalt_stack_push(cobalt_stack_t *stack, void *item);
 /**
  * @brief Pop an element from the top of the stack
  * @param stack Pointer to the stack
- * @return The element pointer popped from the top of the stack. Returns NULL if the stack is empty or stack is NULL.
+ * @return The element pointer popped from the top of the stack. Returns NULL if the stack is empty
+ * or stack is NULL.
  */
 void *cobalt_stack_pop(cobalt_stack_t *stack);
 
 /**
  * @brief Peek at the top element of the stack without popping it
  * @param stack Pointer to the stack
- * @return The element pointer at the top of the stack. Returns NULL if the stack is empty or stack is NULL.
+ * @return The element pointer at the top of the stack. Returns NULL if the stack is empty or stack
+ * is NULL.
  */
 void *cobalt_stack_peek(cobalt_stack_t *stack);
 
