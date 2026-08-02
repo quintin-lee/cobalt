@@ -67,11 +67,11 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
 ## Code Statistics
 
 - **Header files**: 26
-- **Source files**: 25
+- **Source files**: 27
 - **Test files**: 22
-- **Documentation files**: 21
-- **Total lines of code**: 7,213
-- **Git commits**: 35
+- **Documentation files**: 27
+- **Total lines of code**: 6,627
+- **Git commits**: 82
 - **Test modules passing**: 22/22
 
 ## Key Features
