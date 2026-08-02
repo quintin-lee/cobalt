@@ -27,6 +27,7 @@ int main(void)
     if (arena)
         {
             void* mem = cobalt_arena_alloc(arena, 64);
+            (void)mem;
             printf("Arena: OK\n");
             cobalt_arena_destroy(arena);
         }

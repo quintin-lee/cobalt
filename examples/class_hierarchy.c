@@ -14,8 +14,8 @@
 #include <stdlib.h>
 
 /* Forward declare our custom class */
-static const cobalt_class_t* BaseClass = NULL;
-static const cobalt_class_t* DerivedClass = NULL;
+static cobalt_class_t* BaseClass = NULL;
+static cobalt_class_t* DerivedClass = NULL;
 
 /* Method implementation for BaseClass */
 void* base_invoke(cobalt_object_t* self, void** args, size_t arg_count)

@@ -13,6 +13,7 @@ static cobalt_class_t* CircleClass = NULL;
 /* Base class method */
 static void* shape_area(cobalt_object_t* self, void** args, size_t arg_count)
 {
+    (void)self;
     (void)args;
     (void)arg_count;
     printf("  Shape area method called\n");

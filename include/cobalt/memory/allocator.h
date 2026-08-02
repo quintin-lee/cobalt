@@ -1,5 +1,5 @@
 #ifndef MEMORY_ALLOCATOR_H
-#define MEMORY_ALLOCITOR_H
+#define MEMORY_ALLOCATOR_H
 
 /**
  * @file allocator.h
