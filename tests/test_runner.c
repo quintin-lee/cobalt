@@ -21,6 +21,8 @@ void test_json(void);
 void test_eventloop(void);
 void test_stack(void);
 void test_queue(void);
+void test_set(void);
+void test_deque(void);
 void test_iterator(void);
 
 /* Test function registry */
@@ -37,7 +39,8 @@ static const TestEntry test_registry[] = {
     {"vector", test_vector},     {"list", test_list},           {"hashmap", test_hashmap},
     {"treemap", test_treemap},   {"sort", test_sort},           {"functional", test_functional},
     {"json", test_json},         {"eventloop", test_eventloop}, {"stack", test_stack},
-    {"queue", test_queue},       {"iterator", test_iterator},
+    {"queue", test_queue},       {"set", test_set},             {"deque", test_deque},
+    {"iterator", test_iterator},
 };
 
 static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);

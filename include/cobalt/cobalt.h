@@ -25,9 +25,11 @@
 #include <cobalt/interface/map.h>
 #include <cobalt/interface/sequence.h>
 
+#include <cobalt/container/deque.h>
 #include <cobalt/container/hashmap.h>
 #include <cobalt/container/list.h>
 #include <cobalt/container/queue.h>
+#include <cobalt/container/set.h>
 #include <cobalt/container/stack.h>
 #include <cobalt/container/treemap.h>
 #include <cobalt/container/vector.h>

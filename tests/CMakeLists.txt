@@ -21,6 +21,8 @@ add_executable(cobalt_test
     unit/test_eventloop.c
     unit/test_stack.c
     unit/test_queue.c
+    unit/test_set.c
+    unit/test_deque.c
     unit/test_iterator.c
 )
 
@@ -57,6 +59,8 @@ add_test(NAME test_json COMMAND cobalt_test --filter json)
 add_test(NAME test_eventloop COMMAND cobalt_test --filter eventloop)
 add_test(NAME test_stack COMMAND cobalt_test --filter stack)
 add_test(NAME test_queue COMMAND cobalt_test --filter queue)
+add_test(NAME test_set COMMAND cobalt_test --filter set)
+add_test(NAME test_deque COMMAND cobalt_test --filter deque)
 add_test(NAME test_iterator COMMAND cobalt_test --filter iterator)
 
 # Benchmarks

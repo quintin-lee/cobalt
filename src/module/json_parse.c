@@ -1,0 +1,259 @@
+#include "cobalt/module/json.h"
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct {
+    const char *str;
+    int         pos;
+    int         len;
+} json_parse_ctx_t;
+
+static inline int is_space(int c)
+{
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
+
+static void json_skip_whitespace(json_parse_ctx_t *ctx)
+{
+    while (ctx->pos < ctx->len && is_space((unsigned char)ctx->str[ctx->pos])) {
+        ctx->pos++;
+    }
+}
+
+static json_node_t *json_node_create(json_type_t type)
+{
+    json_node_t *node = malloc(sizeof(json_node_t));
+    if (node) {
+        node->type = type;
+        memset(&node->value, 0, sizeof(node->value));
+        node->next = NULL;
+        node->key  = NULL;
+    }
+    return node;
+}
+
+static char *json_parse_string(json_parse_ctx_t *ctx)
+{
+    if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '"') {
+        return NULL;
+    }
+    ctx->pos++;
+
+    int start = ctx->pos;
+    while (ctx->pos < ctx->len && ctx->str[ctx->pos] != '"') {
+        if (ctx->str[ctx->pos] == '\\' && ctx->pos + 1 < ctx->len) {
+            ctx->pos += 2;
+        } else {
+            ctx->pos++;
+        }
+    }
+
+    if (ctx->pos >= ctx->len) {
+        return NULL;
+    }
+
+    int   len    = ctx->pos - start;
+    char *result = malloc(len + 1);
+    if (!result) {
+        return NULL;
+    }
+
+    strncpy(result, ctx->str + start, len);
+    result[len] = '\0';
+    ctx->pos++;
+
+    return result;
+}
+
+static json_node_t *json_parse_value(json_parse_ctx_t *ctx);
+
+static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
+{
+    json_skip_whitespace(ctx);
+    if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '{') {
+        return NULL;
+    }
+    ctx->pos++;
+
+    json_node_t *root = json_node_create(JSON_OBJECT);
+    json_skip_whitespace(ctx);
+    if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
+        ctx->pos++;
+        return root;
+    }
+
+    while (1) {
+        json_skip_whitespace(ctx);
+        if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '"') {
+            break;
+        }
+
+        char *key = json_parse_string(ctx);
+        if (!key) {
+            break;
+        }
+
+        json_skip_whitespace(ctx);
+        if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != ':') {
+            free(key);
+            break;
+        }
+        ctx->pos++;
+
+        json_node_t *value = json_parse_value(ctx);
+        if (!value) {
+            free(key);
+            break;
+        }
+
+        json_node_t *kv = json_node_create(JSON_OBJECT);
+        kv->key         = key;
+        kv->next        = value;
+        if (!root->next) {
+            root->next = kv;
+        } else {
+            json_node_t *tail = root->next;
+            while (tail->next) {
+                tail = tail->next;
+            }
+            tail->next = kv;
+        }
+
+        json_skip_whitespace(ctx);
+        if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ',') {
+            ctx->pos++;
+            continue;
+        }
+        if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
+            ctx->pos++;
+        }
+        break;
+    }
+
+    json_skip_whitespace(ctx);
+    if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
+        ctx->pos++;
+    }
+    return root;
+}
+
+static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
+{
+    json_skip_whitespace(ctx);
+    if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '[') {
+        return NULL;
+    }
+    ctx->pos++;
+
+    json_node_t *root = json_node_create(JSON_ARRAY);
+    json_skip_whitespace(ctx);
+    if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
+        ctx->pos++;
+        return root;
+    }
+
+    while (1) {
+        json_node_t *elem = json_parse_value(ctx);
+        if (!elem) {
+            break;
+        }
+
+        elem->next = root->next;
+        root->next = elem;
+
+        json_skip_whitespace(ctx);
+        if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ',') {
+            ctx->pos++;
+            continue;
+        }
+        break;
+    }
+
+    json_skip_whitespace(ctx);
+    if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
+        ctx->pos++;
+    }
+    return root;
+}
+
+static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
+{
+    json_skip_whitespace(ctx);
+    if (ctx->pos >= ctx->len) {
+        return NULL;
+    }
+
+    char c = ctx->str[ctx->pos];
+
+    if (c == '{') {
+        return json_parse_object(ctx);
+    }
+    if (c == '[') {
+        return json_parse_array(ctx);
+    }
+    if (c == '"') {
+        char *s = json_parse_string(ctx);
+        if (!s) {
+            return NULL;
+        }
+        json_node_t *node  = json_node_create(JSON_STRING);
+        node->value.string = s;
+        return node;
+    }
+
+    if (c == '-' || isdigit((unsigned char)c)) {
+        int start = ctx->pos;
+        while (ctx->pos < ctx->len &&
+               (isdigit((unsigned char)ctx->str[ctx->pos]) || ctx->str[ctx->pos] == '.')) {
+            ctx->pos++;
+        }
+        int   num_len = ctx->pos - start;
+        char *num_str = malloc(num_len + 1);
+        if (!num_str) {
+            return NULL;
+        }
+        strncpy(num_str, ctx->str + start, num_len);
+        num_str[num_len] = '\0';
+        double val       = atof(num_str);
+        free(num_str);
+
+        json_node_t *node  = json_node_create(JSON_NUMBER);
+        node->value.number = val;
+        return node;
+    }
+
+    if (strncmp(ctx->str + ctx->pos, "true", 4) == 0) {
+        ctx->pos += 4;
+        return json_node_create(JSON_TRUE);
+    }
+    if (strncmp(ctx->str + ctx->pos, "false", 5) == 0) {
+        ctx->pos += 5;
+        return json_node_create(JSON_FALSE);
+    }
+    if (strncmp(ctx->str + ctx->pos, "null", 4) == 0) {
+        ctx->pos += 4;
+        return json_node_create(JSON_NULL);
+    }
+
+    return NULL;
+}
+
+json_node_t *json_parse(const char *text)
+{
+    if (!text) {
+        return NULL;
+    }
+    int len = strlen(text);
+    if (len == 0) {
+        return NULL;
+    }
+
+    json_parse_ctx_t ctx = {.str = text, .pos = 0, .len = len};
+    json_skip_whitespace(&ctx);
+    if (ctx.pos >= ctx.len) {
+        return NULL;
+    }
+
+    return json_parse_value(&ctx);
+}
