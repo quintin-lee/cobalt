@@ -8,8 +8,8 @@ A lightweight, zero-dependency C11 framework providing object-oriented capabilit
 - **Object System**: Single inheritance + multi-interface support
 - **Memory Management**: Arena allocator with automatic cleanup
 - **Thread Safety**: Atomic operations with stdatomic.h
-- **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue
-- **Algorithms**: Sort, predicates, functional utilities
+- **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque
+- **Algorithms**: Sort, binary search, find_if, for_each, predicates
 - **Modules**: JSON parser/serializer, event loop (epoll/kqueue)
 - **Cross-platform**: Linux, macOS, Windows support
 
@@ -91,7 +91,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure
+ctest --output-on-failure  # 22 tests passing
 # or with verbose output
 ctest --verbose
 ```
@@ -104,7 +104,7 @@ The project includes 14 runnable examples covering all major features:
 |---------|-------------|-------|
 | `basic_usage` | Platform detection, allocator, arena, logger, vector, hashmap | L7a-L4 |
 | `hello_world` | Logging initialization and basic API usage | L7b |
-| `containers_demo` | All container types (Vector, List, HashMap, TreeMap, Stack, Queue) | L4 |
+| `containers_demo` | All container types (Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque) | L4 |
 | `vector_demo` | Vector operations: create, push, get, set, destroy | L4 |
 | `hashmap_demo` | HashMap operations: put, get, remove, iterate | L4 |
 | `arena_allocator` | Arena allocator lifecycle: alloc, reset, destroy | L7a |
@@ -140,9 +140,9 @@ cd build
 
 | Category | Count |
 |----------|-------|
-| Source files (.c) | 20 |
-| Header files (.h) | 23 |
-| Test files (.c) | 20 |
+| Source files (.c) | 25 |
+| Header files (.h) | 26 |
+| Test files (.c) | 22 |
 | Example files (.c) | 14 |
 | Documentation (.md) | 21 |
 

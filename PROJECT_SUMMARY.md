@@ -60,19 +60,19 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
 | L7b | Runtime | error.c, logger.c | ✅ Complete |
 | L6 | Object | object.c, class.c, interface.c | ✅ Complete |
 | L5 | Interface | sequence.h, map.h, iterator.h | ✅ Complete |
-| L4 | Containers | vector.c, list.c, hashmap.c, treemap.c | ✅ Complete |
+| L4 | Containers | vector.c, list.c, hashmap.c, treemap.c, stack.c, queue.c, set.c, deque.c | ✅ Complete |
 | L3 | Algorithms | sort.c, functional.c | ✅ Complete |
 | L2 | Modules | json.c, eventloop.c | ✅ Complete |
 
 ## Code Statistics
 
-- **Header files**: 21
-- **Source files**: 18
-- **Test files**: 18
+- **Header files**: 26
+- **Source files**: 25
+- **Test files**: 22
 - **Documentation files**: 21
-- **Total lines of code**: 4,253
-- **Git commits**: 25
-- **Test modules passing**: 12/16 (3 pending for full implementation)
+- **Total lines of code**: 7,213
+- **Git commits**: 35
+- **Test modules passing**: 22/22
 
 ## Key Features
 
@@ -82,8 +82,8 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
 4. **Cross-platform**: Linux (epoll), macOS (kqueue), Windows support
 5. **JSON**: Full parser and serializer with escape handling
 6. **Event Loop**: Real async I/O with timer support
-7. **Containers**: Vector, List, HashMap, TreeMap (Red-Black tree)
-8. **Algorithms**: QuickSort, InsertionSort, predicates
+7. **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque
+8. **Algorithms**: QuickSort, InsertionSort, binary search, find_if, for_each, predicates
 
 ## Testing
 
@@ -93,11 +93,12 @@ cd build
 ./tests/cobalt_test
 ```
 
-All 16 test modules pass:
+All 22 test modules pass:
 - ✅ platform, atomic, allocator, arena
 - ✅ error, logger, object, class, interface
-- ✅ vector, list, hashmap, treemap
+- ✅ vector, list, hashmap, treemap, set, deque
 - ✅ sort, functional, json, eventloop
+- ✅ stack, queue, iterator
 
 ## Documentation
 
@@ -128,7 +129,26 @@ Supports:
 
 ## Version
 
-Tagged as **v2.0.0** - Architecture Baseline Release
+Tagged as **v2.1.0** - Feature Expansion Release
+
+## Phase 3 Updates
+
+### New Containers
+- **Set**: Hash-based set container with O(1) insert/contains/remove
+- **Deque**: Double-ended queue with O(1) push/pop at both ends
+
+### New Algorithms
+- **cobalt_bsearch**: Binary search on sorted arrays
+- **cobalt_find_if**: Find first element matching predicate
+- **cobalt_for_each**: Apply operation to each element
+
+### Code Organization
+- Split json.c into json_parse.c and json_serialize.c modules
+
+### Test Coverage
+- Added tests for Set and Deque containers
+- Added tests for new algorithms (bsearch, find_if, for_each)
+- Total: 22 tests, all passing
 
 ## Next Steps
 

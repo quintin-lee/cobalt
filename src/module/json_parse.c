@@ -1,12 +1,21 @@
+/**
+ * @file json_parse.c
+ * @brief Implementation of the JSON parser
+ * @note This file is typically included and compiled by json.c, not exposed separately.
+ */
 #include "cobalt/module/json.h"
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * @brief JSON parsing context
+ * Stores the string currently being parsed, position, and total length.
+ */
 typedef struct {
-    const char *str;
-    int         pos;
-    int         len;
+    const char *str;    /**< The JSON string to be parsed */
+    int         pos;    /**< The current character position being parsed */
+    int         len;    /**< Total length of the string */
 } json_parse_ctx_t;
 
 static inline int is_space(int c)
@@ -177,6 +186,11 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
     return root;
 }
 
+/*
+ * @brief Attempt to parse any valid JSON value
+ * 
+ * Determines the type based on the current character and dispatches to specific parsing functions.
+ */
 static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
 {
     json_skip_whitespace(ctx);
@@ -204,6 +218,7 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
 
     if (c == '-' || isdigit((unsigned char)c)) {
         int start = ctx->pos;
+        // Simple handling: skip all digits, minus sign, decimal point
         while (ctx->pos < ctx->len &&
                (isdigit((unsigned char)ctx->str[ctx->pos]) || ctx->str[ctx->pos] == '.')) {
             ctx->pos++;
@@ -239,6 +254,11 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
     return NULL;
 }
 
+/*
+ * @brief Exposed entry point for parsing
+ * 
+ * Wraps the text, initializes the parsing context, and calls json_parse_value.
+ */
 json_node_t *json_parse(const char *text)
 {
     if (!text) {

@@ -1,3 +1,7 @@
+/**
+ * @file eventloop.c
+ * @brief Implementation of the event-driven I/O loop module
+ */
 #define _POSIX_C_SOURCE 200112L
 #ifndef _DEFAULT_SOURCE
 #define _DEFAULT_SOURCE
@@ -24,28 +28,42 @@
 #define COBALT_NANOS_PER_MILLI 1000000ULL
 #define COBALT_NANOS_PER_SEC 1000000000LL
 
-/* Internal timer entry */
+/* ============================================================
+ * Internal data structures
+ * ============================================================ */
+
+/**
+ * @brief Internal timer entry structure
+ * Records timer trigger time, callback, and status information.
+ */
 typedef struct timer_entry {
-    uint64_t            timer_id;
-    uint64_t            timeout_ms;
-    uint64_t            interval_ms;
-    timer_handler_t     callback;
-    void               *user_data;
-    int                 active;
-    struct timespec     next_fire;
-    struct timer_entry *next;
+    uint64_t            timer_id;       /**< Unique timer ID */
+    uint64_t            timeout_ms;     /**< Delay time for the first trigger (milliseconds) */
+    uint64_t            interval_ms;    /**< Interval time for repeating timer (milliseconds), 0 means one-shot */
+    timer_handler_t     callback;       /**< Timer callback function */
+    void               *user_data;      /**< User data for the callback function */
+    int                 active;         /**< Whether the timer is currently active */
+    struct timespec     next_fire;      /**< Absolute time for the next trigger */
+    struct timer_entry *next;           /**< Next pointer for linked list structure (currently mainly maintained by array heap) */
 } timer_entry_t;
 
-/* Internal fd entry */
+/**
+ * @brief Internal file descriptor event entry structure
+ * Saves listened FDs and their callbacks in a linked list form.
+ */
 typedef struct fd_entry {
-    int              fd;
-    short            events;
-    fd_handler_t     callback;
-    void            *user_data;
-    struct fd_entry *next;
+    int              fd;                /**< The file descriptor being listened to */
+    short            events;            /**< Mask of events to listen for */
+    fd_handler_t     callback;          /**< Callback function when event occurs */
+    void            *user_data;         /**< User data for the callback function */
+    struct fd_entry *next;              /**< The next entry in the linked list */
 } fd_entry_t;
 
-/* Heap helpers for timer entries */
+/* ============================================================
+ * Min-heap helper functions (used for managing timers)
+ * ============================================================ */
+
+/* Compare trigger times of two timer entries. Returns negative if a < b */
 static int timer_compare(const timer_entry_t *a, const timer_entry_t *b)
 {
     if (a->next_fire.tv_sec < b->next_fire.tv_sec) {
@@ -63,6 +81,7 @@ static int timer_compare(const timer_entry_t *a, const timer_entry_t *b)
     return 0;
 }
 
+/* Sift up operation in the timer heap to maintain min-heap property */
 static void heap_sift_up(timer_entry_t **heap, int idx)
 {
     while (idx > 0) {
@@ -77,6 +96,7 @@ static void heap_sift_up(timer_entry_t **heap, int idx)
     }
 }
 
+/* Sift down operation in the timer heap to maintain min-heap property */
 static void heap_sift_down(timer_entry_t **heap, int count, int idx)
 {
     while (1) {
@@ -99,28 +119,33 @@ static void heap_sift_down(timer_entry_t **heap, int count, int idx)
     }
 }
 
-/* Event loop context */
+/**
+ * @brief Specific definition of the event loop context
+ */
 struct cobalt_eventloop {
 #ifdef __linux__
-    int                 epoll_fd;
-    struct epoll_event *epoll_events;
-    int                 epoll_capacity;
+    int                 epoll_fd;       /**< epoll file descriptor */
+    struct epoll_event *epoll_events;   /**< Array to store epoll_wait results */
+    int                 epoll_capacity; /**< Capacity of the epoll events array */
 #elif __APPLE__
-    int kq;
+    int kq;                             /**< kqueue file descriptor */
 #endif
-    fd_entry_t     *fd_head;
-    fd_entry_t     *fd_tail;
-    timer_entry_t **timer_heap;
-    int             timer_count;
-    int             timer_capacity;
-    uint64_t        next_timer_id;
-    int             running;
-    int             stop_flag;
+    fd_entry_t     *fd_head;            /**< Head pointer of the FD listening linked list */
+    fd_entry_t     *fd_tail;            /**< Tail pointer of the FD listening linked list */
+    timer_entry_t **timer_heap;         /**< Min-heap array managing timers */
+    int             timer_count;        /**< Current number of timers in the heap */
+    int             timer_capacity;     /**< Capacity of the heap */
+    uint64_t        next_timer_id;      /**< The next allocated timer ID */
+    int             running;            /**< Flag indicating if the event loop is running */
+    int             stop_flag;          /**< Flag requesting to stop the event loop */
 };
 
-/* Heap helpers that access cobalt_eventloop_t */
+/* Heap operation helper functions bound to the event loop object */
+
+/* Push a timer into the heap */
 static void heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
 {
+    // If capacity is insufficient, expand it
     if (loop->timer_count >= loop->timer_capacity) {
         int             new_cap  = loop->timer_capacity * 2;
         timer_entry_t **new_heap = realloc(loop->timer_heap, sizeof(timer_entry_t *) * new_cap);
@@ -135,6 +160,7 @@ static void heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
     loop->timer_count++;
 }
 
+/* Pop and return the timer with the nearest trigger time in the heap */
 static timer_entry_t *heap_pop_min(cobalt_eventloop_t *loop)
 {
     if (loop->timer_count == 0) {
@@ -147,6 +173,7 @@ static timer_entry_t *heap_pop_min(cobalt_eventloop_t *loop)
     return min;
 }
 
+/* Peek at the timer with the nearest trigger time in the heap, without popping */
 static timer_entry_t *heap_peek(const cobalt_eventloop_t *loop)
 {
     if (loop->timer_count == 0) {
@@ -156,14 +183,16 @@ static timer_entry_t *heap_peek(const cobalt_eventloop_t *loop)
 }
 
 /* ============================================================
-   HELPERS
+   Helper functions
    ============================================================ */
 
+/* Get monotonic time (unaffected by system clock adjustments, suitable for timers) */
 static void get_time_now(struct timespec *timepoint)
 {
     clock_gettime(CLOCK_MONOTONIC, timepoint);
 }
 
+/* Check if the time represented by lhs is later than or equal to the time represented by rhs (now) */
 static int timer_expired(const struct timespec *lhs, const struct timespec *rhs)
 {
     long secs  = lhs->tv_sec - rhs->tv_sec;
@@ -172,9 +201,10 @@ static int timer_expired(const struct timespec *lhs, const struct timespec *rhs)
 }
 
 /* ============================================================
-   PRIVATE HELPERS
+   Private logic handling
    ============================================================ */
 
+/* Check and process all expired timers */
 static void process_expired_timers(cobalt_eventloop_t *loop, const struct timespec *now)
 {
     while (loop->timer_count > 0) {
@@ -206,6 +236,7 @@ static void process_expired_timers(cobalt_eventloop_t *loop, const struct timesp
     }
 }
 
+/* Calculate the timeout to wait for epoll_wait/kevent */
 static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct timespec *now)
 {
     int                  timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
@@ -213,10 +244,12 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
     if (next_timer != NULL) {
         long secs  = next_timer->next_fire.tv_sec - now->tv_sec;
         long nsecs = next_timer->next_fire.tv_nsec - now->tv_nsec;
+        // Calculate the remaining milliseconds until the next timer triggers
         timeout_ms = (int)((secs * COBALT_MILLIS_PER_SEC) + (nsecs / COBALT_NANOS_PER_MILLI));
         if (timeout_ms < 0) {
             timeout_ms = 0;
         }
+        // Set a maximum value to prevent waiting too long
         if (timeout_ms > COBALT_EVENTLOOP_TIMEOUT_MAX) {
             timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MAX;
         }
@@ -225,9 +258,13 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
 }
 
 /* ============================================================
-   PUBLIC API
+   Public interface implementation
    ============================================================ */
 
+/*
+ * @brief Create event loop object
+ * Initializes the internal structures and the underlying IO multiplexing mechanism (epoll/kqueue).
+ */
 cobalt_eventloop_t *cobalt_eventloop_create(void)
 {
     cobalt_eventloop_t *loop = calloc(1, sizeof(cobalt_eventloop_t));
@@ -272,6 +309,10 @@ cobalt_eventloop_t *cobalt_eventloop_create(void)
     return loop;
 }
 
+/*
+ * @brief Destroy the event loop
+ * Closes the underlying file descriptors, frees all entries in the FD linked list and timer heap, as well as the loop's own memory.
+ */
 void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
 {
     if (loop == NULL) {
@@ -304,6 +345,10 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
     free(loop);
 }
 
+/*
+ * @brief Add a file descriptor to the event loop's listeners
+ * Wraps and calls the underlying epoll_ctl or kevent, and saves the related state to the internal linked list.
+ */
 int cobalt_eventloop_add_fd(
     cobalt_eventloop_t *loop,
     cobalt_fd_t         file_descriptor, // NOLINT(bugprone-easily-swappable-parameters)
@@ -349,6 +394,10 @@ int cobalt_eventloop_add_fd(
     return 0;
 }
 
+/*
+ * @brief Modify the listened events of an already listening file descriptor
+ * This is done by deleting first and then re-adding.
+ */
 int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
                             cobalt_fd_t         file_descriptor,
                             cobalt_events_t     events,
@@ -362,6 +411,10 @@ int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
     return cobalt_eventloop_add_fd(loop, file_descriptor, events, callback, user_data);
 }
 
+/*
+ * @brief Remove a file descriptor from the event loop's listeners
+ * Removes it from both the underlying epoll/kqueue and the internal listening linked list simultaneously.
+ */
 int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t file_descriptor)
 {
     if (loop == NULL || file_descriptor < 0) {
@@ -390,6 +443,10 @@ int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t file_descripto
     return -1;
 }
 
+/*
+ * @brief Add a new timer task
+ * Creates a new timer structure based on the given parameters, calculates its absolute trigger time, and puts it in the min-heap for management.
+ */
 uint64_t cobalt_eventloop_add_timer(
     cobalt_eventloop_t  *loop,
     cobalt_timeout_ms_t  timeout_ms, // NOLINT(bugprone-easily-swappable-parameters)
@@ -429,6 +486,10 @@ uint64_t cobalt_eventloop_add_timer(
     return timer_id;
 }
 
+/*
+ * @brief Delete the specified timer
+ * Finds the matching ID in the heap, removes it, and readapts the heap to maintain the min-heap property.
+ */
 int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
 {
     if (loop == NULL) {
@@ -447,6 +508,10 @@ int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
     return -1;
 }
 
+/*
+ * @brief Run the event loop until the stop flag is received
+ * In the internal loop, it continuously calls cobalt_eventloop_iteration to process expired tasks and IO events.
+ */
 void cobalt_eventloop_run(cobalt_eventloop_t *loop)
 {
     if (loop == NULL) {
@@ -462,6 +527,10 @@ void cobalt_eventloop_run(cobalt_eventloop_t *loop)
     loop->running = 0;
 }
 
+/*
+ * @brief Stop the event loop
+ * Sets the stop_flag so that the next loop condition check fails.
+ */
 void cobalt_eventloop_stop(cobalt_eventloop_t *loop)
 {
     if (loop != NULL) {
@@ -469,6 +538,12 @@ void cobalt_eventloop_stop(cobalt_eventloop_t *loop)
     }
 }
 
+/*
+ * @brief Execute a single event handling iteration
+ * Mainly executes two steps:
+ * 1. Process all expired timer callbacks.
+ * 2. Block waiting (timeout determined by the nearest timer) and handle occurred I/O events.
+ */
 int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
 {
     if (loop == NULL) {

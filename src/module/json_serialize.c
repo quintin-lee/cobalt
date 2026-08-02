@@ -1,9 +1,22 @@
+/**
+ * @file json_serialize.c
+ * @brief Implementation of the JSON serializer
+ * @note This file is typically included and compiled by json.c, not exposed separately.
+ */
 #include "cobalt/module/json.h"
 #include "cobalt/utils/string.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+/*
+ * @brief Apply JSON escaping to a string
+ * @param str The original string to escape
+ * @param len The length of the string
+ * @return Dynamically allocated, escaped string (must be manually freed), returns NULL on failure
+ * 
+ * Two passes: the first pass calculates the required length after escaping, and the second pass performs the actual escaping and writing.
+ */
 static char *json_escape_string(const char *str, size_t len)
 {
     size_t      out_len = 0;
@@ -81,6 +94,13 @@ static char *json_escape_string(const char *str, size_t len)
     return result;
 }
 
+/*
+ * @brief Recursively serialize a JSON node tree to a JSON string
+ * @param node The JSON node to serialize
+ * @return Dynamically allocated serialized string (caller must free manually), returns "{}" or "null" on failure
+ * 
+ * Converts nodes of different types to strings according to the JSON format specification, using a dynamically expanding buffer for storage.
+ */
 char *json_serialize(json_node_t *node)
 {
     if (!node) {
