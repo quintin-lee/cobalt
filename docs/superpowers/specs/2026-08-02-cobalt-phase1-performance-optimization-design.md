@@ -25,7 +25,7 @@ Phase 1 focuses on internal performance improvements with no public API breaking
 **Design:**
 - Round up requested size to `alignof(max_align_t)` boundary (typically 8 or 16 bytes)
 - Return pointer aligned to at least `alignof(void*)`
-- Store original unrounded size internally to track actual usage accurately
+- Store rounded-up size internally to keep `arena->used` aligned with actual buffer offset
 - API signature unchanged: `void* cobalt_arena_alloc(cobalt_arena_t* arena, size_t size)`
 - Internal bookkeeping uses `arena->used += round_up(size)` while returning aligned pointer
 
@@ -122,7 +122,10 @@ Phase 1 focuses on internal performance improvements with no public API breaking
   COBALT_ERR_IO = -5
   COBALT_ERR_UNSUPPORTED = -6
   ```
-- Document that existing return values (`NULL`, `-1`) map to `COBALT_ERR_INVALID_ARG` or `COBALT_ERR_OUT_OF_MEMORY` as appropriate
+- Document mapping from existing return values to error codes:
+  - `NULL` return → `COBALT_ERR_OUT_OF_MEMORY` or `COBALT_ERR_NOT_FOUND`
+  - `-1` return → `COBALT_ERR_INVALID_ARG` or `COBALT_ERR_ALREADY_EXISTS`
+  - Specific mapping per function is defined in implementation comments
 - Do NOT change existing function signatures in Phase 1
 - Add `cobalt_errno()` getter for thread-local last error
 - Update internal implementations to set thread-local errno on failure paths
