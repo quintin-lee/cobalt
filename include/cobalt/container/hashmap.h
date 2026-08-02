@@ -41,4 +41,7 @@ int cobalt_hashmap_remove(cobalt_hashmap_t* map, const char* key);
 /* Map size */
 size_t cobalt_hashmap_size(cobalt_hashmap_t* map);
 
+/* Bucket count (for debugging / resize verification) */
+size_t cobalt_hashmap_capacity(const cobalt_hashmap_t* map);
+
 #endif /* HASHMAP_H */

@@ -4,8 +4,10 @@
  */
 
 #include "cobalt/container/hashmap.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void test_hashmap_basic(void)
 {
@@ -46,8 +48,62 @@ void test_hashmap_basic(void)
     printf("  Hashmap tests completed\n");
 }
 
+void test_hashmap_resize(void)
+{
+    printf("Testing hashmap resize...\n");
+
+    cobalt_hashmap_t* map = cobalt_hashmap_create(8);
+    TEST_ASSERT(map != NULL);
+
+    TEST_ASSERT(cobalt_hashmap_capacity(map) == 8);
+
+    int values[100];
+    char keys[100][16];
+    for (int i = 0; i < 100; i++)
+        {
+            snprintf(keys[i], 16, "key_%d", i);
+            values[i] = i * 10;
+            TEST_ASSERT(cobalt_hashmap_put(map, keys[i], &values[i]) == 0);
+        }
+
+    TEST_ASSERT(cobalt_hashmap_size(map) == 100);
+    TEST_ASSERT(cobalt_hashmap_capacity(map) > 8);
+
+    for (int i = 0; i < 100; i++)
+        {
+            void* val = cobalt_hashmap_get(map, keys[i]);
+            TEST_ASSERT(val != NULL);
+            TEST_ASSERT(*(int*)val == i * 10);
+        }
+
+    cobalt_hashmap_destroy(map);
+    printf("  Hashmap resize test passed\n");
+}
+
+void test_hashmap_zero_initial_capacity(void)
+{
+    printf("Testing hashmap zero initial capacity...\n");
+
+    cobalt_hashmap_t* map = cobalt_hashmap_create(0);
+    TEST_ASSERT(map != NULL);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 0);
+    TEST_ASSERT(cobalt_hashmap_capacity(map) == 0);
+
+    int value = 42;
+    TEST_ASSERT(cobalt_hashmap_put(map, "first", &value) == 0);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 1);
+    TEST_ASSERT(cobalt_hashmap_capacity(map) > 0);
+    TEST_ASSERT(*(int*)cobalt_hashmap_get(map, "first") == 42);
+
+    cobalt_hashmap_destroy(map);
+    printf("  Hashmap zero initial capacity test passed\n");
+}
+
 void test_hashmap(void)
 {
     printf("Testing hashmap...\n");
     test_hashmap_basic();
+    test_hashmap_resize();
+    test_hashmap_zero_initial_capacity();
+    printf("  Hashmap tests completed\n");
 }

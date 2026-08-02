@@ -35,10 +35,10 @@ struct cobalt_hashmap
 
 static unsigned int hash_string(const char* str)
 {
-    unsigned int h = 0;
+    unsigned int h = 2166136261U;
     while (*str)
         {
-            h = (h << 5) + h + *str;
+            h = (h ^ (unsigned char)*str) * 16777619U;
             str++;
         }
     return h;
@@ -51,17 +51,53 @@ cobalt_hashmap_t* cobalt_hashmap_create(size_t initial_buckets)
         return NULL;
 
     hashmap_impl_t* impl = &map->impl;
-    size_t buckets = initial_buckets > 0 ? initial_buckets : 16;
-    impl->buckets = calloc(buckets, sizeof(hashmap_node_t*));
-    if (!impl->buckets)
+    if (initial_buckets > 0)
         {
-            free(map);
-            return NULL;
+            impl->buckets = calloc(initial_buckets, sizeof(hashmap_node_t*));
+            if (!impl->buckets)
+                {
+                    free(map);
+                    return NULL;
+                }
+            impl->bucket_count = initial_buckets;
         }
-
-    impl->bucket_count = buckets;
+    else
+        {
+            impl->buckets = NULL;
+            impl->bucket_count = 0;
+        }
     impl->size = 0;
     return map;
+}
+
+static int hashmap_ensure_buckets(hashmap_impl_t* impl, size_t min_buckets)
+{
+    if (impl->bucket_count >= min_buckets)
+        return 0;
+    size_t new_count = min_buckets > 0 ? min_buckets : 16;
+    hashmap_node_t** new_buckets = calloc(new_count, sizeof(hashmap_node_t*));
+    if (!new_buckets)
+        return -1;
+
+    if (impl->buckets)
+        {
+            for (size_t i = 0; i < impl->bucket_count; i++)
+                {
+                    hashmap_node_t* node = impl->buckets[i];
+                    while (node)
+                        {
+                            hashmap_node_t* next = node->next;
+                            unsigned int new_idx = hash_string(node->key) % new_count;
+                            node->next = new_buckets[new_idx];
+                            new_buckets[new_idx] = node;
+                            node = next;
+                        }
+                }
+            free(impl->buckets);
+        }
+    impl->buckets = new_buckets;
+    impl->bucket_count = new_count;
+    return 0;
 }
 
 void cobalt_hashmap_destroy(cobalt_hashmap_t* map)
@@ -89,6 +125,19 @@ int cobalt_hashmap_put(cobalt_hashmap_t* map, const char* key, void* value)
     if (!map || !key)
         return -1;
     hashmap_impl_t* impl = &map->impl;
+
+    if (impl->bucket_count == 0)
+        {
+            if (hashmap_ensure_buckets(impl, 16) != 0)
+                return -1;
+        }
+
+    if ((impl->size + 1) * 4 / impl->bucket_count > 3)
+        {
+            if (hashmap_ensure_buckets(impl, impl->bucket_count * 2) != 0)
+                return -1;
+        }
+
     unsigned int idx = hash_string(key) % impl->bucket_count;
 
     hashmap_node_t* node = impl->buckets[idx];
@@ -115,7 +164,7 @@ int cobalt_hashmap_put(cobalt_hashmap_t* map, const char* key, void* value)
 
 void* cobalt_hashmap_get(cobalt_hashmap_t* map, const char* key)
 {
-    if (!map || !key)
+    if (!map || !key || map->impl.bucket_count == 0)
         return NULL;
     hashmap_impl_t* impl = &map->impl;
     unsigned int idx = hash_string(key) % impl->bucket_count;
@@ -132,7 +181,7 @@ void* cobalt_hashmap_get(cobalt_hashmap_t* map, const char* key)
 
 int cobalt_hashmap_remove(cobalt_hashmap_t* map, const char* key)
 {
-    if (!map || !key)
+    if (!map || !key || map->impl.bucket_count == 0)
         return -1;
     hashmap_impl_t* impl = &map->impl;
     unsigned int idx = hash_string(key) % impl->bucket_count;
@@ -161,4 +210,11 @@ size_t cobalt_hashmap_size(cobalt_hashmap_t* map)
     if (!map)
         return 0;
     return map->impl.size;
+}
+
+size_t cobalt_hashmap_capacity(const cobalt_hashmap_t* map)
+{
+    if (!map)
+        return 0;
+    return map->impl.bucket_count;
 }
