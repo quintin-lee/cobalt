@@ -58,6 +58,38 @@ int main(void)
     printf("Queue: size=%zu\n", cobalt_queue_size(queue));
     cobalt_queue_destroy(queue);
 
+    /* Set */
+    cobalt_set_t* set = cobalt_set_create(8);
+    const char* s1 = "alpha";
+    const char* s2 = "beta";
+    const char* s3 = "gamma";
+    cobalt_set_insert(set, (void*)s1);
+    cobalt_set_insert(set, (void*)s2);
+    cobalt_set_insert(set, (void*)s3);
+    printf("Set: size=%zu, contains alpha=%d, beta=%d, delta=%d\n",
+           cobalt_set_size(set),
+           cobalt_set_contains(set, (void*)s1),
+           cobalt_set_contains(set, (void*)s2),
+           cobalt_set_contains(set, (void*)"delta"));
+    cobalt_set_remove(set, (void*)s2);
+    printf("Set after remove beta: size=%zu\n", cobalt_set_size(set));
+    cobalt_set_destroy(set);
+
+    /* Deque */
+    cobalt_deque_t* dq = cobalt_deque_create();
+    cobalt_deque_push_back(dq, &v1);
+    cobalt_deque_push_back(dq, &v2);
+    cobalt_deque_push_front(dq, &v3);
+    printf("Deque: size=%zu, front=%d, back=%d\n",
+           cobalt_deque_size(dq),
+           *(int*)cobalt_deque_peek_front(dq),
+           *(int*)cobalt_deque_peek_back(dq));
+    void* item = cobalt_deque_pop_front(dq);
+    printf("Deque pop front: %d\n", *(int*)item);
+    item = cobalt_deque_pop_back(dq);
+    printf("Deque pop back: %d\n", *(int*)item);
+    cobalt_deque_destroy(dq);
+
     printf("\n=== Example completed ===\n");
     return 0;
 }

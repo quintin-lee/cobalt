@@ -21,7 +21,7 @@ L7a Memory         → System allocator, Arena allocator
 L7b Runtime        → Error handling, Structured logging
 L6  Core           → Object system, Class system, Interface
 L5  Interface      → Sequence, Map, Iterator protocols
-L4  Container      → Vector, List, HashMap, TreeMap, Stack, Queue
+L4  Container      → Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque
 L3  Algorithm      → Sort algorithms, Predicate functions
 L2  Module         → JSON parser/serializer, Event loop
 L1  Application    → Example applications

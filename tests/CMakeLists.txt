@@ -69,3 +69,9 @@ target_link_libraries(benchmark_hashmap cobalt)
 
 add_executable(benchmark_vector benchmark/benchmark_vector.c)
 target_link_libraries(benchmark_vector cobalt)
+
+add_executable(benchmark_set benchmark/benchmark_set.c)
+target_link_libraries(benchmark_set cobalt)
+
+add_executable(benchmark_deque benchmark/benchmark_deque.c)
+target_link_libraries(benchmark_deque cobalt)
