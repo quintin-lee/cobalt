@@ -56,13 +56,7 @@ cobalt_vector_t* cobalt_vector_create(size_t initial_capacity)
     if (!vec)
         return NULL;
 
-    vec->items = malloc(initial_capacity * sizeof(void*));
-    if (!vec->items)
-        {
-            free(vec);
-            return NULL;
-        }
-
+    vec->items = initial_capacity > 0 ? malloc(initial_capacity * sizeof(void*)) : NULL;
     vec->capacity = initial_capacity;
     vec->size = 0;
 

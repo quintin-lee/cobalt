@@ -5,6 +5,7 @@
 
 #include "cobalt/container/vector.h"
 #include "cobalt/interface/iterator.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -258,6 +259,24 @@ void test_vector_iterator(void)
     cobalt_vector_destroy(vec);
 }
 
+void test_vector_zero_capacity(void)
+{
+    printf("Testing vector zero capacity...\n");
+
+    cobalt_vector_t* vec = cobalt_vector_create(0);
+    TEST_ASSERT(vec != NULL);
+    TEST_ASSERT(cobalt_vector_is_empty(vec));
+    TEST_ASSERT(cobalt_vector_size(vec) == 0);
+
+    int val = 42;
+    TEST_ASSERT(cobalt_vector_push(vec, &val) == 0);
+    TEST_ASSERT(cobalt_vector_size(vec) == 1);
+    TEST_ASSERT(*(int*)cobalt_vector_get(vec, 0) == 42);
+
+    cobalt_vector_destroy(vec);
+    printf("  Vector zero capacity test passed\n");
+}
+
 void test_vector(void)
 {
     printf("Testing vector...\n");
@@ -265,4 +284,5 @@ void test_vector(void)
     test_vector_edge_cases();
     test_vector_growth();
     test_vector_iterator();
+    test_vector_zero_capacity();
 }
