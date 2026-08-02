@@ -53,4 +53,7 @@ size_t cobalt_list_size(cobalt_list_t* list);
 /* Is empty? */
 int cobalt_list_is_empty(cobalt_list_t* list);
 
+/* List-specific iterator creation */
+cobalt_iterator_t* cobalt_list_iterator_create(cobalt_list_t* list);
+
 #endif /* LIST_H */

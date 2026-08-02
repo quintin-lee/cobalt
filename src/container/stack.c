@@ -1,4 +1,5 @@
 #include "cobalt/container/stack.h"
+#include "cobalt/runtime/error.h"
 #include <stdlib.h>
 
 typedef struct stack_node
@@ -45,7 +46,10 @@ int cobalt_stack_push(cobalt_stack_t* stack, void* item)
 
     stack_node_t* node = malloc(sizeof(stack_node_t));
     if (!node)
-        return -1;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            return -1;
+        }
 
     node->data = item;
     node->next = stack->top;

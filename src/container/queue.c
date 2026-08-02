@@ -1,4 +1,5 @@
 #include "cobalt/container/queue.h"
+#include "cobalt/runtime/error.h"
 #include <stdlib.h>
 
 typedef struct queue_node
@@ -46,7 +47,10 @@ int cobalt_queue_enqueue(cobalt_queue_t* queue, void* item)
 
     queue_node_t* node = malloc(sizeof(queue_node_t));
     if (!node)
-        return -1;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            return -1;
+        }
 
     node->data = item;
     node->next = NULL;

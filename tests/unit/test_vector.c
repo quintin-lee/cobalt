@@ -277,6 +277,49 @@ void test_vector_zero_capacity(void)
     printf("  Vector zero capacity test passed\n");
 }
 
+void test_vector_remove(void)
+{
+    printf("Testing vector_remove...\n");
+    
+    cobalt_vector_t* vec = cobalt_vector_create(4);
+    TEST_ASSERT(vec != NULL);
+    
+    int values[] = {10, 20, 30, 40, 50};
+    for (int i = 0; i < 5; i++)
+    {
+        TEST_ASSERT(cobalt_vector_push(vec, &values[i]) == 0);
+    }
+    
+    TEST_ASSERT(cobalt_vector_size(vec) == 5);
+    
+    /* Remove middle element using sequence interface */
+    cobalt_sequence_t* seq = (cobalt_sequence_t*)vec;
+    seq->remove(seq, &values[2]);  /* Remove 30 */
+    
+    TEST_ASSERT(cobalt_vector_size(vec) == 4);
+    TEST_ASSERT(*(int*)cobalt_vector_get(vec, 0) == 10);
+    TEST_ASSERT(*(int*)cobalt_vector_get(vec, 1) == 20);
+    TEST_ASSERT(*(int*)cobalt_vector_get(vec, 2) == 40);
+    TEST_ASSERT(*(int*)cobalt_vector_get(vec, 3) == 50);
+    
+    /* Remove first element */
+    seq->remove(seq, &values[0]);
+    TEST_ASSERT(cobalt_vector_size(vec) == 3);
+    TEST_ASSERT(*(int*)cobalt_vector_get(vec, 0) == 20);
+    
+    /* Remove last element */
+    seq->remove(seq, &values[4]);
+    TEST_ASSERT(cobalt_vector_size(vec) == 2);
+    
+    /* Remove non-existent element */
+    int not_found = 999;
+    seq->remove(seq, &not_found);
+    TEST_ASSERT(cobalt_vector_size(vec) == 2);  /* Size unchanged */
+    
+    cobalt_vector_destroy(vec);
+    printf("  vector_remove test passed\n");
+}
+
 void test_vector(void)
 {
     printf("Testing vector...\n");
@@ -285,4 +328,5 @@ void test_vector(void)
     test_vector_growth();
     test_vector_iterator();
     test_vector_zero_capacity();
+    test_vector_remove();
 }

@@ -1,6 +1,8 @@
 #include "cobalt/container/vector.h"
 #include "cobalt/interface/iterator.h"
+#include "cobalt/runtime/error.h"
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct
 {
@@ -31,7 +33,10 @@ static void vector_add_seq(cobalt_sequence_t* self, void* item)
             size_t new_cap = (vec->capacity == 0) ? 1 : vec->capacity * 2;
             void** new_items = (void**)realloc(vec->items, new_cap * sizeof(void*));
             if (!new_items)
-                return;
+                {
+                    cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+                    return;
+                }
             vec->items = new_items;
             vec->capacity = new_cap;
         }
@@ -40,8 +45,20 @@ static void vector_add_seq(cobalt_sequence_t* self, void* item)
 
 static void vector_remove_seq(cobalt_sequence_t* self, void* item)
 {
-    (void)self;
-    (void)item;
+    cobalt_vector_impl_t* vec = (cobalt_vector_impl_t*)self;
+    if (!vec || !item)
+        return;
+
+    for (size_t i = 0; i < vec->size; i++)
+    {
+        if (vec->items[i] == item)
+        {
+            memmove(vec->items + i, vec->items + i + 1,
+                    (vec->size - i - 1) * sizeof(void*));
+            vec->size--;
+            return;
+        }
+    }
 }
 
 static cobalt_iterator_t* vector_iterator_seq(cobalt_sequence_t* self)
@@ -82,7 +99,10 @@ void cobalt_vector_destroy(cobalt_vector_t* vec)
 int cobalt_vector_push(cobalt_vector_t* vec, void* item)
 {
     if (!vec)
-        return -1;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+            return -1;
+        }
     vector_add_seq((cobalt_sequence_t*)vec, item);
     return 0;
 }
@@ -97,7 +117,10 @@ void* cobalt_vector_get(cobalt_vector_t* vec, size_t index)
 int cobalt_vector_set(cobalt_vector_t* vec, size_t index, void* item)
 {
     if (!vec || index >= vec->size)
-        return -1;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+            return -1;
+        }
     vec->items[index] = item;
     return 0;
 }

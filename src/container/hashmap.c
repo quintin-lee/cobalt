@@ -1,19 +1,8 @@
 #include "cobalt/container/hashmap.h"
 #include "cobalt/runtime/error.h"
+#include "cobalt/utils/string.h"
 #include <stdlib.h>
 #include <string.h>
-
-/* Portable strdup for C11 */
-static char* my_strdup(const char* s)
-{
-    if (!s)
-        return NULL;
-    size_t len = strlen(s) + 1;
-    char* dup = malloc(len);
-    if (dup)
-        memcpy(dup, s, len);
-    return dup;
-}
 
 typedef struct hashmap_node
 {
@@ -168,7 +157,7 @@ int cobalt_hashmap_put(cobalt_hashmap_t* map, const char* key, void* value)
             cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
             return -1;
         }
-    new_node->key = my_strdup(key);
+    new_node->key = cobalt_strdup(key);
     if (!new_node->key)
         {
             free(new_node);

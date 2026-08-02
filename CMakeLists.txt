@@ -35,6 +35,7 @@ set(SOURCES
     src/module/json.c
     src/module/eventloop.c
     src/interface/iterator.c
+    src/utils/string.c
 )
 
 # Main library

@@ -47,6 +47,39 @@ jobs:
         pkg-config --cflags cobalt
         pkg-config --libs cobalt
 
+  valgrind:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Valgrind
+      run: sudo apt-get install -y valgrind
+
+    - name: Configure CMake
+      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build --parallel
+
+    - name: Run Valgrind memory check
+      working-directory: ${{github.workspace}}/build
+      run: valgrind --leak-check=full --error-exitcode=1 ./tests/cobalt_test
+
+  asan:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure with ASan
+      run: cmake -B ${{github.workspace}}/build-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-fsanitize=address -g" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
+
+    - name: Build
+      run: cmake --build ${{github.workspace}}/build-asan --parallel
+
+    - name: Run tests with ASan
+      working-directory: ${{github.workspace}}/build-asan
+      run: ctest --output-on-failure
+
   lint:
     runs-on: ubuntu-latest
     steps:

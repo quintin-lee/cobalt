@@ -99,11 +99,48 @@ void test_hashmap_zero_initial_capacity(void)
     printf("  Hashmap zero initial capacity test passed\n");
 }
 
+void test_hashmap_resize_stress(void)
+{
+    printf("Testing hashmap resize stress...\n");
+    
+    cobalt_hashmap_t* map = cobalt_hashmap_create(4);
+    TEST_ASSERT(map != NULL);
+    
+    size_t initial_capacity = cobalt_hashmap_capacity(map);
+    TEST_ASSERT(initial_capacity == 4);
+    
+    /* Insert enough to trigger multiple resizes */
+    int values[200];
+    char keys[200][32];
+    
+    for (int i = 0; i < 200; i++)
+    {
+        snprintf(keys[i], 32, "stress_key_%d", i);
+        values[i] = i * 100;
+        TEST_ASSERT(cobalt_hashmap_put(map, keys[i], &values[i]) == 0);
+    }
+    
+    TEST_ASSERT(cobalt_hashmap_size(map) == 200);
+    TEST_ASSERT(cobalt_hashmap_capacity(map) > initial_capacity);
+    
+    /* Verify all values still accessible after resizes */
+    for (int i = 0; i < 200; i++)
+    {
+        void* val = cobalt_hashmap_get(map, keys[i]);
+        TEST_ASSERT(val != NULL);
+        TEST_ASSERT(*(int*)val == i * 100);
+    }
+    
+    cobalt_hashmap_destroy(map);
+    printf("  Resize stress test passed\n");
+}
+
 void test_hashmap(void)
 {
     printf("Testing hashmap...\n");
     test_hashmap_basic();
     test_hashmap_resize();
     test_hashmap_zero_initial_capacity();
+    test_hashmap_resize_stress();
     printf("  Hashmap tests completed\n");
 }

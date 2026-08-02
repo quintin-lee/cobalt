@@ -1,15 +1,8 @@
 #ifndef FUNCTIONAL_H
 #define FUNCTIONAL_H
 
-/**
- * @file functional.h
- * @generic functional utilities and predicates
- */
-
+#include "cobalt/algorithm/sort.h"
 #include <stddef.h>
-
-/* Comparison function type (shared with sort.h) */
-typedef int (*compare_func_t)(const void* a, const void* b);
 
 /* Predicate function type */
 typedef int (*predicate_func_t)(const void* item);
