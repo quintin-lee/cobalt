@@ -1,4 +1,5 @@
 #include "cobalt/container/hashmap.h"
+#include "cobalt/runtime/error.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -48,7 +49,10 @@ cobalt_hashmap_t* cobalt_hashmap_create(size_t initial_buckets)
 {
     cobalt_hashmap_t* map = malloc(sizeof(cobalt_hashmap_t));
     if (!map)
-        return NULL;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            return NULL;
+        }
 
     hashmap_impl_t* impl = &map->impl;
     if (initial_buckets > 0)
@@ -57,6 +61,7 @@ cobalt_hashmap_t* cobalt_hashmap_create(size_t initial_buckets)
             if (!impl->buckets)
                 {
                     free(map);
+                    cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
                     return NULL;
                 }
             impl->bucket_count = initial_buckets;
@@ -77,7 +82,10 @@ static int hashmap_ensure_buckets(hashmap_impl_t* impl, size_t min_buckets)
     size_t new_count = min_buckets > 0 ? min_buckets : 16;
     hashmap_node_t** new_buckets = calloc(new_count, sizeof(hashmap_node_t*));
     if (!new_buckets)
-        return -1;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            return -1;
+        }
 
     if (impl->buckets)
         {
@@ -123,7 +131,10 @@ void cobalt_hashmap_destroy(cobalt_hashmap_t* map)
 int cobalt_hashmap_put(cobalt_hashmap_t* map, const char* key, void* value)
 {
     if (!map || !key)
-        return -1;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+            return -1;
+        }
     hashmap_impl_t* impl = &map->impl;
 
     if (impl->bucket_count == 0)
@@ -153,8 +164,17 @@ int cobalt_hashmap_put(cobalt_hashmap_t* map, const char* key, void* value)
 
     hashmap_node_t* new_node = malloc(sizeof(hashmap_node_t));
     if (!new_node)
-        return -1;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            return -1;
+        }
     new_node->key = my_strdup(key);
+    if (!new_node->key)
+        {
+            free(new_node);
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            return -1;
+        }
     new_node->value = value;
     new_node->next = impl->buckets[idx];
     impl->buckets[idx] = new_node;
@@ -164,8 +184,16 @@ int cobalt_hashmap_put(cobalt_hashmap_t* map, const char* key, void* value)
 
 void* cobalt_hashmap_get(cobalt_hashmap_t* map, const char* key)
 {
-    if (!map || !key || map->impl.bucket_count == 0)
-        return NULL;
+    if (!map || !key)
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+            return NULL;
+        }
+    if (map->impl.bucket_count == 0)
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_NOT_FOUND);
+            return NULL;
+        }
     hashmap_impl_t* impl = &map->impl;
     unsigned int idx = hash_string(key) % impl->bucket_count;
 
@@ -176,13 +204,17 @@ void* cobalt_hashmap_get(cobalt_hashmap_t* map, const char* key)
                 return node->value;
             node = node->next;
         }
+    cobalt_error_set(NULL, COBALT_ERROR_NOT_FOUND);
     return NULL;
 }
 
 int cobalt_hashmap_remove(cobalt_hashmap_t* map, const char* key)
 {
     if (!map || !key || map->impl.bucket_count == 0)
-        return -1;
+        {
+            cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+            return -1;
+        }
     hashmap_impl_t* impl = &map->impl;
     unsigned int idx = hash_string(key) % impl->bucket_count;
 
@@ -202,6 +234,7 @@ int cobalt_hashmap_remove(cobalt_hashmap_t* map, const char* key)
             prev = &node->next;
             node = node->next;
         }
+    cobalt_error_set(NULL, COBALT_ERROR_NOT_FOUND);
     return -1;
 }
 

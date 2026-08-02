@@ -1,4 +1,7 @@
 #include "cobalt/runtime/error.h"
+#include <threads.h>
+
+static _Thread_local cobalt_error_t last_error = COBALT_SUCCESS;
 
 const char* cobalt_error_get_message(cobalt_error_t code)
 {
@@ -31,9 +34,10 @@ void cobalt_error_set(cobalt_error_t* error_ptr, cobalt_error_t code)
 {
     if (error_ptr)
         *error_ptr = code;
+    last_error = code;
 }
 
 cobalt_error_t cobalt_error_get_current(void)
 {
-    return COBALT_SUCCESS; /* Simplified */
+    return last_error;
 }

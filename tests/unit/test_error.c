@@ -4,6 +4,8 @@
  */
 
 #include "cobalt/runtime/error.h"
+#include "cobalt/container/hashmap.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -73,10 +75,53 @@ void test_error_set_get(void)
     printf("  Current thread-local error: %d (0=SUCCESS)\n", current);
 }
 
+void test_error_thread_local(void)
+{
+    printf("Testing thread-local error tracking...\n");
+
+    cobalt_error_set(NULL, COBALT_SUCCESS);
+    TEST_ASSERT(cobalt_error_get_current() == COBALT_SUCCESS);
+
+    cobalt_error_set(NULL, COBALT_ERROR_NOT_FOUND);
+    TEST_ASSERT(cobalt_error_get_current() == COBALT_ERROR_NOT_FOUND);
+
+    cobalt_error_set(NULL, COBALT_SUCCESS);
+    TEST_ASSERT(cobalt_error_get_current() == COBALT_SUCCESS);
+
+    printf("  Thread-local error tracking test passed\n");
+}
+
+void test_error_hashmap_integration(void)
+{
+    printf("Testing hashmap error integration...\n");
+
+    cobalt_error_set(NULL, COBALT_SUCCESS);
+
+    cobalt_hashmap_t* map = cobalt_hashmap_create(8);
+    TEST_ASSERT(map != NULL);
+
+    TEST_ASSERT(cobalt_error_get_current() == COBALT_SUCCESS);
+
+    void* val = cobalt_hashmap_get(map, "missing");
+    TEST_ASSERT(val == NULL);
+    TEST_ASSERT(cobalt_error_get_current() == COBALT_ERROR_NOT_FOUND);
+
+    TEST_ASSERT(cobalt_hashmap_remove(map, "missing") == -1);
+    TEST_ASSERT(cobalt_error_get_current() == COBALT_ERROR_NOT_FOUND);
+
+    TEST_ASSERT(cobalt_hashmap_put(map, NULL, NULL) == -1);
+    TEST_ASSERT(cobalt_error_get_current() == COBALT_ERROR_INVALID_ARGUMENT);
+
+    cobalt_hashmap_destroy(map);
+    printf("  Hashmap error integration test passed\n");
+}
+
 void test_error(void)
 {
     printf("Testing error...\n");
     test_error_codes();
     test_error_set_get();
+    test_error_thread_local();
+    test_error_hashmap_integration();
     printf("  Error tests completed\n");
 }
