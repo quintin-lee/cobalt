@@ -32,8 +32,8 @@
 #include <cobalt/container/treemap.h>
 #include <cobalt/container/vector.h>
 
-#include <cobalt/algorithm/sort.h>
 #include <cobalt/algorithm/functional.h>
+#include <cobalt/algorithm/sort.h>
 
 #include <cobalt/module/eventloop.h>
 #include <cobalt/module/json.h>

@@ -10,8 +10,7 @@
 #include <stdio.h>
 
 /* Log levels */
-typedef enum
-{
+typedef enum {
     LOG_LEVEL_TRACE = 0,
     LOG_LEVEL_DEBUG,
     LOG_LEVEL_INFO,
@@ -21,19 +20,18 @@ typedef enum
 } log_level_t;
 
 /* Log message structure */
-typedef struct
-{
+typedef struct {
     log_level_t level;
-    const char* file;
-    int line;
-    const char* message;
+    const char *file;
+    int         line;
+    const char *message;
 } log_msg_t;
 
 /* Initialize logger */
-void cobalt_logger_init(FILE* output_file, log_level_t min_level);
+void cobalt_logger_init(FILE *output_file, log_level_t min_level);
 
 /* Log a message */
-void cobalt_logger_log(log_level_t level, const char* file, int line, const char* format, ...);
+void cobalt_logger_log(log_level_t level, const char *file, int line, const char *format, ...);
 
 /* Convenience macros */
 #define cobalt_trace(...) cobalt_logger_log(LOG_LEVEL_TRACE, __FILE__, __LINE__, __VA_ARGS__)

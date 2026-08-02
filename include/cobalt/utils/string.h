@@ -6,6 +6,6 @@
 /**
  * Portable strdup for C11
  */
-char* cobalt_strdup(const char* s);
+char *cobalt_strdup(const char *s);
 
 #endif /* COBALT_STRING_UTIL_H */

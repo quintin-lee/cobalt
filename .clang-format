@@ -1,15 +1,22 @@
 ---
+Language: Cpp
 BasedOnStyle: LLVM
-Language: C
-ColumnLimit: 100
 IndentWidth: 4
+TabWidth: 4
 UseTab: Never
-BreakBeforeBraces: GNU
-AllowShortIfStatementsOnASingleLine: false
-AllowShortLoopsOnASingleLine: false
+ColumnLimit: 100
 AllowShortFunctionsOnASingleLine: None
-AllowShortBlocksOnASingleLine: Empty
-SpaceBeforeParens: ControlStatements
-IndentCaseLabels: true
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: Never
+BreakBeforeBraces: Linux
 AlignAfterOpenBracket: Align
-PointerAlignment: Left
+AlignTrailingComments: true
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+BinPackParameters: false
+BinPackArguments: false
+PointerAlignment: Right
+SortIncludes: true
+InsertBraces: true
+...
