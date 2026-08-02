@@ -1,6 +1,7 @@
 #include "cobalt/memory/arena.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdalign.h>
 
 struct cobalt_arena
 {
@@ -43,24 +44,22 @@ void cobalt_arena_destroy(cobalt_arena_t* arena)
 void* cobalt_arena_alloc(cobalt_arena_t* arena, size_t size)
 {
     if (!arena)
+        return NULL;
+
+    size_t aligned_size = (size + alignof(max_align_t) - 1) & ~(alignof(max_align_t) - 1);
+
+    if (arena->used + aligned_size > arena->capacity)
         {
-            return NULL;
-        }
-    if (arena->used + size > arena->capacity)
-        {
-            /* Grow buffer if needed */
             size_t new_capacity = arena->capacity * 2;
             void* new_buffer = realloc(arena->buffer, new_capacity);
             if (!new_buffer)
-                {
-                    return NULL;
-                }
+                return NULL;
             arena->buffer = new_buffer;
             arena->capacity = new_capacity;
         }
 
     void* ptr = (char*)arena->buffer + arena->used;
-    arena->used += size;
+    arena->used += aligned_size;
     return ptr;
 }
 

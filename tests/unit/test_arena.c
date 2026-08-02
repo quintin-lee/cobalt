@@ -4,8 +4,11 @@
  */
 
 #include "cobalt/memory/arena.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdalign.h>
 
 void test_arena_create_destroy(void)
 {
@@ -111,11 +114,32 @@ void test_arena_boundary(void)
     cobalt_arena_destroy(arena);
 }
 
+void test_arena_alignment(void)
+{
+    printf("Testing arena alignment...\n");
+
+    cobalt_arena_t* arena = cobalt_arena_create(1024);
+    TEST_ASSERT(arena != NULL);
+
+    size_t alignment = alignof(max_align_t);
+
+    for (size_t sz = 1; sz <= 64; sz++)
+        {
+            void* ptr = cobalt_arena_alloc(arena, sz);
+            TEST_ASSERT(ptr != NULL);
+            TEST_ASSERT(((uintptr_t)ptr % alignment) == 0);
+        }
+
+    printf("  Arena alignment test passed\n");
+    cobalt_arena_destroy(arena);
+}
+
 void test_arena(void)
 {
     printf("Testing arena...\n");
     test_arena_create_destroy();
     test_arena_alloc_reset();
     test_arena_boundary();
+    test_arena_alignment();
     printf("  Arena tests completed\n");
 }
