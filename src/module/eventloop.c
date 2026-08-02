@@ -19,6 +19,7 @@
 #define COBALT_EVENTLOOP_DEFAULT_CAPACITY 16
 #define COBALT_EVENTLOOP_TIMEOUT_MS 10
 #define COBALT_EVENTLOOP_TIMEOUT_MAX 100
+#define COBALT_EVENTLOOP_TIMER_HEAP_INITIAL 16
 #define COBALT_MILLIS_PER_SEC 1000ULL
 #define COBALT_NANOS_PER_MILLI 1000000ULL
 #define COBALT_NANOS_PER_SEC 1000000000LL
@@ -46,6 +47,50 @@ typedef struct fd_entry
     struct fd_entry* next;
 } fd_entry_t;
 
+/* Heap helpers for timer entries */
+static int timer_compare(const timer_entry_t* a, const timer_entry_t* b)
+{
+    if (a->next_fire.tv_sec < b->next_fire.tv_sec) return -1;
+    if (a->next_fire.tv_sec > b->next_fire.tv_sec) return 1;
+    if (a->next_fire.tv_nsec < b->next_fire.tv_nsec) return -1;
+    if (a->next_fire.tv_nsec > b->next_fire.tv_nsec) return 1;
+    return 0;
+}
+
+static void heap_sift_up(timer_entry_t** heap, int idx)
+{
+    while (idx > 0)
+        {
+            int parent = (idx - 1) / 2;
+            if (timer_compare(heap[parent], heap[idx]) <= 0)
+                break;
+            timer_entry_t* tmp = heap[parent];
+            heap[parent] = heap[idx];
+            heap[idx] = tmp;
+            idx = parent;
+        }
+}
+
+static void heap_sift_down(timer_entry_t** heap, int count, int idx)
+{
+    while (1)
+        {
+            int smallest = idx;
+            int left = 2 * idx + 1;
+            int right = 2 * idx + 2;
+            if (left < count && timer_compare(heap[left], heap[smallest]) < 0)
+                smallest = left;
+            if (right < count && timer_compare(heap[right], heap[smallest]) < 0)
+                smallest = right;
+            if (smallest == idx)
+                break;
+            timer_entry_t* tmp = heap[idx];
+            heap[idx] = heap[smallest];
+            heap[smallest] = tmp;
+            idx = smallest;
+        }
+}
+
 /* Event loop context */
 struct cobalt_eventloop
 {
@@ -58,11 +103,48 @@ struct cobalt_eventloop
 #endif
     fd_entry_t* fd_head;
     fd_entry_t* fd_tail;
-    timer_entry_t* timer_head;
+    timer_entry_t** timer_heap;
+    int timer_count;
+    int timer_capacity;
     uint64_t next_timer_id;
     int running;
     int stop_flag;
 };
+
+/* Heap helpers that access cobalt_eventloop_t */
+static void heap_push(cobalt_eventloop_t* loop, timer_entry_t* entry)
+{
+    if (loop->timer_count >= loop->timer_capacity)
+        {
+            int new_cap = loop->timer_capacity * 2;
+            timer_entry_t** new_heap = realloc(loop->timer_heap, sizeof(timer_entry_t*) * new_cap);
+            if (!new_heap)
+                return;
+            loop->timer_heap = new_heap;
+            loop->timer_capacity = new_cap;
+        }
+    loop->timer_heap[loop->timer_count] = entry;
+    heap_sift_up(loop->timer_heap, loop->timer_count);
+    loop->timer_count++;
+}
+
+static timer_entry_t* heap_pop_min(cobalt_eventloop_t* loop)
+{
+    if (loop->timer_count == 0)
+        return NULL;
+    timer_entry_t* min = loop->timer_heap[0];
+    loop->timer_count--;
+    loop->timer_heap[0] = loop->timer_heap[loop->timer_count];
+    heap_sift_down(loop->timer_heap, loop->timer_count, 0);
+    return min;
+}
+
+static timer_entry_t* heap_peek(const cobalt_eventloop_t* loop)
+{
+    if (loop->timer_count == 0)
+        return NULL;
+    return loop->timer_heap[0];
+}
 
 /* ============================================================
    HELPERS
@@ -84,72 +166,47 @@ static int timer_expired(const struct timespec* lhs, const struct timespec* rhs)
    PRIVATE HELPERS
    ============================================================ */
 
-static void add_timer_to_list(cobalt_eventloop_t* loop, timer_entry_t* entry)
+static void process_expired_timers(cobalt_eventloop_t* loop, const struct timespec* now)
 {
-    if (loop->timer_head == NULL)
+    while (loop->timer_count > 0)
         {
-            loop->timer_head = entry;
-        }
-    else
-        {
-            /* Insert in sorted order by next_fire time */
-            timer_entry_t* prev = NULL;
-            timer_entry_t* curr = loop->timer_head;
-            while (curr != NULL && curr->next_fire.tv_sec < entry->next_fire.tv_sec)
+            timer_entry_t* timer = heap_peek(loop);
+            if (!timer || !timer->active)
+                break;
+            if (!timer_expired(&timer->next_fire, now))
+                break;
+
+            heap_pop_min(loop);
+
+            if (timer->callback != NULL)
                 {
-                    prev = curr;
-                    curr = curr->next;
+                    timer->callback(timer->timer_id, timer->user_data);
                 }
-            if (prev == NULL)
+            if (timer->interval_ms > 0)
                 {
-                    entry->next = loop->timer_head;
-                    loop->timer_head = entry;
+                    timer->next_fire.tv_sec +=
+                        (long)(timer->interval_ms / COBALT_MILLIS_PER_SEC);
+                    timer->next_fire.tv_nsec +=
+                        (long)((timer->interval_ms % COBALT_MILLIS_PER_SEC) *
+                               COBALT_NANOS_PER_MILLI);
+                    if (timer->next_fire.tv_nsec >= COBALT_NANOS_PER_SEC)
+                        {
+                            timer->next_fire.tv_sec++;
+                            timer->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
+                        }
+                    heap_push(loop, timer);
                 }
             else
                 {
-                    prev->next = entry;
-                    entry->next = curr;
+                    free(timer);
                 }
         }
 }
 
-static void process_expired_timers(cobalt_eventloop_t* loop, const struct timespec* now)
-{
-    timer_entry_t* timer = loop->timer_head;
-    while (timer != NULL && timer->active)
-        {
-            if (timer->next_fire.tv_sec < now->tv_sec || (timer->next_fire.tv_sec == now->tv_sec &&
-                                                          timer->next_fire.tv_nsec <= now->tv_nsec))
-                {
-                    if (timer->callback != NULL)
-                        {
-                            timer->callback(timer->timer_id, timer->user_data);
-                        }
-                    if (timer->interval_ms > 0)
-                        {
-                            timer->next_fire.tv_sec +=
-                                (long)(timer->interval_ms / COBALT_MILLIS_PER_SEC);
-                            timer->next_fire.tv_nsec +=
-                                (long)((timer->interval_ms % COBALT_MILLIS_PER_SEC) *
-                                       COBALT_NANOS_PER_MILLI);
-                            if (timer->next_fire.tv_nsec >= COBALT_NANOS_PER_SEC)
-                                {
-                                    timer->next_fire.tv_sec++;
-                                    timer->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
-                                }
-                        }
-                    else
-                        {
-                            timer->active = 0;
-                        }
-                }
-            timer = timer->next;
-        }
-}
-
-static int calculate_timeout_ms(const timer_entry_t* next_timer, const struct timespec* now)
+static int calculate_timeout_ms(const cobalt_eventloop_t* loop, const struct timespec* now)
 {
     int timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
+    const timer_entry_t* next_timer = heap_peek(loop);
     if (next_timer != NULL)
         {
             long secs = next_timer->next_fire.tv_sec - now->tv_sec;
@@ -203,6 +260,20 @@ cobalt_eventloop_t* cobalt_eventloop_create(void)
         }
 #endif
 
+    loop->timer_capacity = COBALT_EVENTLOOP_TIMER_HEAP_INITIAL;
+    loop->timer_heap = malloc(sizeof(timer_entry_t*) * loop->timer_capacity);
+    if (loop->timer_heap == NULL)
+        {
+#ifdef __linux__
+            close(loop->epoll_fd);
+            free(loop->epoll_events);
+#elif __APPLE__
+            close(loop->kq);
+#endif
+            free(loop);
+            return NULL;
+        }
+
     return loop;
 }
 
@@ -234,13 +305,11 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t* loop)
             current_fd = next;
         }
 
-    timer_entry_t* current_timer = loop->timer_head;
-    while (current_timer != NULL)
+    for (int i = 0; i < loop->timer_count; i++)
         {
-            timer_entry_t* next = current_timer->next;
-            free(current_timer);
-            current_timer = next;
+            free(loop->timer_heap[i]);
         }
+    free(loop->timer_heap);
 
     free(loop);
 }
@@ -372,7 +441,7 @@ uint64_t cobalt_eventloop_add_timer(
             entry->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
         }
 
-    add_timer_to_list(loop, entry);
+    heap_push(loop, entry);
 
     return timer_id;
 }
@@ -384,18 +453,16 @@ int cobalt_eventloop_del_timer(cobalt_eventloop_t* loop, uint64_t timer_id)
             return -1;
         }
 
-    timer_entry_t** prev_ptr = &loop->timer_head;
-    timer_entry_t* current = *prev_ptr;
-    while (current != NULL)
+    for (int i = 0; i < loop->timer_count; i++)
         {
-            if (current->timer_id == timer_id)
+            if (loop->timer_heap[i]->timer_id == timer_id)
                 {
-                    *prev_ptr = current->next;
-                    free(current);
+                    loop->timer_count--;
+                    loop->timer_heap[i] = loop->timer_heap[loop->timer_count];
+                    heap_sift_down(loop->timer_heap, loop->timer_count, i);
+                    free(loop->timer_heap[loop->timer_count]);
                     return 0;
                 }
-            prev_ptr = &current->next;
-            current = current->next;
         }
     return -1;
 }
@@ -441,7 +508,7 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t* loop)
 #ifdef __linux__
     /* Wait for FD events using epoll */
     /* Use a short timeout so tests don't hang when no timers/FDs are registered */
-    int timeout_ms = calculate_timeout_ms(loop->timer_head, &now);
+    int timeout_ms = calculate_timeout_ms(loop, &now);
     int event_count =
         epoll_wait(loop->epoll_fd, loop->epoll_events, loop->epoll_capacity, timeout_ms);
     for (int i = 0; i < event_count; i++)

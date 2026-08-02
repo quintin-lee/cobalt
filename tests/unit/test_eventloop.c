@@ -4,20 +4,28 @@
  */
 
 #include "cobalt/module/eventloop.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 static int timer_called = 0;
 static int fd_called = 0;
+static int* g_fired_order = NULL;
+static int g_fire_idx = 0;
 
 static void on_timer(uint64_t id, void* user_data)
 {
     (void)id;
     timer_called++;
-    int* counter = (int*)user_data;
-    if (counter)
-        (*counter)++;
+    uint64_t* timer_id_ptr = (uint64_t*)user_data;
+    if (timer_id_ptr)
+        (*timer_id_ptr)++;
+    if (g_fired_order)
+        {
+            g_fired_order[g_fire_idx++] = (int)id;
+        }
     printf("  Timer %lu fired (call #%d)\n", (unsigned long)id, timer_called);
 }
 
@@ -182,6 +190,49 @@ void test_eventloop_multiple_timers(void)
     cobalt_eventloop_destroy(loop);
 }
 
+void test_eventloop_timer_heap_order(void)
+{
+    printf("Testing eventloop timer heap ordering...\n");
+
+    cobalt_eventloop_t* loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    const int timer_count = 100;
+    static int fired_order[100];
+    static uint64_t timer_ids[101];
+    static int fire_idx = 0;
+
+    memset(fired_order, -1, sizeof(fired_order));
+    memset(timer_ids, 0, sizeof(timer_ids));
+    fire_idx = 0;
+
+    g_fired_order = fired_order;
+    g_fire_idx = 0;
+
+    for (int i = 0; i < timer_count; i++)
+        {
+            timer_ids[i + 1] = cobalt_eventloop_add_timer(loop, i + 1, 0, on_timer, &timer_ids[i + 1]);
+            TEST_ASSERT(timer_ids[i + 1] != 0);
+        }
+
+    for (int i = 0; i < timer_count; i++)
+        {
+            cobalt_eventloop_iteration(loop);
+            usleep(2000);
+        }
+
+    TEST_ASSERT(g_fire_idx == timer_count);
+
+    for (int i = 0; i < timer_count; i++)
+        {
+            TEST_ASSERT(fired_order[i] == (i + 1));
+        }
+
+    g_fired_order = NULL;
+    cobalt_eventloop_destroy(loop);
+    printf("  Eventloop timer heap ordering test passed\n");
+}
+
 void test_eventloop(void)
 {
     printf("Testing eventloop...\n");
@@ -190,5 +241,6 @@ void test_eventloop(void)
     test_eventloop_timer();
     test_eventloop_run_stop();
     test_eventloop_multiple_timers();
+    test_eventloop_timer_heap_order();
     printf("  Eventloop tests completed\n");
 }
