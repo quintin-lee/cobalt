@@ -4,9 +4,14 @@ project(Cobalt VERSION 2.0.0 LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
+# Generate compile_commands.json for clang-tidy/clang-format
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Options
 option(COBALT_BUILD_TESTS "Build tests" ON)
 option(COBALT_BUILD_EXAMPLES "Build examples" ON)
+option(COBALT_RUN_TIDY "Run clang-tidy checks" OFF)
+option(COBALT_RUN_FORMAT "Run clang-format checks" OFF)
 
 # Source files
 set(SOURCES
@@ -123,3 +128,61 @@ target_link_libraries(examples_refcount_demo cobalt pthread)
 
 add_executable(examples_simple_server examples/simple_server.c)
 target_link_libraries(examples_simple_server cobalt)
+
+# ============================================================
+# clang-tidy & clang-format integration
+# ============================================================
+find_program(CLANG_TIDY_EXECUTABLE clang-tidy)
+find_program(CLANG_FORMAT_EXECUTABLE clang-format)
+
+if(CLANG_TIDY_EXECUTABLE)
+    # Collect all source and header files (exclude build/ and tests/)
+    file(GLOB_RECURSE ALL_SRC_FILES
+        ${CMAKE_SOURCE_DIR}/src/*.c
+        ${CMAKE_SOURCE_DIR}/include/**/*.h
+    )
+
+    add_custom_target(tidy
+        COMMAND ${CLANG_TIDY_EXECUTABLE}
+            -p ${CMAKE_BINARY_DIR}
+            --config-file=${CMAKE_SOURCE_DIR}/.clang-tidy
+            --warnings-as-errors='*'
+            --
+            ${ALL_SRC_FILES}
+        DEPENDS ${ALL_SRC_FILES}
+        COMMENT "Running clang-tidy checks..."
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+else()
+    message(WARNING "clang-tidy not found. Install it or skip: cmake --build . --target tidy")
+endif()
+
+if(CLANG_FORMAT_EXECUTABLE)
+    add_custom_target(format
+        COMMAND ${CLANG_FORMAT_EXECUTABLE}
+            --dry-run --Werror --style=file
+            ${ALL_SRC_FILES}
+        COMMENT "Running clang-format checks..."
+    )
+
+    add_custom_target(format-fix
+        COMMAND ${CLANG_FORMAT_EXECUTABLE}
+            --style=file -i
+            ${ALL_SRC_FILES}
+        COMMENT "Fixing code formatting..."
+    )
+else()
+    message(WARNING "clang-format not found. Install it or skip: cmake --build . --target format")
+endif()
+
+# Convenience: run both tidy and format as a single check target
+if(CLANG_TIDY_EXECUTABLE AND CLANG_FORMAT_EXECUTABLE)
+    add_custom_target(check
+        DEPENDS tidy format
+        COMMENT "Running all static checks (clang-tidy + clang-format)..."
+    )
+elseif(CLANG_TIDY_EXECUTABLE)
+    add_custom_target(check DEPENDS tidy)
+elseif(CLANG_FORMAT_EXECUTABLE)
+    add_custom_target(check DEPENDS format)
+endif()
