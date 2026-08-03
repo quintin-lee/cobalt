@@ -1,0 +1,9 @@
+{
+  "name": "cobalt",
+  "version-semver": "2.0.0",
+  "description": "A lightweight, zero-dependency C11 framework providing object-oriented capabilities, memory management, and cross-platform abstractions",
+  "homepage": "https://github.com/quintin-lee/cobalt",
+  "license": "MIT",
+  "dependencies": [],
+  "supports": "(linux | darwin | windows)"
+}
