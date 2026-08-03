@@ -38,7 +38,6 @@ cobalt_class_t *cobalt_class_create(const char *name, cobalt_class_t *base_class
 
 /**
  * @brief Add a new method to the class
- * @details Currently a stub implementation, only performs parameter validation.
  *
  * @param cls Target class
  * @param name Method name
@@ -49,19 +48,30 @@ int cobalt_class_add_method(cobalt_class_t *cls,
                             const char     *name,
                             void *(*invoke)(cobalt_object_t *self, void **args, size_t arg_count))
 {
-    /* Check the validity of the input parameters */
     if (!cls || !name || !invoke) {
         return -1;
     }
-    /* Prevent unused parameter warnings */
-    (void)name;
-    (void)invoke;
+
+    cobalt_method_t **new_methods = realloc(cls->methods,
+                                            sizeof(cobalt_method_t *) * (cls->method_count + 1));
+    if (!new_methods) {
+        return -1;
+    }
+    cls->methods = new_methods;
+
+    cls->methods[cls->method_count] = malloc(sizeof(cobalt_method_t));
+    if (!cls->methods[cls->method_count]) {
+        return -1;
+    }
+    cls->methods[cls->method_count]->name = cobalt_strdup(name);
+    cls->methods[cls->method_count]->invoke = invoke;
+    cls->method_count++;
+
     return 0;
 }
 
 /**
  * @brief Add a new property to the class
- * @details Currently a stub implementation, only performs parameter validation.
  *
  * @param cls Target class
  * @param name Property name
@@ -74,14 +84,26 @@ int cobalt_class_add_property(cobalt_class_t *cls,
                               void *(*get)(cobalt_object_t *self),
                               void (*set)(cobalt_object_t *self, void *value))
 {
-    /* Check the validity of the input parameters, note that get and set might be optional, but
-     * class and property name must exist */
     if (!cls || !name) {
         return -1;
     }
-    /* Prevent unused parameter warnings */
-    (void)get;
-    (void)set;
+
+    cobalt_property_t **new_properties = realloc(cls->properties,
+                                                  sizeof(cobalt_property_t *) * (cls->property_count + 1));
+    if (!new_properties) {
+        return -1;
+    }
+    cls->properties = new_properties;
+
+    cls->properties[cls->property_count] = malloc(sizeof(cobalt_property_t));
+    if (!cls->properties[cls->property_count]) {
+        return -1;
+    }
+    cls->properties[cls->property_count]->name = cobalt_strdup(name);
+    cls->properties[cls->property_count]->get = get;
+    cls->properties[cls->property_count]->set = set;
+    cls->property_count++;
+
     return 0;
 }
 
@@ -99,14 +121,31 @@ int cobalt_class_is_abstract(cobalt_class_t *cls)
 
 /**
  * @brief Destroy the class information object and free memory
- * @details Frees the class name string and the class structure itself.
+ * @details Frees the class name string, method table, property table, and the class structure itself.
  *
  * @param cls Target class
  */
 void cobalt_class_destroy(cobalt_class_t *cls)
 {
     if (cls) {
-        /* The name field is allocated by cobalt_strdup, it must be freed */
+        /* Free method names and method structures */
+        if (cls->methods) {
+            for (size_t i = 0; i < cls->method_count; i++) {
+                free((void *)cls->methods[i]->name);
+                free(cls->methods[i]);
+            }
+            free(cls->methods);
+        }
+
+        /* Free property names and property structures */
+        if (cls->properties) {
+            for (size_t i = 0; i < cls->property_count; i++) {
+                free((void *)cls->properties[i]->name);
+                free(cls->properties[i]);
+            }
+            free(cls->properties);
+        }
+
         free((void *)cls->name);
         free(cls);
     }

@@ -1,10 +1,11 @@
 /**
  * @file test_class.c
- * @Unit test for class metadata system.
+ * @brief Unit test for class metadata system.
  */
 
 #include "cobalt/core/class.h"
 #include "cobalt/core/object.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -54,31 +55,46 @@ void test_class_methods(void)
         return;
     }
 
-    /* Add a method */
-    int ret = cobalt_class_add_method(cls, "test_method", dummy_method);
-    if (ret == 0) {
-        printf("  Method added successfully\n");
-    } else {
-        fprintf(stderr, "ERROR: Failed to add method\n");
+    /* Add methods and verify count */
+    int ret = cobalt_class_add_method(cls, "method1", dummy_method);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cls->method_count == 1);
+    printf("  Method 1 added, count=%zu: OK\n", cls->method_count);
+
+    ret = cobalt_class_add_method(cls, "method2", dummy_method);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cls->method_count == 2);
+    printf("  Method 2 added, count=%zu: OK\n", cls->method_count);
+
+    /* Verify method names stored correctly */
+    TEST_ASSERT(strcmp(cls->methods[0]->name, "method1") == 0);
+    TEST_ASSERT(strcmp(cls->methods[1]->name, "method2") == 0);
+    printf("  Method names stored correctly: OK\n");
+
+    /* Add multiple methods in sequence */
+    for (int i = 3; i <= 10; i++) {
+        char name[16];
+        snprintf(name, sizeof(name), "method%d", i);
+        ret = cobalt_class_add_method(cls, name, dummy_method);
+        TEST_ASSERT(ret == 0);
     }
+    TEST_ASSERT(cls->method_count == 10);
+    printf("  Added 10 methods total: OK\n");
 
     /* Try adding method to NULL class */
     ret = cobalt_class_add_method(NULL, "test", dummy_method);
-    if (ret == -1) {
-        printf("  Add method to NULL class returns -1: OK\n");
-    }
+    TEST_ASSERT(ret == -1);
+    printf("  Add method to NULL class returns -1: OK\n");
 
     /* Try adding method with NULL name */
     ret = cobalt_class_add_method(cls, NULL, dummy_method);
-    if (ret == -1) {
-        printf("  Add method with NULL name returns -1: OK\n");
-    }
+    TEST_ASSERT(ret == -1);
+    printf("  Add method with NULL name returns -1: OK\n");
 
     /* Try adding method with NULL invoke */
     ret = cobalt_class_add_method(cls, "test2", NULL);
-    if (ret == -1) {
-        printf("  Add method with NULL invoke returns -1: OK\n");
-    }
+    TEST_ASSERT(ret == -1);
+    printf("  Add method with NULL invoke returns -1: OK\n");
 
     cobalt_class_destroy(cls);
 }
@@ -93,25 +109,31 @@ void test_class_properties(void)
         return;
     }
 
-    /* Add a property */
-    int ret = cobalt_class_add_property(cls, "test_prop", NULL, NULL);
-    if (ret == 0) {
-        printf("  Property added successfully\n");
-    } else {
-        fprintf(stderr, "ERROR: Failed to add property\n");
-    }
+    /* Add properties and verify count */
+    int ret = cobalt_class_add_property(cls, "prop1", NULL, NULL);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cls->property_count == 1);
+    printf("  Property 1 added, count=%zu: OK\n", cls->property_count);
+
+    ret = cobalt_class_add_property(cls, "prop2", NULL, NULL);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cls->property_count == 2);
+    printf("  Property 2 added, count=%zu: OK\n", cls->property_count);
+
+    /* Verify property names stored correctly */
+    TEST_ASSERT(strcmp(cls->properties[0]->name, "prop1") == 0);
+    TEST_ASSERT(strcmp(cls->properties[1]->name, "prop2") == 0);
+    printf("  Property names stored correctly: OK\n");
 
     /* Try adding property to NULL class */
     ret = cobalt_class_add_property(NULL, "test", NULL, NULL);
-    if (ret == -1) {
-        printf("  Add property to NULL class returns -1: OK\n");
-    }
+    TEST_ASSERT(ret == -1);
+    printf("  Add property to NULL class returns -1: OK\n");
 
     /* Try adding property with NULL name */
     ret = cobalt_class_add_property(cls, NULL, NULL, NULL);
-    if (ret == -1) {
-        printf("  Add property with NULL name returns -1: OK\n");
-    }
+    TEST_ASSERT(ret == -1);
+    printf("  Add property with NULL name returns -1: OK\n");
 
     cobalt_class_destroy(cls);
 }
