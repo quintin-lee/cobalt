@@ -3,8 +3,8 @@
  * @Unit test for error handling subsystem.
  */
 
-#include "cobalt/runtime/error.h"
 #include "cobalt/container/hashmap.h"
+#include "cobalt/runtime/error.h"
 #include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
@@ -23,30 +23,34 @@ void test_error_codes(void)
                               COBALT_ERROR_IO,
                               COBALT_ERROR_TIMEOUT};
 
-    const char* expected[] = {"Success",           "General error", "Invalid argument",
-                              "Out of memory",     "Not found",     "Already exists",
-                              "Permission denied", "IO error",      "Timeout"};
+    const char *expected[] = {"Success",
+                              "General error",
+                              "Invalid argument",
+                              "Out of memory",
+                              "Not found",
+                              "Already exists",
+                              "Permission denied",
+                              "IO error",
+                              "Timeout"};
 
     int all_ok = 1;
-    for (int i = 0; i < 9; i++)
-        {
-            const char* msg = cobalt_error_get_message(codes[i]);
-            if (msg && strcmp(msg, expected[i]) == 0)
-                {
-                    printf("  %s -> OK\n", msg);
-                }
-            else
-                {
-                    fprintf(stderr, "ERROR: Code %d message mismatch (got: '%s', expected: '%s')\n",
-                            codes[i], msg ? msg : "NULL", expected[i]);
-                    all_ok = 0;
-                }
+    for (int i = 0; i < 9; i++) {
+        const char *msg = cobalt_error_get_message(codes[i]);
+        if (msg && strcmp(msg, expected[i]) == 0) {
+            printf("  %s -> OK\n", msg);
+        } else {
+            fprintf(stderr,
+                    "ERROR: Code %d message mismatch (got: '%s', expected: '%s')\n",
+                    codes[i],
+                    msg ? msg : "NULL",
+                    expected[i]);
+            all_ok = 0;
         }
+    }
 
-    if (all_ok)
-        {
-            printf("  All error code mappings correct\n");
-        }
+    if (all_ok) {
+        printf("  All error code mappings correct\n");
+    }
 }
 
 void test_error_set_get(void)
@@ -57,14 +61,11 @@ void test_error_set_get(void)
 
     /* Test setting error through pointer */
     cobalt_error_set(&err, COBALT_ERROR_NOT_FOUND);
-    if (err == COBALT_ERROR_NOT_FOUND)
-        {
-            printf("  Error set via pointer: OK\n");
-        }
-    else
-        {
-            fprintf(stderr, "ERROR: Error not set correctly\n");
-        }
+    if (err == COBALT_ERROR_NOT_FOUND) {
+        printf("  Error set via pointer: OK\n");
+    } else {
+        fprintf(stderr, "ERROR: Error not set correctly\n");
+    }
 
     /* Test passing NULL (should be safe) */
     cobalt_error_set(NULL, COBALT_ERROR_IO);
@@ -97,12 +98,12 @@ void test_error_hashmap_integration(void)
 
     cobalt_error_set(NULL, COBALT_SUCCESS);
 
-    cobalt_hashmap_t* map = cobalt_hashmap_create(8);
+    cobalt_hashmap_t *map = cobalt_hashmap_create(8);
     TEST_ASSERT(map != NULL);
 
     TEST_ASSERT(cobalt_error_get_current() == COBALT_SUCCESS);
 
-    void* val = cobalt_hashmap_get(map, "missing");
+    void *val = cobalt_hashmap_get(map, "missing");
     TEST_ASSERT(val == NULL);
     TEST_ASSERT(cobalt_error_get_current() == COBALT_ERROR_NOT_FOUND);
 

@@ -6,7 +6,7 @@ void test_set_basic(void)
 {
     printf("Testing set basic operations...\n");
 
-    cobalt_set_t* set = cobalt_set_create(16);
+    cobalt_set_t *set = cobalt_set_create(16);
     TEST_ASSERT(set != NULL);
     TEST_ASSERT(cobalt_set_is_empty(set));
     TEST_ASSERT(cobalt_set_size(set) == 0);
@@ -44,7 +44,7 @@ void test_set_duplicates(void)
 {
     printf("Testing set duplicate handling...\n");
 
-    cobalt_set_t* set = cobalt_set_create(4);
+    cobalt_set_t *set = cobalt_set_create(4);
     TEST_ASSERT(set != NULL);
 
     int val = 42;
@@ -60,7 +60,7 @@ void test_set_empty(void)
 {
     printf("Testing set empty operations...\n");
 
-    cobalt_set_t* set = cobalt_set_create(0);
+    cobalt_set_t *set = cobalt_set_create(0);
     TEST_ASSERT(set != NULL);
     TEST_ASSERT(cobalt_set_is_empty(set));
     TEST_ASSERT(cobalt_set_size(set) == 0);

@@ -14,7 +14,7 @@ void test_list_basic(void)
 {
     printf("Testing list basic operations...\n");
 
-    cobalt_list_t* list = cobalt_list_create();
+    cobalt_list_t *list = cobalt_list_create();
     TEST_ASSERT(list != NULL);
 
     /* Should be empty initially */
@@ -24,29 +24,29 @@ void test_list_basic(void)
 
     /* Push front */
     int val1 = 10;
-    int ret = cobalt_list_push_front(list, &val1);
+    int ret  = cobalt_list_push_front(list, &val1);
     TEST_ASSERT(ret == 0);
     TEST_ASSERT(cobalt_list_size(list) == 1);
     printf("  Push front: OK\n");
 
     /* Push back */
     int val2 = 20;
-    ret = cobalt_list_push_back(list, &val2);
+    ret      = cobalt_list_push_back(list, &val2);
     TEST_ASSERT(ret == 0);
     TEST_ASSERT(cobalt_list_size(list) == 2);
     printf("  Push back: OK\n");
 
     /* Pop front returns 10 */
-    void* item = cobalt_list_pop_front(list);
+    void *item = cobalt_list_pop_front(list);
     TEST_ASSERT(item != NULL);
-    TEST_ASSERT(*(int*)item == 10);
+    TEST_ASSERT(*(int *)item == 10);
     TEST_ASSERT(cobalt_list_size(list) == 1);
     printf("  Pop front returns 10: OK\n");
 
     /* Pop back returns 20 */
     item = cobalt_list_pop_back(list);
     TEST_ASSERT(item != NULL);
-    TEST_ASSERT(*(int*)item == 20);
+    TEST_ASSERT(*(int *)item == 20);
     TEST_ASSERT(cobalt_list_size(list) == 0);
     printf("  Pop back returns 20: OK\n");
 
@@ -60,11 +60,11 @@ void test_list_edge_cases(void)
 {
     printf("Testing list edge cases...\n");
 
-    cobalt_list_t* list = cobalt_list_create();
+    cobalt_list_t *list = cobalt_list_create();
     TEST_ASSERT(list != NULL);
 
     /* Pop from empty list should return NULL */
-    void* item = cobalt_list_pop_front(list);
+    void *item = cobalt_list_pop_front(list);
     TEST_ASSERT(item == NULL);
     printf("  Pop empty list returns NULL: OK\n");
 
@@ -94,7 +94,7 @@ void test_list_pop_back(void)
 {
     printf("Testing list_pop_back...\n");
 
-    cobalt_list_t* list = cobalt_list_create();
+    cobalt_list_t *list = cobalt_list_create();
     TEST_ASSERT(list != NULL);
 
     int val1 = 10;
@@ -107,21 +107,21 @@ void test_list_pop_back(void)
     TEST_ASSERT(cobalt_list_size(list) == 3);
 
     /* Pop back should return last element (30) */
-    void* item = cobalt_list_pop_back(list);
+    void *item = cobalt_list_pop_back(list);
     TEST_ASSERT(item != NULL);
-    TEST_ASSERT(*(int*)item == 30);
+    TEST_ASSERT(*(int *)item == 30);
     TEST_ASSERT(cobalt_list_size(list) == 2);
 
     /* Pop back again should return 20 */
     item = cobalt_list_pop_back(list);
     TEST_ASSERT(item != NULL);
-    TEST_ASSERT(*(int*)item == 20);
+    TEST_ASSERT(*(int *)item == 20);
     TEST_ASSERT(cobalt_list_size(list) == 1);
 
     /* Pop back again should return 10 */
     item = cobalt_list_pop_back(list);
     TEST_ASSERT(item != NULL);
-    TEST_ASSERT(*(int*)item == 10);
+    TEST_ASSERT(*(int *)item == 10);
     TEST_ASSERT(cobalt_list_size(list) == 0);
 
     /* Pop back from empty list should return NULL */
@@ -136,31 +136,30 @@ void test_list_get(void)
 {
     printf("Testing list_get...\n");
 
-    cobalt_list_t* list = cobalt_list_create();
+    cobalt_list_t *list = cobalt_list_create();
     TEST_ASSERT(list != NULL);
 
     int values[] = {10, 20, 30, 40, 50};
-    for (int i = 0; i < 5; i++)
-    {
+    for (int i = 0; i < 5; i++) {
         TEST_ASSERT(cobalt_list_push_back(list, &values[i]) == 0);
     }
 
     /* Test getting elements from beginning */
-    void* item = cobalt_list_get(list, 0);
+    void *item = cobalt_list_get(list, 0);
     TEST_ASSERT(item != NULL);
-    TEST_ASSERT(*(int*)item == 10);
+    TEST_ASSERT(*(int *)item == 10);
     printf("  Get index 0 returns 10: OK\n");
 
     /* Test getting element from middle */
     item = cobalt_list_get(list, 2);
     TEST_ASSERT(item != NULL);
-    TEST_ASSERT(*(int*)item == 30);
+    TEST_ASSERT(*(int *)item == 30);
     printf("  Get index 2 returns 30: OK\n");
 
     /* Test getting element from end */
     item = cobalt_list_get(list, 4);
     TEST_ASSERT(item != NULL);
-    TEST_ASSERT(*(int*)item == 50);
+    TEST_ASSERT(*(int *)item == 50);
     printf("  Get index 4 returns 50: OK\n");
 
     /* Test out of bounds */
@@ -173,7 +172,7 @@ void test_list_get(void)
     printf("  Get far out of bounds returns NULL: OK\n");
 
     /* Test empty list */
-    cobalt_list_t* empty = cobalt_list_create();
+    cobalt_list_t *empty = cobalt_list_create();
     TEST_ASSERT(empty != NULL);
     item = cobalt_list_get(empty, 0);
     TEST_ASSERT(item == NULL);
@@ -188,23 +187,21 @@ void test_list_iterator(void)
 {
     printf("Testing list_iterator...\n");
 
-    cobalt_list_t* list = cobalt_list_create();
+    cobalt_list_t *list = cobalt_list_create();
     TEST_ASSERT(list != NULL);
 
     int values[] = {1, 2, 3, 4, 5};
-    for (int i = 0; i < 5; i++)
-    {
+    for (int i = 0; i < 5; i++) {
         TEST_ASSERT(cobalt_list_push_back(list, &values[i]) == 0);
     }
 
     /* Get list-specific iterator */
-    cobalt_iterator_t* iter = cobalt_list_iterator_create(list);
+    cobalt_iterator_t *iter = cobalt_list_iterator_create(list);
     TEST_ASSERT(iter != NULL);
 
     int count = 0;
-    while (cobalt_iterator_has_next(iter))
-    {
-        void* item = cobalt_iterator_next(iter);
+    while (cobalt_iterator_has_next(iter)) {
+        void *item = cobalt_iterator_next(iter);
         TEST_ASSERT(item != NULL);
         count++;
     }

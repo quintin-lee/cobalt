@@ -19,33 +19,32 @@ int main(void)
     cobalt_logger_init(stdout, LOG_LEVEL_INFO);
 
     /* Create a hash map with initial bucket count of 16 */
-    cobalt_hashmap_t* map = cobalt_hashmap_create(16);
-    if (!map)
-        {
-            fprintf(stderr, "Failed to create hashmap\n");
-            return 1;
-        }
+    cobalt_hashmap_t *map = cobalt_hashmap_create(16);
+    if (!map) {
+        fprintf(stderr, "Failed to create hashmap\n");
+        return 1;
+    }
 
     /* Set some key-value pairs */
-    const char* keys[] = {"name", "age", "city"};
-    char* values[] = {"Alice", "30", "New York"};
+    const char *keys[]   = {"name", "age", "city"};
+    char       *values[] = {"Alice", "30", "New York"};
 
-    for (size_t i = 0; i < 3; i++)
-        {
-            int ret = cobalt_hashmap_put(map, keys[i], values[i]);
-            if (ret == 0)
-                {
-                    cobalt_info("Put: %s -> %s\n", keys[i], values[i]);
-                }
+    for (size_t i = 0; i < 3; i++) {
+        int ret = cobalt_hashmap_put(map, keys[i], values[i]);
+        if (ret == 0) {
+            cobalt_info("Put: %s -> %s\n", keys[i], values[i]);
         }
+    }
 
     /* Retrieve values by key */
-    char* name = (char*)cobalt_hashmap_get(map, "name");
-    char* age = (char*)cobalt_hashmap_get(map, "age");
-    if (name)
+    char *name = (char *)cobalt_hashmap_get(map, "name");
+    char *age  = (char *)cobalt_hashmap_get(map, "age");
+    if (name) {
         cobalt_info("Name: %s\n", name);
-    if (age)
+    }
+    if (age) {
         cobalt_info("Age: %s\n", age);
+    }
 
     /* Check size */
     cobalt_info("Map size: %zu\n", cobalt_hashmap_size(map));

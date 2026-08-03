@@ -7,11 +7,11 @@
 #include <stdio.h>
 
 /* Forward declaration */
-static cobalt_class_t* ShapeClass = NULL;
-static cobalt_class_t* CircleClass = NULL;
+static cobalt_class_t *ShapeClass  = NULL;
+static cobalt_class_t *CircleClass = NULL;
 
 /* Base class method */
-static void* shape_area(cobalt_object_t* self, void** args, size_t arg_count)
+static void *shape_area(cobalt_object_t *self, void **args, size_t arg_count)
 {
     (void)self;
     (void)args;
@@ -21,12 +21,12 @@ static void* shape_area(cobalt_object_t* self, void** args, size_t arg_count)
 }
 
 /* Circle specific method */
-static void* circle_area(cobalt_object_t* self, void** args, size_t arg_count)
+static void *circle_area(cobalt_object_t *self, void **args, size_t arg_count)
 {
     (void)self;
     (void)arg_count;
-    double radius = args[0] ? *(double*)args[0] : 1.0;
-    double area = 3.14159 * radius * radius;
+    double radius = args[0] ? *(double *)args[0] : 1.0;
+    double area   = 3.14159 * radius * radius;
     printf("  Circle area: %.2f\n", area);
     return NULL;
 }
@@ -36,7 +36,7 @@ int main(void)
     printf("=== Object Oriented Example ===\n\n");
 
     /* Initialize classes */
-    ShapeClass = cobalt_class_create("Shape", NULL);
+    ShapeClass  = cobalt_class_create("Shape", NULL);
     CircleClass = cobalt_class_create("Circle", ShapeClass);
 
     /* Add methods */
@@ -44,7 +44,7 @@ int main(void)
     cobalt_class_add_method(CircleClass, "area", circle_area);
 
     /* Create object */
-    cobalt_object_t* circle = cobalt_object_new(CircleClass, 0);
+    cobalt_object_t *circle = cobalt_object_new(CircleClass, 0);
     printf("Created circle object\n");
 
     /* Reference counting */

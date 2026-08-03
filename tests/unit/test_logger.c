@@ -8,8 +8,8 @@
 #include <string.h>
 
 /* Capture log output to string */
-static char log_buffer[1024];
-static FILE* log_fp;
+static char  log_buffer[1024];
+static FILE *log_fp;
 
 void test_logger_levels(void)
 {
@@ -17,11 +17,10 @@ void test_logger_levels(void)
 
     /* Open a temp file for capturing */
     log_fp = fopen("/tmp/cobalt_test_log.txt", "w");
-    if (!log_fp)
-        {
-            fprintf(stderr, "WARNING: Cannot open temp log file\n");
-            return;
-        }
+    if (!log_fp) {
+        fprintf(stderr, "WARNING: Cannot open temp log file\n");
+        return;
+    }
 
     /* Initialize with INFO level */
     cobalt_logger_init(log_fp, LOG_LEVEL_INFO);
@@ -39,36 +38,34 @@ void test_logger_levels(void)
 
     /* Read back and verify */
     log_fp = fopen("/tmp/cobalt_test_log.txt", "r");
-    if (log_fp)
-        {
-            char line[256];
-            int info_count = 0;
-            int warn_count = 0;
-            int err_count = 0;
+    if (log_fp) {
+        char line[256];
+        int  info_count = 0;
+        int  warn_count = 0;
+        int  err_count  = 0;
 
-            while (fgets(line, sizeof(line), log_fp))
-                {
-                    if (strstr(line, "INFO"))
-                        info_count++;
-                    if (strstr(line, "WARNING"))
-                        warn_count++;
-                    if (strstr(line, "ERROR"))
-                        err_count++;
-                }
-            fclose(log_fp);
-
-            printf("  Log levels filtered: INFO=%d WARN=%d ERR=%d\n", info_count, warn_count,
-                   err_count);
-
-            if (info_count >= 1 && warn_count >= 1 && err_count >= 1)
-                {
-                    printf("  Logger level filtering: OK\n");
-                }
-            else
-                {
-                    fprintf(stderr, "ERROR: Unexpected log counts\n");
-                }
+        while (fgets(line, sizeof(line), log_fp)) {
+            if (strstr(line, "INFO")) {
+                info_count++;
+            }
+            if (strstr(line, "WARNING")) {
+                warn_count++;
+            }
+            if (strstr(line, "ERROR")) {
+                err_count++;
+            }
         }
+        fclose(log_fp);
+
+        printf(
+            "  Log levels filtered: INFO=%d WARN=%d ERR=%d\n", info_count, warn_count, err_count);
+
+        if (info_count >= 1 && warn_count >= 1 && err_count >= 1) {
+            printf("  Logger level filtering: OK\n");
+        } else {
+            fprintf(stderr, "ERROR: Unexpected log counts\n");
+        }
+    }
 }
 
 void test_logger_macros(void)

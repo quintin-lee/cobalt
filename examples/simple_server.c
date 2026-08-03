@@ -13,15 +13,15 @@
 #include <stdlib.h>
 
 /* Callback when a fd is ready */
-void fd_callback(int fd, short events, void* user_data)
+void fd_callback(int fd, short events, void *user_data)
 {
     (void)events;
-    char* label = (char*)user_data;
+    char *label = (char *)user_data;
     cobalt_info("File descriptor %d ready (%s)\n", fd, label);
 }
 
 /* Timer callback */
-void timer_callback(uint64_t id, void* user_data)
+void timer_callback(uint64_t id, void *user_data)
 {
     (void)user_data;
     cobalt_info("Timer % fired\n", id);
@@ -32,12 +32,11 @@ int main(void)
     cobalt_logger_init(stdout, LOG_LEVEL_INFO);
 
     /* Create an event loop */
-    cobalt_eventloop_t* loop = cobalt_eventloop_create();
-    if (!loop)
-        {
-            fprintf(stderr, "Failed to create event loop\n");
-            return 1;
-        }
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    if (!loop) {
+        fprintf(stderr, "Failed to create event loop\n");
+        return 1;
+    }
 
     cobalt_info("Event loop created\n");
 

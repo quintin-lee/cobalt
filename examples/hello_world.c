@@ -15,7 +15,7 @@
 int main(void)
 {
     /* Initialize logging to stdout at INFO level */
-    FILE* log_output = stdout;
+    FILE *log_output = stdout;
     cobalt_logger_init(log_output, LOG_LEVEL_INFO);
 
     cobalt_info("=== Cobalt Hello World ===\n");
@@ -25,11 +25,10 @@ int main(void)
     cobalt_info("Platform detected: %d (1=Windows, 2=macOS, 3=Linux)\n", platform);
 
     /* Get system allocator */
-    cobalt_allocator_t* sys_alloc = cobalt_allocator_get_system();
-    if (sys_alloc)
-        {
-            cobalt_info("System allocator available\n");
-        }
+    cobalt_allocator_t *sys_alloc = cobalt_allocator_get_system();
+    if (sys_alloc) {
+        cobalt_info("System allocator available\n");
+    }
 
     cobalt_info("Hello from Cobalt framework!\n");
     return 0;
