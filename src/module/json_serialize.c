@@ -10,6 +10,27 @@
 #include <string.h>
 
 /*
+ * @brief Expand buffer if needed
+ * @param buffer Pointer to buffer pointer
+ * @param capacity Pointer to capacity value
+ * @param needed Additional bytes needed
+ * @return 0 on success, -1 on allocation failure
+ */
+static int ensure_capacity(char **buffer, size_t *capacity, size_t needed)
+{
+    if (*capacity < *capacity + needed) {
+        size_t new_capacity = (*capacity + needed) * 2;
+        char *tmp = realloc(*buffer, new_capacity);
+        if (!tmp) {
+            return -1;
+        }
+        *buffer = tmp;
+        *capacity = new_capacity;
+    }
+    return 0;
+}
+
+/*
  * @brief Apply JSON escaping to a string
  * @param str The original string to escape
  * @param len The length of the string
