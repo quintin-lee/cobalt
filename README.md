@@ -149,9 +149,19 @@ cd build
 | Metric | Value |
 |--------|-------|
 | Total lines of code | 6,627 |
-| Git commits | 181 |
+| Git commits | 183 |
 | Tests passing | 22/22 |
 
 ## License
 
 MIT License - See [LICENSE](LICENSE) for details.
+
+## Package Managers
+
+Available via popular package managers:
+
+| Manager | Command |
+|---------|---------|
+| vcpkg | `vcpkg install cobalt` |
+| Conan | `conan install --requires=cobalt/2.0.0` |
+| pkg-config | `pkg-config --cflags --libs cobalt` |
