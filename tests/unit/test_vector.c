@@ -176,6 +176,7 @@ void test_vector_growth(void)
     }
 
     cobalt_vector_destroy(vec);
+    free(values);
 }
 
 void test_vector_iterator(void)
