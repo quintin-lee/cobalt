@@ -24,11 +24,16 @@ int main(void)
 
     /* Test 1: Insert 10K strings */
     char   key[64];
-    int    value = 42;
+    int   *values = malloc(sizeof(int) * 10000);
+    if (!values) {
+        fprintf(stderr, "Failed to allocate values\n");
+        return 1;
+    }
     double start = current_time_ms();
     for (int i = 0; i < 10000; i++) {
         snprintf(key, 64, "key_%d", i);
-        cobalt_treemap_put(map, key, &value);
+        values[i] = i;
+        cobalt_treemap_put(map, key, &values[i]);
     }
     double insert_time = current_time_ms() - start;
     printf("Insert 10K strings: %.2f ms (size=%zu)\n", insert_time, cobalt_treemap_size(map));
@@ -55,6 +60,7 @@ int main(void)
     printf("Remove 5K strings: %.2f ms (size=%zu)\n", remove_time, cobalt_treemap_size(map));
 
     cobalt_treemap_destroy(map);
+    free(values);
 
     printf("Benchmark completed\n");
     return 0;
