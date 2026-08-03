@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <poll.h>
 
 static int  timer_called  = 0;
 static int  fd_called     = 0;
@@ -62,24 +63,38 @@ void test_eventloop_fd(void)
         return;
     }
 
-    /* Add an FD handler (using a dummy fd) */
-    int ret = cobalt_eventloop_add_fd(loop, -1, 1, on_fd, NULL);
-    if (ret == 0) {
-        printf("  Add FD handler: OK\n");
-    } else {
-        printf("  Add FD handler: ret=%d (implementation-specific)\n", ret);
-    }
+    int pipefd[2];
+    if (pipe(pipefd) == 0) {
+        /* Test READ event */
+        int ret = cobalt_eventloop_add_fd(loop, pipefd[0], POLLIN, on_fd, NULL);
+        if (ret == 0) {
+            printf("  Add FD READ handler: OK\n");
+        }
 
-    /* Modify FD */
-    ret = cobalt_eventloop_mod_fd(loop, -1, 1, on_fd, NULL);
-    if (ret == 0) {
-        printf("  Modify FD handler: OK\n");
-    }
+        /* Test WRITE event */
+        ret = cobalt_eventloop_add_fd(loop, pipefd[1], POLLOUT, on_fd, NULL);
+        if (ret == 0) {
+            printf("  Add FD WRITE handler: OK\n");
+        }
 
-    /* Delete FD */
-    ret = cobalt_eventloop_del_fd(loop, -1);
-    if (ret == 0) {
-        printf("  Delete FD handler: OK\n");
+        /* Modify FD events */
+        ret = cobalt_eventloop_mod_fd(loop, pipefd[0], POLLOUT, on_fd, NULL);
+        if (ret == 0) {
+            printf("  Modify FD events: OK\n");
+        }
+
+        /* Delete FD */
+        ret = cobalt_eventloop_del_fd(loop, pipefd[0]);
+        if (ret == 0) {
+            printf("  Delete FD handler: OK\n");
+        }
+        ret = cobalt_eventloop_del_fd(loop, pipefd[1]);
+        if (ret == 0) {
+            printf("  Delete FD handler: OK\n");
+        }
+
+        close(pipefd[0]);
+        close(pipefd[1]);
     }
 
     cobalt_eventloop_destroy(loop);
