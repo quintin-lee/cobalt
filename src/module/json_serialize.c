@@ -20,11 +20,11 @@ static int ensure_capacity(char **buffer, size_t *capacity, size_t needed)
 {
     if (*capacity < *capacity + needed) {
         size_t new_capacity = (*capacity + needed) * 2;
-        char *tmp = realloc(*buffer, new_capacity);
+        char  *tmp          = realloc(*buffer, new_capacity);
         if (!tmp) {
             return -1;
         }
-        *buffer = tmp;
+        *buffer   = tmp;
         *capacity = new_capacity;
     }
     return 0;

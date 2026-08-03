@@ -106,7 +106,11 @@ void test_treemap_remove_stress(void)
     for (int i = 0; i < 50; i++) {
         char key[16];
         snprintf(key, sizeof(key), "key_%d", i);
+        void *val = cobalt_treemap_get(map, key);
         int ret = cobalt_treemap_remove(map, key);
+        if (ret == 0) {
+            free(val);
+        }
         if (ret != 0) {
             printf("  Remove failed for %s at iteration %d, size=%zu\n", key, i, cobalt_treemap_size(map));
         }
@@ -128,7 +132,9 @@ void test_treemap_remove_stress(void)
     for (int i = 50; i < 100; i++) {
         char key[16];
         snprintf(key, sizeof(key), "key_%d", i);
+        void *val = cobalt_treemap_get(map, key);
         TEST_ASSERT(cobalt_treemap_remove(map, key) == 0);
+        free(val);
     }
     TEST_ASSERT(cobalt_treemap_size(map) == 0);
 

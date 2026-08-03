@@ -50,8 +50,8 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
     ctx->pos++;
 
     size_t capacity = 64;
-    size_t len = 0;
-    char *result = malloc(capacity);
+    size_t len      = 0;
+    char  *result   = malloc(capacity);
     if (!result) {
         return NULL;
     }
@@ -63,19 +63,43 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
                 free(result);
                 return NULL;
             }
-            char c = ctx->str[ctx->pos];
-            char escaped[5] = {0};
-            size_t elen = 0;
+            char   c          = ctx->str[ctx->pos];
+            char   escaped[5] = {0};
+            size_t elen       = 0;
 
             switch (c) {
-            case '"':  escaped[0] = '"'; elen = 1; break;
-            case '\\': escaped[0] = '\\'; elen = 1; break;
-            case '/':  escaped[0] = '/'; elen = 1; break;
-            case 'b':  escaped[0] = '\b'; elen = 1; break;
-            case 'f':  escaped[0] = '\f'; elen = 1; break;
-            case 'n':  escaped[0] = '\n'; elen = 1; break;
-            case 'r':  escaped[0] = '\r'; elen = 1; break;
-            case 't':  escaped[0] = '\t'; elen = 1; break;
+            case '"':
+                escaped[0] = '"';
+                elen       = 1;
+                break;
+            case '\\':
+                escaped[0] = '\\';
+                elen       = 1;
+                break;
+            case '/':
+                escaped[0] = '/';
+                elen       = 1;
+                break;
+            case 'b':
+                escaped[0] = '\b';
+                elen       = 1;
+                break;
+            case 'f':
+                escaped[0] = '\f';
+                elen       = 1;
+                break;
+            case 'n':
+                escaped[0] = '\n';
+                elen       = 1;
+                break;
+            case 'r':
+                escaped[0] = '\r';
+                elen       = 1;
+                break;
+            case 't':
+                escaped[0] = '\t';
+                elen       = 1;
+                break;
             case 'u': {
                 if (ctx->pos + 4 >= ctx->len) {
                     free(result);
@@ -86,28 +110,28 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
                 unsigned int cp = (unsigned int)strtol(hex, NULL, 16);
                 if (cp < 0x80) {
                     escaped[0] = (char)cp;
-                    elen = 1;
+                    elen       = 1;
                 } else if (cp < 0x800) {
                     escaped[0] = (char)(0xC0 | (cp >> 6));
                     escaped[1] = (char)(0x80 | (cp & 0x3F));
-                    elen = 2;
+                    elen       = 2;
                 } else {
                     escaped[0] = (char)(0xE0 | (cp >> 12));
                     escaped[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
                     escaped[2] = (char)(0x80 | (cp & 0x3F));
-                    elen = 3;
+                    elen       = 3;
                 }
                 ctx->pos += 4;
                 break;
             }
             default:
                 escaped[0] = c;
-                elen = 1;
+                elen       = 1;
                 break;
             }
 
             if (len + elen + 1 > capacity) {
-                capacity = (len + elen + 1) * 2;
+                capacity  = (len + elen + 1) * 2;
                 char *tmp = realloc(result, capacity);
                 if (!tmp) {
                     free(result);

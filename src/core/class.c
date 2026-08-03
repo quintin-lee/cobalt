@@ -52,8 +52,8 @@ int cobalt_class_add_method(cobalt_class_t *cls,
         return -1;
     }
 
-    cobalt_method_t **new_methods = realloc(cls->methods,
-                                            sizeof(cobalt_method_t *) * (cls->method_count + 1));
+    cobalt_method_t **new_methods =
+        realloc(cls->methods, sizeof(cobalt_method_t *) * (cls->method_count + 1));
     if (!new_methods) {
         return -1;
     }
@@ -63,7 +63,7 @@ int cobalt_class_add_method(cobalt_class_t *cls,
     if (!cls->methods[cls->method_count]) {
         return -1;
     }
-    cls->methods[cls->method_count]->name = cobalt_strdup(name);
+    cls->methods[cls->method_count]->name   = cobalt_strdup(name);
     cls->methods[cls->method_count]->invoke = invoke;
     cls->method_count++;
 
@@ -88,8 +88,8 @@ int cobalt_class_add_property(cobalt_class_t *cls,
         return -1;
     }
 
-    cobalt_property_t **new_properties = realloc(cls->properties,
-                                                  sizeof(cobalt_property_t *) * (cls->property_count + 1));
+    cobalt_property_t **new_properties =
+        realloc(cls->properties, sizeof(cobalt_property_t *) * (cls->property_count + 1));
     if (!new_properties) {
         return -1;
     }
@@ -100,8 +100,8 @@ int cobalt_class_add_property(cobalt_class_t *cls,
         return -1;
     }
     cls->properties[cls->property_count]->name = cobalt_strdup(name);
-    cls->properties[cls->property_count]->get = get;
-    cls->properties[cls->property_count]->set = set;
+    cls->properties[cls->property_count]->get  = get;
+    cls->properties[cls->property_count]->set  = set;
     cls->property_count++;
 
     return 0;
@@ -121,7 +121,8 @@ int cobalt_class_is_abstract(cobalt_class_t *cls)
 
 /**
  * @brief Destroy the class information object and free memory
- * @details Frees the class name string, method table, property table, and the class structure itself.
+ * @details Frees the class name string, method table, property table, and the class structure
+ * itself.
  *
  * @param cls Target class
  */
