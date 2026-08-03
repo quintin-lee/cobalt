@@ -301,3 +301,4 @@ size_t cobalt_treemap_size(cobalt_treemap_t *map)
 {
     return map ? map->impl.size : 0;
 }
+#include "cobalt/platform/debug_assert.h"
