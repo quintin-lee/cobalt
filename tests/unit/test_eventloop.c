@@ -157,8 +157,8 @@ void test_eventloop_multiple_timers(void)
         return;
     }
 
-    int counter1 = 0;
-    int counter2 = 0;
+    uint64_t counter1 = 0;
+    uint64_t counter2 = 0;
 
     uint64_t id1 = cobalt_eventloop_add_timer(loop, 1, 0, on_timer, &counter1);
     uint64_t id2 = cobalt_eventloop_add_timer(loop, 1, 0, on_timer, &counter2);

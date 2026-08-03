@@ -195,6 +195,7 @@ void test_json_serialize(void)
     if (null_ser == NULL) {
         printf("  Serialize NULL returns NULL: OK\n");
     }
+    free(null_ser);
 
     /* Create a simple number and serialize */
     json_node_t *num = json_parse("42");
