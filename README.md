@@ -149,7 +149,7 @@ cd build
 | Metric | Value |
 |--------|-------|
 | Total lines of code | 6,627 |
-| Git commits | 155 |
+| Git commits | 157 |
 | Tests passing | 22/22 |
 
 ## License
