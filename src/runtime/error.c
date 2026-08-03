@@ -38,6 +38,10 @@ const char *cobalt_error_get_message(cobalt_error_t code)
         return "IO error";
     case COBALT_ERROR_TIMEOUT:
         return "Timeout";
+    case COBALT_ERROR_OUT_OF_BOUNDS:
+        return "Index out of bounds";
+    case COBALT_ERROR_EMPTY_CONTAINER:
+        return "Container is empty";
     default:
         return "Unknown error";
     }

@@ -136,7 +136,8 @@ int cobalt_deque_push_back(cobalt_deque_t *deque, void *item)
 void *cobalt_deque_pop_front(cobalt_deque_t *deque)
 {
     if (!deque || !deque->head) {
-        return NULL; // Queue is empty or pointer is invalid
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
+        return NULL;
     }
 
     deque_node_t *node = deque->head;
@@ -162,7 +163,8 @@ void *cobalt_deque_pop_front(cobalt_deque_t *deque)
 void *cobalt_deque_pop_back(cobalt_deque_t *deque)
 {
     if (!deque || !deque->tail) {
-        return NULL; // Queue is empty or pointer is invalid
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
+        return NULL;
     }
 
     deque_node_t *node = deque->tail;
@@ -188,6 +190,7 @@ void *cobalt_deque_pop_back(cobalt_deque_t *deque)
 void *cobalt_deque_peek_front(cobalt_deque_t *deque)
 {
     if (!deque || !deque->head) {
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
     return deque->head->data;
@@ -199,6 +202,7 @@ void *cobalt_deque_peek_front(cobalt_deque_t *deque)
 void *cobalt_deque_peek_back(cobalt_deque_t *deque)
 {
     if (!deque || !deque->tail) {
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
     return deque->tail->data;

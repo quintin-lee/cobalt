@@ -99,7 +99,8 @@ int cobalt_queue_enqueue(cobalt_queue_t *queue, void *item)
 void *cobalt_queue_dequeue(cobalt_queue_t *queue)
 {
     if (!queue || !queue->head) {
-        return NULL; // Queue is empty or pointer is invalid
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
+        return NULL;
     }
 
     queue_node_t *node = queue->head;
@@ -122,6 +123,7 @@ void *cobalt_queue_dequeue(cobalt_queue_t *queue)
 void *cobalt_queue_peek(cobalt_queue_t *queue)
 {
     if (!queue || !queue->head) {
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
     return queue->head->data;

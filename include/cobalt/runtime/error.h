@@ -28,6 +28,8 @@ typedef enum {
     COBALT_ERROR_PERMISSION_DENIED = -6, /**< Permission denied */
     COBALT_ERROR_IO                = -7, /**< IO error */
     COBALT_ERROR_TIMEOUT           = -8, /**< Timeout */
+    COBALT_ERROR_OUT_OF_BOUNDS     = -9, /**< Index out of bounds */
+    COBALT_ERROR_EMPTY_CONTAINER   = -10, /**< Container is empty */
 } cobalt_error_t;
 
 /**

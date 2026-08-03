@@ -172,7 +172,12 @@ int cobalt_vector_push(cobalt_vector_t *vec, void *item)
  */
 void *cobalt_vector_get(cobalt_vector_t *vec, size_t index)
 {
-    if (!vec || index >= vec->size) {
+    if (!vec) {
+        cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+        return NULL;
+    }
+    if (index >= vec->size) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_BOUNDS);
         return NULL;
     }
     return vec->items[index];

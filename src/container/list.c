@@ -242,6 +242,7 @@ int cobalt_list_push_back(cobalt_list_t *list, void *item)
 void *cobalt_list_pop_front(cobalt_list_t *list)
 {
     if (!list || !((cobalt_list_impl_t *)list)->head) {
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
     cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
@@ -267,6 +268,7 @@ void *cobalt_list_pop_front(cobalt_list_t *list)
 void *cobalt_list_pop_back(cobalt_list_t *list)
 {
     if (!list || !((cobalt_list_impl_t *)list)->tail) {
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
     cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
@@ -296,10 +298,12 @@ void *cobalt_list_pop_back(cobalt_list_t *list)
 void *cobalt_list_get(cobalt_list_t *list, size_t index)
 {
     if (!list) {
+        cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
         return NULL;
     }
     cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
     if (index >= impl->size) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_BOUNDS);
         return NULL;
     }
 

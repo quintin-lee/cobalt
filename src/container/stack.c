@@ -102,6 +102,7 @@ int cobalt_stack_push(cobalt_stack_t *stack, void *item)
 void *cobalt_stack_pop(cobalt_stack_t *stack)
 {
     if (!stack || !stack->top) {
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
 
@@ -122,6 +123,7 @@ void *cobalt_stack_pop(cobalt_stack_t *stack)
 void *cobalt_stack_peek(cobalt_stack_t *stack)
 {
     if (!stack || !stack->top) {
+        cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
     return stack->top->data;
