@@ -92,8 +92,8 @@ static void list_remove_seq(cobalt_sequence_t *self, void *item)
         return;
     }
     cobalt_list_impl_t *list = (cobalt_list_impl_t *)self;
-    list_node_t *node = list->head;
-    list_node_t *prev = NULL;
+    list_node_t        *node = list->head;
+    list_node_t        *prev = NULL;
 
     while (node) {
         if (node->data == item) {
@@ -431,8 +431,8 @@ int cobalt_list_remove(cobalt_list_t *list, void *item)
         return -1;
     }
     cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
-    list_node_t *node = impl->head;
-    list_node_t *prev = NULL;
+    list_node_t        *node = impl->head;
+    list_node_t        *prev = NULL;
 
     while (node) {
         if (node->data == item) {
