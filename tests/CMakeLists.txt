@@ -75,3 +75,6 @@ target_link_libraries(benchmark_set cobalt)
 
 add_executable(benchmark_deque benchmark/benchmark_deque.c)
 target_link_libraries(benchmark_deque cobalt)
+
+add_executable(benchmark_treemap benchmark/benchmark_treemap.c)
+target_link_libraries(benchmark_treemap cobalt)

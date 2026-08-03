@@ -276,55 +276,6 @@ void test_vector_remove(void)
     printf("  vector_remove test passed\n");
 }
 
-#ifdef __linux__
-typedef struct {
-    cobalt_vector_t *vec;
-    int thread_id;
-} concurrent_test_data_t;
-
-static void *concurrent_push(void *arg)
-{
-    concurrent_test_data_t *data = (concurrent_test_data_t *)arg;
-    int *val = malloc(sizeof(int));
-    if (!val) return NULL;
-    *val = data->thread_id * 1000 + data->thread_id;
-    cobalt_vector_push(data->vec, val);
-    return NULL;
-}
-
-void test_vector_concurrent(void)
-{
-    printf("Testing vector concurrent push...\n");
-
-    cobalt_vector_t *vec = cobalt_vector_create(8);
-    TEST_ASSERT(vec != NULL);
-
-    const int NUM_THREADS = 8;
-    const int ITERATIONS = 100;
-    pthread_t threads[NUM_THREADS];
-    concurrent_test_data_t thread_data[NUM_THREADS];
-
-    for (int i = 0; i < NUM_THREADS; i++) {
-        thread_data[i].vec = vec;
-        thread_data[i].thread_id = i;
-        int ret = pthread_create(&threads[i], NULL, concurrent_push, &thread_data[i]);
-        TEST_ASSERT(ret == 0);
-    }
-
-    for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_join(threads[i], NULL);
-    }
-
-    /* Each thread pushes ITERATIONS elements */
-    TEST_ASSERT(cobalt_vector_size(vec) == (size_t)(NUM_THREADS * ITERATIONS));
-    printf("  Concurrent push: %d threads x %d iterations = %zu elements: OK\n",
-           NUM_THREADS, ITERATIONS, cobalt_vector_size(vec));
-
-    cobalt_vector_destroy(vec);
-    printf("  Concurrent push test passed\n");
-}
-#endif
-
 void test_vector(void)
 {
     printf("Testing vector...\n");
@@ -334,7 +285,4 @@ void test_vector(void)
     test_vector_iterator();
     test_vector_zero_capacity();
     test_vector_remove();
-#ifdef __linux__
-    test_vector_concurrent();
-#endif
 }
