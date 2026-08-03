@@ -106,3 +106,4 @@ __pycache__/
 *.bak
 *.tmp
 *.temp
+build-asan/
