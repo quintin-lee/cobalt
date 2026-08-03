@@ -59,9 +59,10 @@ void cobalt_set_destroy(cobalt_set_t *set)
 /**
  * @brief Insert an element into the set
  * @details Stores the item as both the key and value of the hash map.
+ *          Item must be a null-terminated C string.
  *
  * @param set Pointer to the set
- * @param item Element (treated as a string)
+ * @param item Element (must be a const char* string)
  * @return Returns 0 on success, -1 on failure
  */
 int cobalt_set_insert(cobalt_set_t *set, void *item)
@@ -69,7 +70,6 @@ int cobalt_set_insert(cobalt_set_t *set, void *item)
     if (!set) {
         return -1;
     }
-    // Underlying hashmap_put accepts const char* key
     return cobalt_hashmap_put(set->map, (const char *)item, item) == 0 ? 0 : -1;
 }
 
@@ -77,7 +77,7 @@ int cobalt_set_insert(cobalt_set_t *set, void *item)
  * @brief Remove an element from the set
  *
  * @param set Pointer to the set
- * @param item Element (treated as a string)
+ * @param item Element (must be a const char* string)
  * @return Returns 0 on success, -1 on failure
  */
 int cobalt_set_remove(cobalt_set_t *set, void *item)

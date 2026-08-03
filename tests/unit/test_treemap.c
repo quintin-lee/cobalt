@@ -1,9 +1,10 @@
 /**
  * @file test_treemap.c
- * @Unit test for treemap (BST-based).
+ * @brief Unit test for treemap (BST-based).
  */
 
 #include "cobalt/container/treemap.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -12,50 +13,133 @@ void test_treemap_basic(void)
     printf("Testing treemap basic operations...\n");
 
     cobalt_treemap_t *map = cobalt_treemap_create();
-    if (!map) {
-        fprintf(stderr, "ERROR: Failed to create treemap\n");
-        return;
-    }
+    TEST_ASSERT(map != NULL);
 
-    /* Test empty tree */
-    if (cobalt_treemap_size(map) == 0) {
-        printf("  Empty tree size: OK\n");
-    }
+    TEST_ASSERT(cobalt_treemap_size(map) == 0);
+    printf("  Empty tree size: OK\n");
 
-    /* Insert simple values */
     int val1 = 1, val2 = 2, val3 = 3;
-    cobalt_treemap_put(map, "b", &val1);
-    cobalt_treemap_put(map, "a", &val2);
-    cobalt_treemap_put(map, "c", &val3);
+    TEST_ASSERT(cobalt_treemap_put(map, "b", &val1) == 0);
+    TEST_ASSERT(cobalt_treemap_put(map, "a", &val2) == 0);
+    TEST_ASSERT(cobalt_treemap_put(map, "c", &val3) == 0);
 
-    if (cobalt_treemap_size(map) == 3) {
-        printf("  Size after 3 inserts: OK\n");
-    }
+    TEST_ASSERT(cobalt_treemap_size(map) == 3);
+    printf("  Size after 3 inserts: OK\n");
 
-    /* Get values */
     int *got = (int *)cobalt_treemap_get(map, "a");
-    if (got && *got == 2) {
-        printf("  Get 'a' returns 2: OK\n");
-    }
+    TEST_ASSERT(got != NULL);
+    TEST_ASSERT(*got == 2);
+    printf("  Get 'a' returns 2: OK\n");
 
-    /* Min/Max */
     const char *min = cobalt_treemap_min_key(map);
     const char *max = cobalt_treemap_max_key(map);
-    if (min && strcmp(min, "a") == 0) {
-        printf("  Min key 'a': OK\n");
-    }
-    if (max && strcmp(max, "c") == 0) {
-        printf("  Max key 'c': OK\n");
-    }
+    TEST_ASSERT(min != NULL && strcmp(min, "a") == 0);
+    TEST_ASSERT(max != NULL && strcmp(max, "c") == 0);
+    printf("  Min key 'a': OK\n");
+    printf("  Max key 'c': OK\n");
 
-    /* Test destroy */
     cobalt_treemap_destroy(map);
     printf("  Treemap destroyed successfully\n");
     printf("  Treemap tests completed\n");
+}
+
+void test_treemap_remove(void)
+{
+    printf("Testing treemap remove...\n");
+
+    cobalt_treemap_t *map = cobalt_treemap_create();
+    TEST_ASSERT(map != NULL);
+
+    int a = 1, b = 2, c = 3;
+    TEST_ASSERT(cobalt_treemap_put(map, "a", &a) == 0);
+    TEST_ASSERT(cobalt_treemap_put(map, "b", &b) == 0);
+    TEST_ASSERT(cobalt_treemap_put(map, "c", &c) == 0);
+    TEST_ASSERT(cobalt_treemap_size(map) == 3);
+
+    TEST_ASSERT(cobalt_treemap_remove(map, "b") == 0);
+    TEST_ASSERT(cobalt_treemap_size(map) == 2);
+    TEST_ASSERT(cobalt_treemap_get(map, "b") == NULL);
+    TEST_ASSERT(cobalt_treemap_get(map, "a") == &a);
+    TEST_ASSERT(cobalt_treemap_get(map, "c") == &c);
+    printf("  Remove middle element: OK\n");
+
+    TEST_ASSERT(cobalt_treemap_remove(map, "a") == 0);
+    TEST_ASSERT(cobalt_treemap_size(map) == 1);
+    TEST_ASSERT(cobalt_treemap_get(map, "a") == NULL);
+    printf("  Remove root element: OK\n");
+
+    TEST_ASSERT(cobalt_treemap_remove(map, "c") == 0);
+    TEST_ASSERT(cobalt_treemap_size(map) == 0);
+    TEST_ASSERT(cobalt_treemap_get(map, "c") == NULL);
+    printf("  Remove last element: OK\n");
+
+    TEST_ASSERT(cobalt_treemap_remove(map, "a") == -1);
+    printf("  Remove from empty tree: OK\n");
+
+    int d = 4;
+    TEST_ASSERT(cobalt_treemap_put(map, "a", &d) == 0);
+    TEST_ASSERT(cobalt_treemap_size(map) == 1);
+    TEST_ASSERT(cobalt_treemap_get(map, "a") == &d);
+    printf("  Re-insert after removal: OK\n");
+
+    cobalt_treemap_destroy(map);
+    printf("  TreeMap remove test passed\n");
+}
+
+void test_treemap_remove_stress(void)
+{
+    printf("Testing treemap remove stress (memory leak check)...\n");
+
+    cobalt_treemap_t *map = cobalt_treemap_create();
+    TEST_ASSERT(map != NULL);
+
+    for (int i = 0; i < 100; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), "key_%d", i);
+        int *val = malloc(sizeof(int));
+        TEST_ASSERT(val != NULL);
+        *val = i;
+        TEST_ASSERT(cobalt_treemap_put(map, key, val) == 0);
+    }
+    TEST_ASSERT(cobalt_treemap_size(map) == 100);
+
+    for (int i = 0; i < 50; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), "key_%d", i);
+        int ret = cobalt_treemap_remove(map, key);
+        if (ret != 0) {
+            printf("  Remove failed for %s at iteration %d, size=%zu\n", key, i, cobalt_treemap_size(map));
+        }
+    }
+    printf("  Size after removing 50: %zu (expected 50)\n", cobalt_treemap_size(map));
+    TEST_ASSERT(cobalt_treemap_size(map) == 50);
+
+    for (int i = 0; i < 50; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), "key_%d", i);
+        TEST_ASSERT(cobalt_treemap_get(map, key) == NULL);
+    }
+    for (int i = 50; i < 100; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), "key_%d", i);
+        TEST_ASSERT(cobalt_treemap_get(map, key) != NULL);
+    }
+
+    for (int i = 50; i < 100; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), "key_%d", i);
+        TEST_ASSERT(cobalt_treemap_remove(map, key) == 0);
+    }
+    TEST_ASSERT(cobalt_treemap_size(map) == 0);
+
+    cobalt_treemap_destroy(map);
+    printf("  TreeMap remove stress test passed\n");
 }
 
 void test_treemap(void)
 {
     printf("Testing treemap...\n");
     test_treemap_basic();
+    test_treemap_remove();
+    test_treemap_remove_stress();
 }

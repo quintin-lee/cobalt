@@ -145,6 +145,15 @@ int cobalt_list_is_empty(cobalt_list_t *list);
  */
 cobalt_iterator_t *cobalt_list_iterator_create(cobalt_list_t *list);
 
+/**
+ * @brief Remove the first occurrence of an element from the list
+ *
+ * @param list Pointer to the target list
+ * @param item Pointer to the data to remove (compared by pointer equality)
+ * @return Returns 0 on success; returns -1 if list is NULL, item is NULL, or element not found.
+ */
+int cobalt_list_remove(cobalt_list_t *list, void *item);
+
 /** @} */
 
 #endif /* LIST_H */

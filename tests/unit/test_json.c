@@ -91,10 +91,48 @@ void test_json_parse_string(void)
     json_node_t *escaped = json_parse("\"hello\\nworld\"");
     if (escaped) {
         const char *val = json_get_string(escaped);
-        if (val) {
-            printf("  Parse escaped string: OK (got \"%s\")\n", val);
+        if (val && strcmp(val, "hello\nworld") == 0) {
+            printf("  Parse escaped newline: OK\n");
+        } else {
+            fprintf(stderr, "ERROR: Expected \"hello\\nworld\", got \"%s\"\n", val ? val : "NULL");
         }
         json_destroy(escaped);
+    }
+
+    /* Test tab escape */
+    json_node_t *tab = json_parse("\"a\\tb\"");
+    if (tab) {
+        const char *val = json_get_string(tab);
+        if (val && strcmp(val, "a\tb") == 0) {
+            printf("  Parse escaped tab: OK\n");
+        } else {
+            fprintf(stderr, "ERROR: Expected \"a\\\\tb\", got \"%s\"\n", val ? val : "NULL");
+        }
+        json_destroy(tab);
+    }
+
+    /* Test backslash escape */
+    json_node_t *bs = json_parse("\"C:\\\\Users\\\\test\"");
+    if (bs) {
+        const char *val = json_get_string(bs);
+        if (val && strcmp(val, "C:\\Users\\test") == 0) {
+            printf("  Parse escaped backslash: OK\n");
+        } else {
+            fprintf(stderr, "ERROR: Expected \"C:\\\\Users\\\\test\", got \"%s\"\n", val ? val : "NULL");
+        }
+        json_destroy(bs);
+    }
+
+    /* Test quote escape */
+    json_node_t *qt = json_parse("\"say \\\"hello\\\"\"");
+    if (qt) {
+        const char *val = json_get_string(qt);
+        if (val && strcmp(val, "say \"hello\"") == 0) {
+            printf("  Parse escaped quote: OK\n");
+        } else {
+            fprintf(stderr, "ERROR: Expected \"say \\\\\"hello\\\\\"\", got \"%s\"\n", val ? val : "NULL");
+        }
+        json_destroy(qt);
     }
 }
 

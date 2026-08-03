@@ -4,9 +4,12 @@
 /**
  * @file set.h
  * @brief Set container
- * @details A set implementation based on a hash map, used to store unique elements. The current
- * implementation casts void* to const char* as the key for the underlying hash map, making it more
- * suitable for storing strings.
+ * @details A set implementation based on a hash map, used to store unique elements.
+ *
+ * @note This set is designed for string elements only. Internally, items are cast to
+ *       `const char*` and used as hashmap keys. Passing non-string pointers will
+ *       result in undefined behavior. For non-string sets, use a different container
+ *       or implement custom hash/equality functions.
  */
 
 #include <stddef.h>

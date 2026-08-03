@@ -530,7 +530,6 @@ void cobalt_eventloop_run(cobalt_eventloop_t *loop)
 
     while (loop->running && !loop->stop_flag) {
         cobalt_eventloop_iteration(loop);
-        usleep(COBALT_MILLIS_PER_SEC);
     }
     loop->running = 0;
 }

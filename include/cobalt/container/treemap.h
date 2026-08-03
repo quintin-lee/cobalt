@@ -56,8 +56,6 @@ void *cobalt_treemap_get(cobalt_treemap_t *map, const char *key);
  * @param map Pointer to the map
  * @param key String key
  * @return Returns 0 on successful removal, -1 if not found or on failure
- * @note The simplified implementation currently only sets the value to NULL, and does not actually
- * delete the node or rebalance the tree.
  */
 int cobalt_treemap_remove(cobalt_treemap_t *map, const char *key);
 

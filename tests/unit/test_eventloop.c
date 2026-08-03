@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 static int  timer_called  = 0;
@@ -215,6 +216,34 @@ void test_eventloop_timer_heap_order(void)
     printf("  Eventloop timer heap ordering test passed\n");
 }
 
+void test_eventloop_timing(void)
+{
+    printf("Testing eventloop timing...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    /* Run 10 iterations on an empty loop — should be fast, not 1s each */
+    for (int i = 0; i < 10; i++) {
+        cobalt_eventloop_iteration(loop);
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+
+    long elapsed_ms = (end.tv_sec - start.tv_sec) * 1000L +
+                      (end.tv_nsec - start.tv_nsec) / 1000000L;
+
+    printf("  10 iterations took %ld ms\n", elapsed_ms);
+    /* The bug caused 1s per iteration; should be well under 1000ms total */
+    TEST_ASSERT(elapsed_ms < 1000);
+
+    cobalt_eventloop_destroy(loop);
+    printf("  Eventloop timing test passed\n");
+}
+
 void test_eventloop(void)
 {
     printf("Testing eventloop...\n");
@@ -224,5 +253,6 @@ void test_eventloop(void)
     test_eventloop_run_stop();
     test_eventloop_multiple_timers();
     test_eventloop_timer_heap_order();
+    test_eventloop_timing();
     printf("  Eventloop tests completed\n");
 }

@@ -218,6 +218,42 @@ void test_list_iterator(void)
     printf("  list_iterator test passed\n");
 }
 
+void test_list_remove(void)
+{
+    printf("Testing list_remove...\n");
+
+    cobalt_list_t *list = cobalt_list_create();
+    TEST_ASSERT(list != NULL);
+
+    int a = 1, b = 2, c = 3;
+
+    TEST_ASSERT(cobalt_list_push_back(list, &a) == 0);
+    TEST_ASSERT(cobalt_list_push_back(list, &b) == 0);
+    TEST_ASSERT(cobalt_list_push_back(list, &c) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 3);
+
+    TEST_ASSERT(cobalt_list_remove(list, &b) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 2);
+    TEST_ASSERT(cobalt_list_get(list, 0) == &a);
+    TEST_ASSERT(cobalt_list_get(list, 1) == &c);
+
+    TEST_ASSERT(cobalt_list_remove(list, &a) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 1);
+    TEST_ASSERT(cobalt_list_get(list, 0) == &c);
+
+    TEST_ASSERT(cobalt_list_remove(list, &c) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 0);
+    TEST_ASSERT(cobalt_list_is_empty(list));
+
+    TEST_ASSERT(cobalt_list_remove(list, &a) == -1);
+
+    int d = 4;
+    TEST_ASSERT(cobalt_list_remove(list, &d) == -1);
+
+    cobalt_list_destroy(list);
+    printf("  List remove test passed\n");
+}
+
 void test_list(void)
 {
     printf("Testing list...\n");
@@ -226,5 +262,6 @@ void test_list(void)
     test_list_pop_back();
     test_list_get();
     test_list_iterator();
+    test_list_remove();
     printf("  List tests completed\n");
 }

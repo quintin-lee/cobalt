@@ -85,13 +85,35 @@ static void list_add_seq(cobalt_sequence_t *self, void *item)
 
 /**
  * @brief Remove element from sequence (Sequence interface implementation)
- * @note This method does not currently implement specific removal logic.
  */
 static void list_remove_seq(cobalt_sequence_t *self, void *item)
 {
-    (void)self;
-    (void)item;
-    // FIXME: Value-based element removal is currently not supported
+    if (!self || !item) {
+        return;
+    }
+    cobalt_list_impl_t *list = (cobalt_list_impl_t *)self;
+    list_node_t *node = list->head;
+    list_node_t *prev = NULL;
+
+    while (node) {
+        if (node->data == item) {
+            if (prev) {
+                prev->next = node->next;
+            } else {
+                list->head = node->next;
+            }
+            if (node->next) {
+                node->next->prev = prev;
+            } else {
+                list->tail = prev;
+            }
+            free(node);
+            list->size--;
+            return;
+        }
+        prev = node;
+        node = node->next;
+    }
 }
 
 /**
@@ -397,4 +419,35 @@ cobalt_iterator_t *cobalt_list_iterator_create(cobalt_list_t *list)
     iter->vtable = &list_vtable;
     iter->data   = iter_data;
     return iter;
+}
+
+int cobalt_list_remove(cobalt_list_t *list, void *item)
+{
+    if (!list || !item) {
+        return -1;
+    }
+    cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
+    list_node_t *node = impl->head;
+    list_node_t *prev = NULL;
+
+    while (node) {
+        if (node->data == item) {
+            if (prev) {
+                prev->next = node->next;
+            } else {
+                impl->head = node->next;
+            }
+            if (node->next) {
+                node->next->prev = prev;
+            } else {
+                impl->tail = prev;
+            }
+            free(node);
+            impl->size--;
+            return 0;
+        }
+        prev = node;
+        node = node->next;
+    }
+    return -1;
 }

@@ -89,7 +89,6 @@ static void destroy_tree(treemap_node_t *node)
  */
 static treemap_node_t *insert_node(treemap_node_t *node, const char *key, void *value)
 {
-    // Find the insertion position and create a new node
     if (!node) {
         return create_node(key, value);
     }
@@ -100,7 +99,6 @@ static treemap_node_t *insert_node(treemap_node_t *node, const char *key, void *
     } else if (cmp > 0) {
         node->right = insert_node(node->right, key, value);
     } else {
-        // Key already exists, update value
         node->value = value;
     }
 
@@ -130,7 +128,7 @@ static treemap_node_t *find_node(treemap_node_t *node, const char *key)
 }
 
 /**
- * @brief Find the node with the minimum key in the tree
+ * @brief Recursively find the node with the minimum key in the tree
  * @details Traverses down the left subtree until a leaf node is reached.
  *
  * @param node Root node of the tree
@@ -141,6 +139,67 @@ static treemap_node_t *find_min(treemap_node_t *node)
     while (node && node->left) {
         node = node->left;
     }
+    return node;
+}
+
+/**
+ * @brief Recursively find and remove a node by key, returning the new subtree root
+ * @details Performs actual node deletion from the BST. For nodes with two children,
+ *          replaces with inorder successor (minimum of right subtree).
+ *
+ * @param node Current subtree root
+ * @param key Key to remove
+ * @param size Pointer to size counter (decremented on successful removal)
+ * @return New root of the subtree after removal
+ */
+static treemap_node_t *remove_node(treemap_node_t *node, const char *key)
+{
+    if (!node) {
+        return NULL;
+    }
+
+    int cmp = strcmp(key, node->key);
+    if (cmp < 0) {
+        node->left = remove_node(node->left, key);
+    } else if (cmp > 0) {
+        node->right = remove_node(node->right, key);
+    } else {
+        /* Found the node to remove */
+        /* Case 1: Leaf node (no children) */
+        if (!node->left && !node->right) {
+            free(node->key);
+            free(node);
+            return NULL;
+        }
+        /* Case 2: Only right child */
+        else if (!node->left) {
+            treemap_node_t *tmp = node->right;
+            free(node->key);
+            free(node);
+            return tmp;
+        }
+        /* Case 3: Only left child */
+        else if (!node->right) {
+            treemap_node_t *tmp = node->left;
+            free(node->key);
+            free(node);
+            return tmp;
+        }
+        /* Case 4: Two children — replace with inorder successor */
+        else {
+            treemap_node_t *successor = find_min(node->right);
+            char *old_key = node->key;
+            void *old_value = node->value;
+            /* Copy successor's key and value to current node */
+            node->key = cobalt_strdup(successor->key);
+            node->value = successor->value;
+            free(old_key);
+            /* old_value is user-owned, do not free */
+            /* Remove the successor from the right subtree */
+            node->right = remove_node(node->right, successor->key);
+        }
+    }
+
     return node;
 }
 
@@ -204,8 +263,14 @@ int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value)
     if (!map || !key) {
         return -1;
     }
-    map->impl.root = insert_node(map->impl.root, key, value);
-    map->impl.size++;
+    /* Check if key already exists before inserting */
+    if (find_node(map->impl.root, key) != NULL) {
+        /* Key exists — update value in place, do not increment size */
+        map->impl.root = insert_node(map->impl.root, key, value);
+    } else {
+        map->impl.root = insert_node(map->impl.root, key, value);
+        map->impl.size++;
+    }
     return 0;
 }
 
@@ -227,9 +292,8 @@ void *cobalt_treemap_get(cobalt_treemap_t *map, const char *key)
 
 /**
  * @brief Remove the specified key-value pair
- * @details Current implementation uses a simplified "soft delete", setting the value of the
- * corresponding node to NULL and decrementing size, without performing physical deletion and tree
- * structure rebalancing.
+ * @details Performs actual node deletion from the BST. For nodes with two children,
+ *          replaces with the inorder successor (minimum of right subtree).
  *
  * @param map TreeMap pointer
  * @param key String key
@@ -245,10 +309,7 @@ int cobalt_treemap_remove(cobalt_treemap_t *map, const char *key)
         return -1;
     }
 
-    /* To simplify implementation, just mark value as NULL and decrease size.
-       In a complete implementation, we should perform actual node deletion and tree rebalancing
-       operations. */
-    node->value = NULL;
+    map->impl.root = remove_node(map->impl.root, key);
     map->impl.size--;
     return 0;
 }
