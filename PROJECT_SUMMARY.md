@@ -157,5 +157,7 @@ All core features implemented and tested. Future enhancements:
 1. ~~Complete remaining test coverage~~ ✅ Done (22/22 tests)
 2. ~~Add Stack/Queue containers~~ ✅ Done (already implemented)
 3. ~~Implement CI/CD pipeline~~ ✅ Done (GitHub Actions with Valgrind + ASan)
-4. Publish to package managers (npm, vcpkg, Conan)
+4. ~~Publish to package managers~~ ✅ Done (vcpkg, Conan)
 5. Add Windows IOCP support for event loop
+6. Implement Stream Operators (map/filter/fold) per SPEC
+7. Add List value-based remove (FIXME in list.c)
