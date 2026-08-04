@@ -153,6 +153,102 @@ void test_functional_for_each(void)
     printf("  Negate all elements: OK\n");
 }
 
+/* Map helper: doubles each element */
+static void map_double(const void *item, void *out, void *ud)
+{
+    *(int *)out = *(int *)item * 2;
+}
+
+/* Fold helper: adds item to accumulator */
+static void *fold_add(void *acc, const void *item, void *ud)
+{
+    *(int *)acc += *(int *)item;
+    return acc;
+}
+
+/* Fold helper: multiplies item into accumulator */
+static void *fold_mul(void *acc, const void *item, void *ud)
+{
+    *(int *)acc *= *(int *)item;
+    return acc;
+}
+
+void test_functional_map(void)
+{
+    printf("Testing cobalt_map...\n");
+
+    int input[] = {1, 2, 3, 4, 5};
+    int output[5];
+
+    int result = cobalt_map(input, output, 5, sizeof(int), map_double, NULL);
+    TEST_ASSERT(result == 0);
+    TEST_ASSERT(output[0] == 2);
+    TEST_ASSERT(output[1] == 4);
+    TEST_ASSERT(output[2] == 6);
+    TEST_ASSERT(output[3] == 8);
+    TEST_ASSERT(output[4] == 10);
+    printf("  Double all elements: OK\n");
+
+    /* NULL safety */
+    TEST_ASSERT(cobalt_map(NULL, output, 5, sizeof(int), NULL, NULL) == -1);
+    printf("  NULL guard: OK\n");
+}
+
+void test_functional_filter(void)
+{
+    printf("Testing cobalt_filter...\n");
+
+    int input[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    int output[10];
+    size_t n = 10;
+
+    int result = cobalt_filter(input, output, &n, sizeof(int), predicate_even);
+    TEST_ASSERT(result == 0);
+    TEST_ASSERT(n == 5);
+    TEST_ASSERT(output[0] == 2);
+    TEST_ASSERT(output[1] == 4);
+    TEST_ASSERT(output[2] == 6);
+    TEST_ASSERT(output[3] == 8);
+    TEST_ASSERT(output[4] == 10);
+    printf("  Filter evens: OK\n");
+
+    n = 10;
+    result = cobalt_filter(input, output, &n, sizeof(int), predicate_greater_than_5);
+    TEST_ASSERT(result == 0);
+    TEST_ASSERT(n == 5);
+    TEST_ASSERT(output[0] == 6);
+    TEST_ASSERT(output[4] == 10);
+    printf("  Filter > 5: OK\n");
+
+    n = 1;
+    result = cobalt_filter(input, output, &n, sizeof(int), predicate_greater_than_100);
+    TEST_ASSERT(result == 0);
+    TEST_ASSERT(n == 0);
+    printf("  Filter none: OK\n");
+}
+
+void test_functional_fold(void)
+{
+    printf("Testing cobalt_fold...\n");
+
+    int input[] = {1, 2, 3, 4, 5};
+    int sum = 0;
+    int *result = cobalt_fold(input, 5, sizeof(int), &sum, fold_add, NULL);
+    TEST_ASSERT(result == &sum);
+    TEST_ASSERT(sum == 15);
+    printf("  Sum fold: OK\n");
+
+    int product = 1;
+    result = cobalt_fold(input, 5, sizeof(int), &product, fold_mul, NULL);
+    TEST_ASSERT(product == 120);
+    printf("  Product fold: OK\n");
+
+    /* Empty array */
+    result = cobalt_fold(input, 0, sizeof(int), &sum, NULL, NULL);
+    TEST_ASSERT(result == &sum);
+    printf("  Empty fold: OK\n");
+}
+
 void test_functional(void)
 {
     printf("Testing functional...\n");
@@ -160,5 +256,8 @@ void test_functional(void)
     test_functional_bsearch();
     test_functional_find_if();
     test_functional_for_each();
+    test_functional_map();
+    test_functional_filter();
+    test_functional_fold();
     printf("  Functional tests completed\n");
 }
