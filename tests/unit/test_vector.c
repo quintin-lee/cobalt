@@ -276,6 +276,61 @@ void test_vector_remove(void)
     printf("  vector_remove test passed\n");
 }
 
+void test_vector_large_capacity(void)
+{
+    printf("Testing vector large capacity...\n");
+
+    cobalt_vector_t *vec = cobalt_vector_create(10000);
+    TEST_ASSERT(vec != NULL);
+
+    int *values = malloc(10000 * sizeof(int));
+    TEST_ASSERT(values != NULL);
+
+    for (int i = 0; i < 10000; i++) {
+        values[i] = i;
+        TEST_ASSERT(cobalt_vector_push(vec, &values[i]) == 0);
+    }
+    TEST_ASSERT(cobalt_vector_size(vec) == 10000);
+
+    for (int i = 0; i < 10000; i++) {
+        int *got = (int *)cobalt_vector_get(vec, i);
+        TEST_ASSERT(got != NULL);
+        TEST_ASSERT(*got == i);
+    }
+
+    free(values);
+    cobalt_vector_destroy(vec);
+    printf("  Large capacity vector test passed\n");
+}
+
+void test_vector_alternating_push_pop(void)
+{
+    printf("Testing vector alternating push/pop...\n");
+
+    cobalt_vector_t *vec = cobalt_vector_create(2);
+    TEST_ASSERT(vec != NULL);
+
+    int values[] = {1, 2, 3, 4, 5};
+    for (int i = 0; i < 5; i++) {
+        TEST_ASSERT(cobalt_vector_push(vec, &values[i]) == 0);
+    }
+
+    for (int i = 0; i < 5; i++) {
+        TEST_ASSERT(cobalt_vector_size(vec) == 5 - i);
+        void *item = cobalt_vector_get(vec, 0);
+        TEST_ASSERT(item != NULL);
+        TEST_ASSERT(*(int *)item == values[i]);
+        int ret = cobalt_vector_set(vec, 0, &values[4 - i]);
+        TEST_ASSERT(ret == 0);
+    }
+
+    TEST_ASSERT(cobalt_vector_size(vec) == 0);
+    TEST_ASSERT(cobalt_vector_is_empty(vec));
+
+    cobalt_vector_destroy(vec);
+    printf("  Alternating push/pop test passed\n");
+}
+
 void test_vector(void)
 {
     printf("Testing vector...\n");
@@ -285,4 +340,6 @@ void test_vector(void)
     test_vector_iterator();
     test_vector_zero_capacity();
     test_vector_remove();
+    test_vector_large_capacity();
+    test_vector_alternating_push_pop();
 }

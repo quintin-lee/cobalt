@@ -9,89 +9,87 @@
 #include <string.h>
 #include <stdarg.h>
 
-static int ensure_capacity(char **buffer, size_t *capacity, size_t needed)
+static int ensure_capacity(char **buf, size_t *cap, size_t need)
 {
-    if (needed > *capacity) {
-        size_t new_cap = (*capacity + needed) * 2;
-        char  *tmp     = realloc(*buffer, new_cap);
+    if (need > *cap) {
+        size_t new_cap = (*cap + need) * 2;
+        char  *tmp     = realloc(*buf, new_cap);
         if (!tmp) {
             return -1;
         }
-        *buffer   = tmp;
-        *capacity = new_cap;
+        *buf    = tmp;
+        *cap    = new_cap;
     }
     return 0;
 }
 
-static int json_append_str(char **buf, size_t *cap, size_t *len, const char *s, size_t n)
+static int json_append(char **buf, size_t *cap, size_t *len, const char *fmt, ...)
 {
-    if (ensure_capacity(buf, cap, n + 1) != 0) {
+    va_list args;
+    va_start(args, fmt);
+
+    int n = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+    if (n < 0) {
         return -1;
     }
-    memcpy(*buf + *len, s, n);
+
+    if (ensure_capacity(buf, cap, *len + n + 1) != 0) {
+        return -1;
+    }
+
+    va_start(args, fmt);
+    n = vsnprintf(*buf + *len, *cap - *len, fmt, args);
+    va_end(args);
+    if (n < 0 || (size_t)n >= *cap - *len) {
+        if (ensure_capacity(buf, cap, *len + n + 1) != 0) {
+            return -1;
+        }
+        va_start(args, fmt);
+        n = vsnprintf(*buf + *len, *cap - *len, fmt, args);
+        va_end(args);
+    }
     *len += n;
     return 0;
 }
 
-static int json_append_fmt(char **buf, size_t *cap, size_t *len, const char *fmt, ...)
+static char *json_escape(const char *s, size_t len)
 {
-    if (ensure_capacity(buf, cap, 256) != 0) {
-        return -1;
-    }
-    va_list args;
-    va_start(args, fmt);
-    int written = vsnprintf(*buf + *len, *cap - *len, fmt, args);
-    va_end(args);
-    if (written < 0 || (size_t)written >= *cap - *len) {
-        size_t needed = *len + written + 1;
-        if (ensure_capacity(buf, cap, needed) != 0) {
-            return -1;
-        }
-        va_start(args, fmt);
-        vsnprintf(*buf + *len, *cap - *len, fmt, args);
-        va_end(args);
-    }
-    *len += strlen(*buf + *len);
-    return 0;
-}
-
-static char *json_escape_string(const char *str, size_t len)
-{
-    size_t out_len = 0;
-    for (const char *p = str; p < str + len; p++) {
+    size_t out = 0;
+    for (const char *p = s; p < s + len; p++) {
         switch (*p) {
         case '"': case '\\': case '\n': case '\r': case '\t':
-            out_len += 2;
+            out += 2;
             break;
         default:
-            out_len += ((unsigned char)*p < 0x20) ? 6 : 1;
+            out += ((unsigned char)*p < 0x20) ? 6 : 1;
             break;
         }
     }
 
-    char *result = malloc(out_len + 1);
+    char *result = malloc(out + 1);
     if (!result) {
         return NULL;
     }
 
-    char *out = result;
-    for (const char *p = str; p < str + len; p++) {
+    char *out_ptr = result;
+    for (const char *p = s; p < s + len; p++) {
         switch (*p) {
-        case '"':  *out++ = '\\'; *out++ = '"';  break;
-        case '\\': *out++ = '\\'; *out++ = '\\'; break;
-        case '\n': *out++ = '\\'; *out++ = 'n';  break;
-        case '\r': *out++ = '\\'; *out++ = 'r';  break;
-        case '\t': *out++ = '\\'; *out++ = 't';  break;
+        case '"':  *out_ptr++ = '\\'; *out_ptr++ = '"';  break;
+        case '\\': *out_ptr++ = '\\'; *out_ptr++ = '\\'; break;
+        case '\n': *out_ptr++ = '\\'; *out_ptr++ = 'n';  break;
+        case '\r': *out_ptr++ = '\\'; *out_ptr++ = 'r';  break;
+        case '\t': *out_ptr++ = '\\'; *out_ptr++ = 't';  break;
         default:
             if ((unsigned char)*p < 0x20) {
-                out += sprintf(out, "\\u00%02x", (unsigned char)*p);
+                out_ptr += sprintf(out_ptr, "\\u00%02x", (unsigned char)*p);
             } else {
-                *out++ = *p;
+                *out_ptr++ = *p;
             }
             break;
         }
     }
-    *out = '\0';
+    *out_ptr = '\0';
     return result;
 }
 
@@ -101,94 +99,91 @@ char *json_serialize(json_node_t *node)
         return cobalt_strdup("null");
     }
 
-    size_t capacity = 256;
-    size_t length   = 0;
-    char  *buffer   = malloc(capacity);
-    if (!buffer) {
+    size_t cap   = 256;
+    size_t len   = 0;
+    char  *buf   = malloc(cap);
+    if (!buf) {
         return cobalt_strdup("{}");
     }
 
     switch (node->type) {
     case JSON_NULL:
-        json_append_str(&buffer, &capacity, &length, "null", 4);
+        json_append(&buf, &cap, &len, "null");
         break;
 
     case JSON_TRUE:
-        json_append_str(&buffer, &capacity, &length, "true", 4);
+        json_append(&buf, &cap, &len, "true");
         break;
 
     case JSON_FALSE:
-        json_append_str(&buffer, &capacity, &length, "false", 5);
+        json_append(&buf, &cap, &len, "false");
         break;
 
     case JSON_NUMBER:
-        json_append_fmt(&buffer, &capacity, &length, "%.17g", node->value.number);
+        json_append(&buf, &cap, &len, "%.17g", node->value.number);
         break;
 
     case JSON_STRING: {
         if (node->value.string) {
-            char *escaped = json_escape_string(node->value.string, strlen(node->value.string));
+            char *escaped = json_escape(node->value.string, strlen(node->value.string));
             if (!escaped) {
-                free(buffer);
+                free(buf);
                 return cobalt_strdup("{}");
             }
-            json_append_fmt(&buffer, &capacity, &length, "\"%s\"", escaped);
+            json_append(&buf, &cap, &len, "\"%s\"", escaped);
             free(escaped);
         } else {
-            json_append_str(&buffer, &capacity, &length, "\"\"", 2);
+            json_append(&buf, &cap, &len, "\"\"");
         }
         break;
     }
 
     case JSON_ARRAY: {
-        json_append_str(&buffer, &capacity, &length, "[", 1);
+        json_append(&buf, &cap, &len, "[");
         json_node_t *child = node->next;
         int first = 1;
         while (child) {
             if (!first) {
-                json_append_str(&buffer, &capacity, &length, ",", 1);
+                json_append(&buf, &cap, &len, ",");
             }
             first = 0;
             char *s = json_serialize(child);
             if (s) {
-                size_t slen = strlen(s);
-                json_append_str(&buffer, &capacity, &length, s, slen);
+                json_append(&buf, &cap, &len, "%s", s);
                 free(s);
             }
             child = child->next;
         }
-        json_append_str(&buffer, &capacity, &length, "]", 1);
+        json_append(&buf, &cap, &len, "]");
         break;
     }
 
     case JSON_OBJECT: {
-        json_append_str(&buffer, &capacity, &length, "{", 1);
+        json_append(&buf, &cap, &len, "{");
         json_node_t *kv = node->next;
         int first = 1;
         while (kv) {
             if (!first) {
-                json_append_str(&buffer, &capacity, &length, ",", 1);
+                json_append(&buf, &cap, &len, ",");
             }
             first = 0;
-            char *key_escaped = json_escape_string(kv->key ? kv->key : "", strlen(kv->key ? kv->key : ""));
-            if (key_escaped) {
-                size_t klen = strlen(key_escaped);
-                json_append_fmt(&buffer, &capacity, &length, "\"%s\":", key_escaped);
-                free(key_escaped);
+            char *key_esc = json_escape(kv->key ? kv->key : "", strlen(kv->key ? kv->key : ""));
+            if (key_esc) {
+                json_append(&buf, &cap, &len, "\"%s\":", key_esc);
+                free(key_esc);
             }
             char *val = json_serialize(kv->next);
             if (val) {
-                size_t vlen = strlen(val);
-                json_append_str(&buffer, &capacity, &length, val, vlen);
+                json_append(&buf, &cap, &len, "%s", val);
                 free(val);
             }
             kv = kv->next ? kv->next->next : NULL;
         }
-        json_append_str(&buffer, &capacity, &length, "}", 1);
+        json_append(&buf, &cap, &len, "}");
         break;
     }
     }
 
-    json_append_str(&buffer, &capacity, &length, "", 1);
-    return buffer;
+    json_append(&buf, &cap, &len, "");
+    return buf;
 }
