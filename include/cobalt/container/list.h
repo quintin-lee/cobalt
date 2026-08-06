@@ -23,31 +23,6 @@ typedef struct cobalt_list_node cobalt_list_node_t;
 typedef struct cobalt_list cobalt_list_t;
 
 /**
- * @brief Doubly-linked list node structure
- *
- * Stores actual data and pointers to previous and next nodes, forming the basic element of a
- * doubly-linked list.
- */
-struct cobalt_list_node {
-    void               *data; /**< Pointer to stored data */
-    cobalt_list_node_t *next; /**< Pointer to the next node */
-    cobalt_list_node_t *prev; /**< Pointer to the previous node */
-};
-
-/**
- * @brief Doubly-linked list structure
- *
- * Maintains the head and tail nodes of the list as well as the list length.
- * @note Inherits from the cobalt_sequence_t interface, supporting polymorphic sequence operations.
- */
-struct cobalt_list {
-    cobalt_sequence_t   base; /**< Base sequence interface (for polymorphism) */
-    cobalt_list_node_t *head; /**< Pointer to the list head node */
-    cobalt_list_node_t *tail; /**< Pointer to the list tail node */
-    size_t              size; /**< Number of elements currently stored in the list */
-};
-
-/**
  * @defgroup list_api Doubly-linked list operation interfaces
  * @{
  */

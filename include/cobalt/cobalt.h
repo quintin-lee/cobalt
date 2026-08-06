@@ -29,7 +29,6 @@
 
 /* --- Abstract interfaces --- */
 #include <cobalt/interface/iterator.h>
-#include <cobalt/interface/map.h>
 #include <cobalt/interface/sequence.h>
 
 /* --- Container components --- */
