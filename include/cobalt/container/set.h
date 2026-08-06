@@ -11,6 +11,7 @@
  */
 
 #include <stddef.h>
+#include "cobalt/interface/map.h"
 
 /**
  * @defgroup set Set (Set)
@@ -125,5 +126,16 @@ size_t cobalt_set_size(const cobalt_set_t *set);
 int cobalt_set_is_empty(const cobalt_set_t *set);
 
 /** @} */
+
+/**
+ * @brief Create a map iterator for this set
+ * @param set Set instance
+ * @return Iterator pointer, or NULL on failure
+ * @note Returns a cobalt_map_iterator_t compatible with the Map interface.
+ *       The value field of each yielded pair points to a static sentinel;
+ *       the key field contains the set element.
+ *       Destroy with cobalt_map_iterator_destroy().
+ */
+cobalt_map_iterator_t *cobalt_set_iterator_create(cobalt_set_t *set);
 
 #endif /* SET_H */
