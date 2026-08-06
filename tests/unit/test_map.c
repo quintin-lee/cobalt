@@ -124,11 +124,16 @@ static void run_map_convenience_tests(cobalt_map_t *map, const char *name)
     TEST_ASSERT(got != NULL);
     TEST_EQUAL(*got, 99);
 
-    /* empty */
-    cobalt_map_remove(map, "alpha", strlen("alpha"));
-    cobalt_map_remove(map, "gamma", strlen("gamma"));
+    /* contains */
+    TEST_ASSERT(cobalt_map_contains(map, "alpha", strlen("alpha")) != 0);
+    TEST_ASSERT(cobalt_map_contains(map, "beta",  strlen("beta"))  == 0);
+    TEST_ASSERT(cobalt_map_contains(map, "gamma", strlen("gamma")) != 0);
+
+    /* clear */
+    cobalt_map_clear(map);
     TEST_ASSERT(cobalt_map_size(map) == 0);
     TEST_ASSERT(cobalt_map_is_empty(map));
+    TEST_ASSERT(cobalt_map_contains(map, "alpha", strlen("alpha")) == 0);
 
     /* NULL safety */
     TEST_ASSERT(cobalt_map_get(NULL, "x", 1) == NULL);

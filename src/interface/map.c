@@ -73,6 +73,22 @@ int cobalt_map_remove(cobalt_map_t *map, const void *key, size_t key_len)
     return map->remove(map, key, key_len);
 }
 
+int cobalt_map_contains(cobalt_map_t *map, const void *key, size_t key_len)
+{
+    if (!map || !map->contains) {
+        return 0;
+    }
+    return map->contains(map, key, key_len);
+}
+
+void cobalt_map_clear(cobalt_map_t *map)
+{
+    if (!map || !map->clear) {
+        return;
+    }
+    map->clear(map);
+}
+
 size_t cobalt_map_size(cobalt_map_t *map)
 {
     if (!map || !map->size) {

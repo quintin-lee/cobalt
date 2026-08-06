@@ -43,6 +43,8 @@ struct cobalt_map {
     void *(*get)(cobalt_map_t *self, const void *key, size_t key_len);
     int  (*put)(cobalt_map_t *self, const void *key, size_t key_len, void *value);
     int  (*remove)(cobalt_map_t *self, const void *key, size_t key_len);
+    int  (*contains)(cobalt_map_t *self, const void *key, size_t key_len);
+    void (*clear)(cobalt_map_t *self);
     size_t (*size)(cobalt_map_t *self);
     int  (*is_empty)(cobalt_map_t *self);
     cobalt_map_iterator_t *(*iterator)(cobalt_map_t *self);
@@ -128,6 +130,21 @@ int cobalt_map_put(cobalt_map_t *map, const void *key, size_t key_len, void *val
  * @return 0 on success, -1 if not found
  */
 int cobalt_map_remove(cobalt_map_t *map, const void *key, size_t key_len);
+
+/**
+ * @brief Check if a key exists in the map
+ * @param map Map instance
+ * @param key Key to check
+ * @param key_len Length of the key in bytes
+ * @return Non-zero if the key exists, 0 otherwise
+ */
+int cobalt_map_contains(cobalt_map_t *map, const void *key, size_t key_len);
+
+/**
+ * @brief Remove all entries from a map
+ * @param map Map instance
+ */
+void cobalt_map_clear(cobalt_map_t *map);
 
 /**
  * @brief Get the number of entries in a map
