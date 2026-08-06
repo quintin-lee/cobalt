@@ -23,6 +23,20 @@ typedef struct {
     size_t size;
 } cobalt_vector_impl_t;
 
+/**
+ * @brief Public opaque type layout — matches cobalt_vector_impl_t exactly.
+ * @details This definition lives in the .c file so users cannot access
+ *          vector internals. The cast from cobalt_vector_t* to
+ *          cobalt_vector_impl_t* is safe because both share the same
+ *          starting cobalt_sequence_t base.
+ */
+struct cobalt_vector {
+    cobalt_sequence_t   base;
+    void             **items;
+    size_t              capacity;
+    size_t              size;
+};
+
 /* ========================================================================= */
 /* Sequence Interface specific implementation                                  */
 /* ========================================================================= */
@@ -148,8 +162,9 @@ cobalt_vector_t *cobalt_vector_create(size_t initial_capacity)
 void cobalt_vector_destroy(cobalt_vector_t *vec)
 {
     if (vec) {
-        free(vec->items);
-        free(vec);
+        cobalt_vector_impl_t *impl = (cobalt_vector_impl_t *)vec;
+        free(impl->items);
+        free(impl);
     }
 }
 
@@ -162,7 +177,9 @@ int cobalt_vector_push(cobalt_vector_t *vec, void *item)
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
         return -1;
     }
-    // Reuse the sequence interface addition logic
+    // Reuse the sequence interface addition logic.
+    // The cast is safe: cobalt_vector_impl_t and struct cobalt_vector
+    // share the same cobalt_sequence_t base at offset 0.
     vector_add_seq((cobalt_sequence_t *)vec, item);
     return 0;
 }
@@ -176,11 +193,12 @@ void *cobalt_vector_get(cobalt_vector_t *vec, size_t index)
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
         return NULL;
     }
-    if (index >= vec->size) {
+    cobalt_vector_impl_t *impl = (cobalt_vector_impl_t *)vec;
+    if (index >= impl->size) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_BOUNDS);
         return NULL;
     }
-    return vec->items[index];
+    return impl->items[index];
 }
 
 /**
@@ -188,12 +206,11 @@ void *cobalt_vector_get(cobalt_vector_t *vec, size_t index)
  */
 int cobalt_vector_set(cobalt_vector_t *vec, size_t index, void *item)
 {
-    // Check for null pointer and index out of bounds
-    if (!vec || index >= vec->size) {
+    if (!vec || index >= ((cobalt_vector_impl_t *)vec)->size) {
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
         return -1;
     }
-    vec->items[index] = item;
+    ((cobalt_vector_impl_t *)vec)->items[index] = item;
     return 0;
 }
 
@@ -202,7 +219,7 @@ int cobalt_vector_set(cobalt_vector_t *vec, size_t index, void *item)
  */
 size_t cobalt_vector_size(cobalt_vector_t *vec)
 {
-    return vec ? vec->size : 0;
+    return vec ? ((cobalt_vector_impl_t *)vec)->size : 0;
 }
 
 /**
@@ -210,5 +227,5 @@ size_t cobalt_vector_size(cobalt_vector_t *vec)
  */
 int cobalt_vector_is_empty(cobalt_vector_t *vec)
 {
-    return vec && vec->size == 0;
+    return vec && ((cobalt_vector_impl_t *)vec)->size == 0;
 }

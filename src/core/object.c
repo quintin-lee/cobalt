@@ -5,6 +5,7 @@
  * in object.h.
  */
 #include "cobalt/core/object.h"
+#include <stdatomic.h>
 #include <stdlib.h>
 
 /**
@@ -15,7 +16,7 @@
 void cobalt_object_ref(cobalt_object_t *obj)
 {
     if (obj) {
-        obj->ref_count++;
+        atomic_fetch_add_explicit(&obj->ref_count, 1, memory_order_relaxed);
     }
 }
 
@@ -28,8 +29,8 @@ void cobalt_object_ref(cobalt_object_t *obj)
  */
 void cobalt_object_unref(cobalt_object_t *obj)
 {
-    /* Prefix decrement, if the decremented value is 0, free the object */
-    if (obj && --obj->ref_count == 0) {
+    /* fetch_sub returns the OLD value; we free when it was 1 (going to 0) */
+    if (obj && atomic_fetch_sub_explicit(&obj->ref_count, 1, memory_order_acq_rel) == 1) {
         free(obj);
     }
 }
@@ -48,7 +49,7 @@ cobalt_object_t *cobalt_object_new(cobalt_class_t *cls, size_t extra_size)
     cobalt_object_t *obj        = malloc(total_size);
     if (obj) {
         /* Initialize reference count to 1 */
-        obj->ref_count = 1;
+        atomic_store_explicit(&obj->ref_count, 1, memory_order_relaxed);
         /* Associate the corresponding class information (RTTI) */
         obj->class = cls;
     }
@@ -64,4 +65,15 @@ cobalt_object_t *cobalt_object_new(cobalt_class_t *cls, size_t extra_size)
 cobalt_class_t *cobalt_object_get_class(cobalt_object_t *obj)
 {
     return obj ? obj->class : NULL;
+}
+
+/**
+ * @brief Get the current reference count of an object
+ *
+ * @param obj Object pointer
+ * @return The current reference count, or 0 if obj is NULL
+ */
+uint64_t cobalt_object_get_ref_count(cobalt_object_t *obj)
+{
+    return obj ? atomic_load_explicit(&obj->ref_count, memory_order_relaxed) : 0;
 }

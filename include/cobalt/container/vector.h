@@ -12,19 +12,11 @@
 #include "cobalt/interface/sequence.h"
 
 /**
- * @brief Dynamic array structure
- *
- * A dynamic array is a container that stores elements in a contiguous memory space, supporting fast
- * access by index. When the capacity is insufficient, it will automatically reallocate memory.
- * @note Inherits from the cobalt_sequence_t interface.
+ * @brief Opaque type definition for the dynamic array structure.
+ * @details The internal layout is defined in vector.c; users must interact
+ *          with vectors only through the public API functions.
  */
-typedef struct {
-    cobalt_sequence_t base;  /**< Base sequence interface (for polymorphism) */
-    void            **items; /**< Pointer to a contiguous block of memory storing elements */
-    size_t capacity; /**< Currently allocated memory capacity, i.e., maximum number of elements it
-                        can hold */
-    size_t size;     /**< Number of elements currently stored */
-} cobalt_vector_t;
+typedef struct cobalt_vector cobalt_vector_t;
 
 /**
  * @defgroup vector_api Dynamic array operation interfaces

@@ -107,3 +107,6 @@ __pycache__/
 *.tmp
 *.temp
 build-asan/
+
+# --- AI ---
+AGENTS.md

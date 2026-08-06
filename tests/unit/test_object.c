@@ -29,7 +29,7 @@ void test_object_lifecycle(void)
     printf("  Object created\n");
 
     /* Check initial ref count is 1 */
-    uint64_t ref_count = obj->ref_count;
+    uint64_t ref_count = cobalt_object_get_ref_count(obj);
     if (ref_count == 1) {
         printf("  Initial ref count is 1: OK\n");
     } else {
@@ -46,13 +46,13 @@ void test_object_lifecycle(void)
 
     /* Ref and unref */
     cobalt_object_ref(obj);
-    ref_count = obj->ref_count;
+    ref_count = cobalt_object_get_ref_count(obj);
     if (ref_count == 2) {
         printf("  After ref: count=%lu: OK\n", (unsigned long)ref_count);
     }
 
     cobalt_object_unref(obj);
-    ref_count = obj->ref_count;
+    ref_count = cobalt_object_get_ref_count(obj);
     if (ref_count == 1) {
         printf("  After unref: count=%lu: OK\n", (unsigned long)ref_count);
     }

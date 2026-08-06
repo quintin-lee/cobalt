@@ -56,11 +56,11 @@ int main(void)
 
     cobalt_info("Object created: class=%s, ref_count=%lu\n",
                 cobalt_object_get_class(obj)->name,
-                obj->ref_count);
+                cobalt_object_get_ref_count(obj));
 
     /* Use reference counting */
     cobalt_object_ref(obj);
-    cobalt_info("After ref, ref_count=%lu\n", obj->ref_count);
+    cobalt_info("After ref, ref_count=%lu\n", cobalt_object_get_ref_count(obj));
 
     /* Clean up - unref twice will free the object */
     cobalt_object_unref(obj);

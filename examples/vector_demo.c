@@ -24,7 +24,7 @@ int main(void)
         return 1;
     }
 
-    cobalt_info("Created vector with capacity %zu\n", vec->capacity);
+    cobalt_info("Created vector\n");
 
     /* Add some integer values to the vector */
     int v1 = 10, v2 = 20, v3 = 30, v4 = 40, v5 = 50;
@@ -37,7 +37,7 @@ int main(void)
     cobalt_info("Vector size: %zu\n", cobalt_vector_size(vec));
 
     /* Access elements by index */
-    for (size_t i = 0; i < vec->size; i++) {
+    for (size_t i = 0; i < cobalt_vector_size(vec); i++) {
         int *val = (int *)cobalt_vector_get(vec, i);
         cobalt_info("vec[%zu] = %d\n", i, *val);
     }
