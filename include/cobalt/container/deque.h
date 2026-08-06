@@ -9,10 +9,12 @@
  * both ends. This implementation is based on a doubly-linked list.
  */
 
+#include "cobalt/interface/sequence.h"
 #include <stddef.h>
 
 /**
  * @brief Forward declaration of opaque double-ended queue type
+ * @details Deque also implements cobalt_sequence_t for polymorphic sequence operations.
  */
 typedef struct cobalt_deque cobalt_deque_t;
 

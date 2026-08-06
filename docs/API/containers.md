@@ -153,25 +153,32 @@ size_t            cobalt_treemap_size(cobalt_treemap_t *map);
 - True Red-Black tree — O(log n) worst case, O(log n) average
 - **String-keyed only**
 
-## Map Interface (HashMap, TreeMap, Set)
+## Sequence Interface (Vector, List, Deque)
 
-All three map containers embed  as their first member, enabling polymorphic use:
+Vector, List, and Deque implement `cobalt_sequence_t` as their first member, enabling polymorphic use:
 
-
+```c
+cobalt_sequence_t *seq = (cobalt_sequence_t *)cobalt_vector_create(4);
+cobalt_sequence_add(seq, &item);
+cobalt_sequence_remove(seq, &item);
+size_t n = cobalt_sequence_size(seq);
+int empty = cobalt_sequence_is_empty(seq);
+```
 
 ### Iterator API
 
-
-
-### Concrete-type iterator factories
-
-
+```c
+cobalt_iterator_t *iter = cobalt_iterator_new(seq);
+while (cobalt_iterator_has_next(iter)) {
+    void *item = cobalt_iterator_next(iter);
+}
+cobalt_iterator_destroy(iter);
+```
 
 ### Convenience API
 
-All map operations have standalone convenience functions that accept :
-, , , ,
-, , .
+All sequence operations have standalone convenience functions that accept `cobalt_sequence_t *`:
+`cobalt_sequence_add`, `cobalt_sequence_remove`, `cobalt_sequence_size`, `cobalt_sequence_is_empty`.
 
 ---
 

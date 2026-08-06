@@ -8,6 +8,7 @@
  */
 
 #include "cobalt/container/deque.h"
+#include "cobalt/interface/iterator.h"
 #include "cobalt/runtime/error.h"
 #include <stdlib.h>
 
@@ -24,11 +25,89 @@ typedef struct deque_node {
  * @brief Internal structure implementation of the double-ended queue
  */
 struct cobalt_deque {
-    deque_node_t *head; /**< Queue head node pointer */
-    deque_node_t *tail; /**< Queue tail node pointer */
-    size_t        size; /**< Current number of elements in the queue */
+    cobalt_sequence_t base; /**< Base sequence interface (for polymorphism) */
+    deque_node_t     *head; /**< Queue head node pointer */
+    deque_node_t     *tail; /**< Queue tail node pointer */
+    size_t            size; /**< Current number of elements in the queue */
 };
 
+/* ========================================================================= */
+/* Sequence Interface vtable                                                 */
+/* ========================================================================= */
+
+static size_t deque_size_seq(cobalt_sequence_t *self)
+{
+    cobalt_deque_t *deque = (cobalt_deque_t *)self;
+    return deque->size;
+}
+
+static int deque_is_empty_seq(cobalt_sequence_t *self)
+{
+    cobalt_deque_t *deque = (cobalt_deque_t *)self;
+    return deque->size == 0;
+}
+
+static void deque_add_seq(cobalt_sequence_t *self, void *item)
+{
+    cobalt_deque_t *deque = (cobalt_deque_t *)self;
+    cobalt_deque_push_back(deque, item);
+}
+
+static void deque_remove_seq(cobalt_sequence_t *self, void *item)
+{
+    cobalt_deque_t *deque = (cobalt_deque_t *)self;
+    if (!deque || !item) {
+        return;
+    }
+    deque_node_t *node = deque->head;
+    while (node) {
+        if (node->data == item) {
+            if (node->prev) {
+                node->prev->next = node->next;
+            } else {
+                deque->head = node->next;
+            }
+            if (node->next) {
+                node->next->prev = node->prev;
+            } else {
+                deque->tail = node->prev;
+            }
+            free(node);
+            deque->size--;
+            return;
+        }
+        node = node->next;
+    }
+}
+
+static void *deque_get_at_index_seq(cobalt_sequence_t *self, size_t index)
+{
+    cobalt_deque_t *deque = (cobalt_deque_t *)self;
+    if (!deque || index >= deque->size) {
+        return NULL;
+    }
+    /* Traverse from the closer end */
+    if (index * 2 < deque->size) {
+        deque_node_t *node = deque->head;
+        for (size_t i = 0; i < index; i++) {
+            node = node->next;
+        }
+        return node->data;
+    } else {
+        deque_node_t *node = deque->tail;
+        for (size_t i = deque->size - 1; i > index; i--) {
+            node = node->prev;
+        }
+        return node->data;
+    }
+}
+
+static cobalt_iterator_t *deque_iterator_seq(cobalt_sequence_t *self)
+{
+    return cobalt_iterator_new(self);
+}
+
+/* ========================================================================= */
 /**
  * @brief Create a new double-ended queue
  */
@@ -38,9 +117,15 @@ cobalt_deque_t *cobalt_deque_create(void)
     if (!deque) {
         return NULL;
     }
-    deque->head = NULL;
-    deque->tail = NULL;
-    deque->size = 0;
+    deque->base.size         = deque_size_seq;
+    deque->base.is_empty     = deque_is_empty_seq;
+    deque->base.add          = deque_add_seq;
+    deque->base.remove       = deque_remove_seq;
+    deque->base.get_at_index = deque_get_at_index_seq;
+    deque->base.iterator     = deque_iterator_seq;
+    deque->head              = NULL;
+    deque->tail              = NULL;
+    deque->size              = 0;
     return deque;
 }
 

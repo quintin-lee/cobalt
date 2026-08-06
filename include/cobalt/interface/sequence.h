@@ -92,6 +92,36 @@ cobalt_sequence_t *cobalt_sequence_create(size_t initial_capacity);
  */
 void cobalt_sequence_destroy(cobalt_sequence_t *seq);
 
+/**
+ * @brief Get the number of elements (convenience wrapper)
+ * @param seq Sequence instance
+ * @return Number of elements, or 0 if seq is NULL
+ */
+size_t cobalt_sequence_size(cobalt_sequence_t *seq);
+
+/**
+ * @brief Check if the sequence is empty (convenience wrapper)
+ * @param seq Sequence instance
+ * @return Non-zero if empty, 0 otherwise
+ */
+int cobalt_sequence_is_empty(cobalt_sequence_t *seq);
+
+/**
+ * @brief Add an element to the sequence (convenience wrapper)
+ * @param seq Sequence instance
+ * @param item Element to add
+ * @return 0 on success, -1 on failure
+ */
+int cobalt_sequence_add(cobalt_sequence_t *seq, void *item);
+
+/**
+ * @brief Remove an element by pointer equality (convenience wrapper)
+ * @param seq Sequence instance
+ * @param item Element to remove
+ * @return 0 on success, -1 if not found
+ */
+int cobalt_sequence_remove(cobalt_sequence_t *seq, void *item);
+
 /** @} */
 
 #endif /* SEQUENCE_H */

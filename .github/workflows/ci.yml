@@ -1,38 +1,82 @@
-name: CI
+name : CI
 
-on:
-  push:
-    branches: [master, main]
-  pull_request:
-    branches: [master, main]
+           on : push : branches : [ master, main ] pull_request : branches : [ master, main ]
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        build_type: [Debug, Release]
-        compiler: [gcc, clang]
-    steps:
-    - uses: actions/checkout@v4
+                                                                             jobs : build : runs -
+                                                                                            on
+    : ubuntu -
+      latest strategy : matrix : build_type : [ Debug, Release ] compiler : [ gcc, clang ] steps
+    : -uses : actions /
+              checkout @v4
 
-    - name: Install dependencies
-      run: sudo apt-get install -y clang-tidy clang-format
+      -
+      name : Install dependencies run : sudo apt - get install - y clang - tidy clang -
+                                        format valgrind                         lcov
 
-    - name: Configure
-      run: |
-        mkdir -p build && cd build
-        cmake .. \
-          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-          -DCMAKE_C_COMPILER=${{ matrix.compiler }} \
-          -DCOBALT_RUN_TIDY=ON \
-          -DCOBALT_RUN_FORMAT=ON
+                                        -
+                                        name : Configure run
+    : |
+      mkdir - p build cmake - B build - DCMAKE_BUILD_TYPE =
+    ${{matrix.build_type}} - DCMAKE_C_COMPILER =
+        ${{matrix.compiler}} - DCOBALT_RUN_TIDY =
+            ON - DCOBALT_RUN_FORMAT = ON
 
-    - name: Build
-      run: cmake --build build --parallel
+                                          - name : Build run : cmake-- build build-- parallel
 
-    - name: Test
-      run: ctest --test-dir build --output-on-failure
+                                                               -
+                                                               name : Format check run
+    : cmake-- build build-- target format
 
-    - name: Run tidy
-      run: cmake --build build --target tidy
+      -
+      name : Test run : ctest-- test - dir build-- output - on - failure
+
+                        -
+                        name : Tidy run : cmake-- build build-- target tidy
+
+                                              asan
+    : runs -
+      on : ubuntu - latest steps : -uses : actions / checkout @v4
+
+           -
+           name : Install dependencies run : sudo apt - get install - y clang - tidy clang - format
+
+                                             -
+                                             name : Configure with ASan run
+    : |
+      mkdir - p build - asan cmake - B build - asan -
+          DCMAKE_BUILD_TYPE = Debug - DCMAKE_C_COMPILER =
+                                  clang - DCMAKE_C_FLAGS =
+                                      "-fsanitize=address -g" - DCMAKE_EXE_LINKER_FLAGS =
+                                          "-fsanitize=address" - DCOBALT_RUN_TIDY =
+                                              ON - DCOBALT_RUN_FORMAT = ON
+
+                                                                            - name : Build run
+    : cmake-- build                                                                        build -
+      asan-- parallel
+
+      -
+      name : Test with ASan run : ctest-- test - dir build - asan-- output - on -
+                                  failure
+
+                                      valgrind
+    : runs -
+      on : ubuntu - latest steps : -uses : actions / checkout @v4
+
+           -
+           name : Install dependencies run : sudo apt - get install - y clang - tidy clang -
+                                             format                                  valgrind
+
+                                             -
+                                             name : Configure run
+    : |
+      mkdir - p build cmake - B build - DCMAKE_BUILD_TYPE = Debug - DCMAKE_C_COMPILER =
+                                                                gcc - DCOBALT_RUN_TIDY =
+                                                                    ON - DCOBALT_RUN_FORMAT =
+                                                                        ON
+
+                                                                        - name : Build run
+    : cmake-- build build-- parallel
+
+      -
+      name : Run Valgrind run : valgrind-- leak - check = full-- error - exitcode =
+                                                              1 build / tests / cobalt_test

@@ -67,6 +67,7 @@ set(SOURCES
     src/module/eventloop.c
     src/interface/iterator.c
     src/interface/map.c
+    src/interface/sequence.c
     src/utils/string.c
 )
 
@@ -203,7 +204,6 @@ if(CLANG_FORMAT_EXECUTABLE)
             COMMAND ${CLANG_FORMAT_EXECUTABLE} --dry-run --Werror --style=file ${ALL_SRC_FILES}
             COMMENT "Checking code formatting..."
             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-            DEPENDS ${ALL_SRC_FILES}
         )
     endif()
 else()
