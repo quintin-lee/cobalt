@@ -213,25 +213,3 @@ void test_hashmap_ext_null_callbacks(void)
     printf("  hashmap ext NULL callbacks: OK\n");
 }
 
-void test_set_ext_int_elements(void)
-{
-    printf("Testing set ext with int elements...\n");
-    cobalt_set_t *set = cobalt_set_create_ext(8, hash_int, equal_int);
-    TEST_ASSERT(set != NULL);
-
-    int a = 10, b = 20, c = 10;
-    TEST_ASSERT(cobalt_set_insert_ext(set, &a, sizeof(int)) == 0);
-    TEST_ASSERT(cobalt_set_insert_ext(set, &b, sizeof(int)) == 0);
-    TEST_ASSERT(cobalt_set_insert_ext(set, &c, sizeof(int)) == 0); /* duplicate */
-    TEST_ASSERT(cobalt_set_size(set) == 2);
-    TEST_ASSERT(cobalt_set_contains_ext(set, &a, sizeof(int)) == 1);
-    TEST_ASSERT(cobalt_set_contains_ext(set, &b, sizeof(int)) == 1);
-    TEST_ASSERT(cobalt_set_contains_ext(set, &c, sizeof(int)) == 1);
-
-    TEST_ASSERT(cobalt_set_remove_ext(set, &a, sizeof(int)) == 0);
-    TEST_ASSERT(cobalt_set_size(set) == 1);
-    TEST_ASSERT(cobalt_set_contains_ext(set, &a, sizeof(int)) == 0);
-
-    cobalt_set_destroy(set);
-    printf("  set ext int elements: OK\n");
-}

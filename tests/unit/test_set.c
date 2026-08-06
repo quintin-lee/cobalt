@@ -1,4 +1,5 @@
 #include "cobalt/container/set.h"
+#include "cobalt/container/hashmap.h"
 #include "test_framework.h"
 #include <stdio.h>
 
