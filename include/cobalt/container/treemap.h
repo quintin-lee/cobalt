@@ -3,8 +3,7 @@
 
 /**
  * @file treemap.h
- * @brief Ordered map based on tree structure (simplified implementation, currently an ordinary
- * binary search tree)
+ * @brief Ordered map based on tree structure (true Red-Black tree implementation)
  * @details Provides a key-value pair container sorted by key value.
  */
 

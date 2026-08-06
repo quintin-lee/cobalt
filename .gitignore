@@ -61,6 +61,7 @@ Desktop.ini
 *.sdf
 *.ipdb
 *.iobj
+.gdb_history
 
 # --- Dependency / Package managers ---
 conaninfo.txt
@@ -98,6 +99,7 @@ perf.data*
 .codegraph/
 .codebase-memory/
 .copibot/
+docs/superpowers/plans/
 
 # --- Misc ---
 *.cache
