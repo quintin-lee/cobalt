@@ -1,29 +1,38 @@
-name : CI
+name: CI
 
-           on : push : branches : [ master, main ] pull_request : branches : [ master, main ]
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
 
-                                                                             jobs : build : runs -
-                                                                                            on
-    : ubuntu -
-      latest strategy : matrix : build_type : [ Debug, Release ] compiler : [ gcc, clang ] steps
-    : -uses : actions /
-              checkout @v4
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+        compiler: [gcc, clang]
+    steps:
+    - uses: actions/checkout@v4
 
-      -
-      name : Install dependencies run : sudo apt - get install - y clang - tidy clang - format
+    - name: Install dependencies
+      run: sudo apt-get install -y clang-tidy clang-format
 
-                                        -
-                                        name : Configure run
-    : |
-      mkdir - p build &&cd build cmake..- DCMAKE_BUILD_TYPE =
-    ${{matrix.build_type}} - DCMAKE_C_COMPILER = ${{matrix.compiler}} - DCOBALT_RUN_TIDY =
-                                                     ON - DCOBALT_RUN_FORMAT = ON
+    - name: Configure
+      run: |
+        mkdir -p build && cd build
+        cmake .. \
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+          -DCMAKE_C_COMPILER=${{ matrix.compiler }} \
+          -DCOBALT_RUN_TIDY=ON \
+          -DCOBALT_RUN_FORMAT=ON
 
-                                                                               - name : Build run
-    : cmake-- build build-- parallel
+    - name: Build
+      run: cmake --build build --parallel
 
-      -
-      name : Test run : ctest-- test - dir build-- output - on - failure
+    - name: Test
+      run: ctest --test-dir build --output-on-failure
 
-                        -
-                        name : Run tidy run : cmake-- build build-- target tidy
+    - name: Run tidy
+      run: cmake --build build --target tidy

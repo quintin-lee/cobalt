@@ -78,11 +78,11 @@ static cobalt_sequence_t *test_seq_create(void)
     seq->count    = 0;
     seq->capacity = 0;
 
-    seq->base.size        = test_seq_size;
-    seq->base.is_empty    = test_seq_is_empty;
-    seq->base.add         = test_seq_add;
-    seq->base.remove      = test_seq_remove;
-    seq->base.iterator    = test_seq_iterator;
+    seq->base.size         = test_seq_size;
+    seq->base.is_empty     = test_seq_is_empty;
+    seq->base.add          = test_seq_add;
+    seq->base.remove       = test_seq_remove;
+    seq->base.iterator     = test_seq_iterator;
     seq->base.get_at_index = test_seq_get_at_index;
 
     return (cobalt_sequence_t *)seq;
@@ -234,6 +234,7 @@ void test_iterator_with_vector(void)
     cobalt_iterator_destroy(iter);
     cobalt_vector_destroy(vec);
 }
+
 
 void test_iterator(void)
 {

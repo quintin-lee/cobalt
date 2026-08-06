@@ -12,8 +12,7 @@
 #include <stdlib.h>
 
 /* Test result tracking */
-typedef struct
-{
+typedef struct {
     int passed;
     int failed;
     int total;
@@ -22,50 +21,39 @@ typedef struct
 static TestResults g_test_results = {0, 0, 0};
 
 /* Print test result */
-static void test_report(const char* name, int passed)
+static void test_report(const char *name, int passed)
 {
     g_test_results.total++;
-    if (passed)
-        {
-            printf("[PASS] %s\n", name);
-            g_test_results.passed++;
-        }
-    else
-        {
-            printf("[FAIL] %s\n", name);
-            g_test_results.failed++;
-        }
+    if (passed) {
+        printf("[PASS] %s\n", name);
+        g_test_results.passed++;
+    } else {
+        printf("[FAIL] %s\n", name);
+        g_test_results.failed++;
+    }
 }
 
 /* Simple assertion macro - aborts on failure in this simple framework */
 #define TEST_ASSERT(cond)                                                                          \
-    do                                                                                             \
-        {                                                                                          \
-            if (!(cond))                                                                           \
-                {                                                                                  \
-                    fprintf(stderr, "Assertion failed: %s at %s:%d\n", #cond, __FILE__, __LINE__); \
-                    exit(1);                                                                       \
-                }                                                                                  \
+    do {                                                                                           \
+        if (!(cond)) {                                                                             \
+            fprintf(stderr, "Assertion failed: %s at %s:%d\n", #cond, __FILE__, __LINE__);         \
+            exit(1);                                                                               \
         }                                                                                          \
-    while (0)
+    } while (0)
 
 /* Simple equality check with message */
 #define TEST_EQUAL(actual, expected)                                                               \
-    do                                                                                             \
-        {                                                                                          \
-            if ((actual) != (expected))                                                            \
-                {                                                                                  \
-                    fprintf(stderr, "Expected %d but got %d\n", (expected), (actual));             \
-                    g_test_results.failed++;                                                       \
-                    g_test_results.total++;                                                        \
-                }                                                                                  \
-            else                                                                                   \
-                {                                                                                  \
-                    g_test_results.passed++;                                                       \
-                    g_test_results.total++;                                                        \
-                }                                                                                  \
+    do {                                                                                           \
+        if ((actual) != (expected)) {                                                              \
+            fprintf(stderr, "Expected %d but got %d\n", (expected), (actual));                     \
+            g_test_results.failed++;                                                               \
+            g_test_results.total++;                                                                \
+        } else {                                                                                   \
+            g_test_results.passed++;                                                               \
+            g_test_results.total++;                                                                \
         }                                                                                          \
-    while (0)
+    } while (0)
 
 /* Register a test function */
 typedef void (*test_func_t)(void);
