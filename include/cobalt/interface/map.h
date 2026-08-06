@@ -41,12 +41,12 @@ typedef struct cobalt_map_pair {
  */
 struct cobalt_map {
     void *(*get)(cobalt_map_t *self, const void *key, size_t key_len);
-    int  (*put)(cobalt_map_t *self, const void *key, size_t key_len, void *value);
-    int  (*remove)(cobalt_map_t *self, const void *key, size_t key_len);
-    int  (*contains)(cobalt_map_t *self, const void *key, size_t key_len);
+    int (*put)(cobalt_map_t *self, const void *key, size_t key_len, void *value);
+    int (*remove)(cobalt_map_t *self, const void *key, size_t key_len);
+    int (*contains)(cobalt_map_t *self, const void *key, size_t key_len);
     void (*clear)(cobalt_map_t *self);
     size_t (*size)(cobalt_map_t *self);
-    int  (*is_empty)(cobalt_map_t *self);
+    int (*is_empty)(cobalt_map_t *self);
     cobalt_map_iterator_t *(*iterator)(cobalt_map_t *self);
     void (*destroy)(cobalt_map_t *self);
 };
@@ -69,7 +69,7 @@ typedef struct cobalt_map_iterator_vtable {
  */
 struct cobalt_map_iterator {
     const cobalt_map_iterator_vtable_t *vtable;
-    void *data;
+    void                               *data;
 };
 
 /* -------------------------------------------------------------------------- */

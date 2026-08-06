@@ -198,7 +198,7 @@ static void hashmap_free_node(hashmap_impl_t *impl, hashmap_node_t *node)
 
 static void hashmap_map_clear(cobalt_map_t *self)
 {
-    cobalt_hashmap_t *map = (cobalt_hashmap_t *)self;
+    cobalt_hashmap_t *map  = (cobalt_hashmap_t *)self;
     hashmap_impl_t   *impl = &map->impl;
     if (!impl->buckets) {
         return;
@@ -293,7 +293,6 @@ static int hashmap_ensure_buckets(hashmap_impl_t *impl, size_t min_buckets)
     impl->bucket_count = new_count;
     return 0;
 }
-
 
 /* -------------------------------------------------------------------------- */
 /* Public API — string-based (backward compatible)                           */

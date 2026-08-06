@@ -9,8 +9,8 @@
  * callbacks for generic key types.
  */
 
-#include <stddef.h>
 #include "cobalt/interface/map.h"
+#include <stddef.h>
 
 /**
  * @defgroup hashmap Hash Map (HashMap)
@@ -65,8 +65,8 @@ cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets);
  *       lifetime exceeds the map's lifetime. With NULL callbacks, string keys are deep-copied
  *       as with cobalt_hashmap_create().
  */
-cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t initial_buckets,
-                                            cobalt_hash_func_t hash_func,
+cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t              initial_buckets,
+                                            cobalt_hash_func_t  hash_func,
                                             cobalt_equal_func_t equal_func);
 
 /**

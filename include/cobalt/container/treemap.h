@@ -7,8 +7,8 @@
  * @details Provides a key-value pair container sorted by key value.
  */
 
-#include <stddef.h>
 #include "cobalt/interface/map.h"
+#include <stddef.h>
 
 /**
  * @defgroup treemap Tree Map (TreeMap)

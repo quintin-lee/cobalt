@@ -150,8 +150,73 @@ size_t            cobalt_treemap_size(cobalt_treemap_t *map);
 - Keys are C-strings compared lexicographically via `strcmp`
 - `min_key`/`max_key` return NULL when tree is empty
 - `cobalt_treemap_put` replaces existing value for same key
-- Currently a binary search tree (not Red-Black) — O(n) worst case, O(log n) average
+- True Red-Black tree — O(log n) worst case, O(log n) average
 - **String-keyed only**
+
+## Map Interface (HashMap, TreeMap, Set)
+
+All three map containers embed  as their first member, enabling polymorphic use:
+
+
+
+### Iterator API
+
+
+
+### Concrete-type iterator factories
+
+
+
+### Convenience API
+
+All map operations have standalone convenience functions that accept :
+, , , ,
+, , .
+
+---
+
+## Map Interface (HashMap, TreeMap, Set)
+
+All three map containers embed `cobalt_map_t` as their first member, enabling polymorphic use:
+
+```c
+cobalt_map_t *map = (cobalt_map_t *)cobalt_hashmap_create(8);
+cobalt_map_put(map, "key", 4, value);
+cobalt_map_get(map, "key", 4);
+cobalt_map_remove(map, "key", 4);
+cobalt_map_contains(map, "key", 4);
+cobalt_map_clear(map);
+cobalt_map_size(map);
+cobalt_map_is_empty(map);
+```
+
+### Iterator API
+
+```c
+cobalt_map_iterator_t *iter = cobalt_map_iterator_create(map);
+while (cobalt_map_iterator_has_next(iter)) {
+    cobalt_map_pair_t pair = cobalt_map_iterator_next(iter);
+    // pair.key   — pointer to key data
+    // pair.value — pointer to value data
+}
+cobalt_map_iterator_destroy(iter);
+```
+
+### Concrete-type iterator factories
+
+```c
+cobalt_map_iterator_t *cobalt_hashmap_iterator_create(cobalt_hashmap_t *map);
+cobalt_map_iterator_t *cobalt_treemap_iterator_create(cobalt_treemap_t *map);
+cobalt_map_iterator_t *cobalt_set_iterator_create(cobalt_set_t *set);
+```
+
+### Convenience API
+
+All map operations have standalone convenience functions that accept `cobalt_map_t *`:
+`cobalt_map_get`, `cobalt_map_put`, `cobalt_map_remove`, `cobalt_map_contains`,
+`cobalt_map_clear`, `cobalt_map_size`, `cobalt_map_is_empty`.
+
+---
 
 ## Set
 
@@ -169,7 +234,8 @@ int           cobalt_set_is_empty(cobalt_set_t *set);
 - Backed by HashMap — string-keyed only
 - `cobalt_set_insert` is idempotent — inserting existing item returns 0
 - `cobalt_set_contains` returns 1 if present, 0 otherwise
-- **Warning:** items are cast to `const char*` internally. Passing non-string pointers causes UB.
+- **Warning:** string-based `cobalt_set_insert`/`cobalt_set_remove` cast items to `const char*`. For generic types, use the `_ext` variants.
+- Implements `cobalt_map_t` — all map interface operations work polymorphically.
 
 ## Error Codes
 
