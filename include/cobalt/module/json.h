@@ -37,22 +37,9 @@ typedef union {
 } json_value_t;
 
 /**
- * @brief Forward declaration of JSON tree node structure
+ * @brief JSON tree node (opaque — use accessor functions)
  */
 typedef struct json_node json_node_t;
-
-/**
- * @brief JSON tree node structure definition
- */
-struct json_node {
-    json_type_t type; /**< JSON data type represented by the current node */
-    json_value_t
-        value; /**< Specific value contained in the current node (if it's a number or string) */
-    struct json_node *next; /**< For arrays: points to the next element; for objects: points to the
-                               first key-value pair node or the next key-value pair node */
-    char *key; /**< For object value nodes, stores its corresponding key name; NULL for arrays or
-                  root nodes */
-};
 
 /* -----------------------------------------------------------------------------
  *  Core JSON Operations

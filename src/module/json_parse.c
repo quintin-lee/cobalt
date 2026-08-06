@@ -4,6 +4,14 @@
  * @note This file is typically included and compiled by json.c, not exposed separately.
  */
 #include "cobalt/module/json.h"
+
+/* Opaque node structure — definition kept private to JSON module */
+struct json_node {
+    json_type_t type;
+    json_value_t value;
+    struct json_node *next;
+    char *key;
+};
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>

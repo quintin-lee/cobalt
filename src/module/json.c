@@ -6,6 +6,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+struct json_node {
+    json_type_t type;
+    json_value_t value;
+    struct json_node *next;
+    char *key;
+};
+
 /*
  * @brief Safely get the numeric value of a JSON node
  * @return Returns the actual value if it's JSON_NUMBER, otherwise returns 0.0

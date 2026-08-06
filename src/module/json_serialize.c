@@ -3,6 +3,14 @@
  * @brief Implementation of the JSON serializer
  */
 #include "cobalt/module/json.h"
+
+/* Opaque node structure — definition kept private to JSON module */
+struct json_node {
+    json_type_t type;
+    json_value_t value;
+    struct json_node *next;
+    char *key;
+};
 #include "cobalt/utils/string.h"
 #include <stdio.h>
 #include <stdlib.h>
