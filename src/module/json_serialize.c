@@ -6,16 +6,16 @@
 
 /* Opaque node structure — definition kept private to JSON module */
 struct json_node {
-    json_type_t type;
-    json_value_t value;
+    json_type_t       type;
+    json_value_t      value;
     struct json_node *next;
-    char *key;
+    char             *key;
 };
 #include "cobalt/utils/string.h"
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdarg.h>
 
 static int ensure_capacity(char **buf, size_t *cap, size_t need)
 {
@@ -25,8 +25,8 @@ static int ensure_capacity(char **buf, size_t *cap, size_t need)
         if (!tmp) {
             return -1;
         }
-        *buf    = tmp;
-        *cap    = new_cap;
+        *buf = tmp;
+        *cap = new_cap;
     }
     return 0;
 }
@@ -66,7 +66,11 @@ static char *json_escape(const char *s, size_t len)
     size_t out = 0;
     for (const char *p = s; p < s + len; p++) {
         switch (*p) {
-        case '"': case '\\': case '\n': case '\r': case '\t':
+        case '"':
+        case '\\':
+        case '\n':
+        case '\r':
+        case '\t':
             out += 2;
             break;
         default:
@@ -83,11 +87,26 @@ static char *json_escape(const char *s, size_t len)
     char *out_ptr = result;
     for (const char *p = s; p < s + len; p++) {
         switch (*p) {
-        case '"':  *out_ptr++ = '\\'; *out_ptr++ = '"';  break;
-        case '\\': *out_ptr++ = '\\'; *out_ptr++ = '\\'; break;
-        case '\n': *out_ptr++ = '\\'; *out_ptr++ = 'n';  break;
-        case '\r': *out_ptr++ = '\\'; *out_ptr++ = 'r';  break;
-        case '\t': *out_ptr++ = '\\'; *out_ptr++ = 't';  break;
+        case '"':
+            *out_ptr++ = '\\';
+            *out_ptr++ = '"';
+            break;
+        case '\\':
+            *out_ptr++ = '\\';
+            *out_ptr++ = '\\';
+            break;
+        case '\n':
+            *out_ptr++ = '\\';
+            *out_ptr++ = 'n';
+            break;
+        case '\r':
+            *out_ptr++ = '\\';
+            *out_ptr++ = 'r';
+            break;
+        case '\t':
+            *out_ptr++ = '\\';
+            *out_ptr++ = 't';
+            break;
         default:
             if ((unsigned char)*p < 0x20) {
                 out_ptr += sprintf(out_ptr, "\\u00%02x", (unsigned char)*p);
@@ -107,9 +126,9 @@ char *json_serialize(json_node_t *node)
         return cobalt_strdup("null");
     }
 
-    size_t cap   = 256;
-    size_t len   = 0;
-    char  *buf   = malloc(cap);
+    size_t cap = 256;
+    size_t len = 0;
+    char  *buf = malloc(cap);
     if (!buf) {
         return cobalt_strdup("{}");
     }
@@ -149,12 +168,12 @@ char *json_serialize(json_node_t *node)
     case JSON_ARRAY: {
         json_append(&buf, &cap, &len, "[");
         json_node_t *child = node->next;
-        int first = 1;
+        int          first = 1;
         while (child) {
             if (!first) {
                 json_append(&buf, &cap, &len, ",");
             }
-            first = 0;
+            first   = 0;
             char *s = json_serialize(child);
             if (s) {
                 json_append(&buf, &cap, &len, "%s", s);
@@ -168,13 +187,13 @@ char *json_serialize(json_node_t *node)
 
     case JSON_OBJECT: {
         json_append(&buf, &cap, &len, "{");
-        json_node_t *kv = node->next;
-        int first = 1;
+        json_node_t *kv    = node->next;
+        int          first = 1;
         while (kv) {
             if (!first) {
                 json_append(&buf, &cap, &len, ",");
             }
-            first = 0;
+            first         = 0;
             char *key_esc = json_escape(kv->key ? kv->key : "", strlen(kv->key ? kv->key : ""));
             if (key_esc) {
                 json_append(&buf, &cap, &len, "\"%s\":", key_esc);

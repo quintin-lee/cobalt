@@ -10,8 +10,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Options
 option(COBALT_BUILD_TESTS "Build tests" ON)
 option(COBALT_BUILD_EXAMPLES "Build examples" ON)
-option(COBALT_RUN_TIDY "Run clang-tidy checks" OFF)
-option(COBALT_RUN_FORMAT "Run clang-format checks" OFF)
+option(COBALT_RUN_TIDY "Run clang-tidy checks" ON)
+option(COBALT_RUN_FORMAT "Run clang-format checks" ON)
 option(COBALT_BUILD_COVERAGE "Build with coverage instrumentation" OFF)
 option(COBALT_RUN_ASAN "Build with AddressSanitizer" OFF)
 

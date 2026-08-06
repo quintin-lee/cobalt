@@ -31,50 +31,58 @@
 #define COBALT_NANOS_PER_SEC 1000000000LL
 
 typedef struct timer_entry {
-    uint64_t timer_id;
-    uint64_t timeout_ms;
-    uint64_t interval_ms;
+    uint64_t        timer_id;
+    uint64_t        timeout_ms;
+    uint64_t        interval_ms;
     timer_handler_t callback;
-    void *user_data;
-    int active;
+    void           *user_data;
+    int             active;
     struct timespec next_fire;
 } timer_entry_t;
 
 typedef struct fd_entry {
-    int fd;
-    short events;
-    fd_handler_t callback;
-    void *user_data;
+    int              fd;
+    short            events;
+    fd_handler_t     callback;
+    void            *user_data;
     struct fd_entry *next;
 } fd_entry_t;
 
 struct cobalt_eventloop {
 #ifdef __linux__
-    int epoll_fd;
+    int                 epoll_fd;
     struct epoll_event *epoll_events;
-    int epoll_capacity;
+    int                 epoll_capacity;
 #elif __APPLE__
     int kq;
 #else
     struct pollfd *pollfds;
-    int pollfds_capacity;
+    int            pollfds_capacity;
 #endif
-    fd_entry_t *fd_head;
-    fd_entry_t *fd_tail;
+    fd_entry_t     *fd_head;
+    fd_entry_t     *fd_tail;
     timer_entry_t **timer_heap;
-    int timer_count;
-    int timer_capacity;
-    uint64_t next_timer_id;
-    int running;
-    int stop_flag;
+    int             timer_count;
+    int             timer_capacity;
+    uint64_t        next_timer_id;
+    int             running;
+    int             stop_flag;
 };
 
 static int timer_compare(const timer_entry_t *a, const timer_entry_t *b)
 {
-    if (a->next_fire.tv_sec < b->next_fire.tv_sec) return -1;
-    if (a->next_fire.tv_sec > b->next_fire.tv_sec) return 1;
-    if (a->next_fire.tv_nsec < b->next_fire.tv_nsec) return -1;
-    if (a->next_fire.tv_nsec > b->next_fire.tv_nsec) return 1;
+    if (a->next_fire.tv_sec < b->next_fire.tv_sec) {
+        return -1;
+    }
+    if (a->next_fire.tv_sec > b->next_fire.tv_sec) {
+        return 1;
+    }
+    if (a->next_fire.tv_nsec < b->next_fire.tv_nsec) {
+        return -1;
+    }
+    if (a->next_fire.tv_nsec > b->next_fire.tv_nsec) {
+        return 1;
+    }
     return 0;
 }
 
@@ -82,11 +90,13 @@ static void heap_sift_up(timer_entry_t **heap, int idx)
 {
     while (idx > 0) {
         int parent = (idx - 1) / 2;
-        if (timer_compare(heap[parent], heap[idx]) <= 0) break;
+        if (timer_compare(heap[parent], heap[idx]) <= 0) {
+            break;
+        }
         timer_entry_t *tmp = heap[parent];
-        heap[parent] = heap[idx];
-        heap[idx] = tmp;
-        idx = parent;
+        heap[parent]       = heap[idx];
+        heap[idx]          = tmp;
+        idx                = parent;
     }
 }
 
@@ -94,25 +104,33 @@ static void heap_sift_down(timer_entry_t **heap, int count, int idx)
 {
     while (1) {
         int smallest = idx;
-        int left = 2 * idx + 1;
-        int right = 2 * idx + 2;
-        if (left < count && timer_compare(heap[left], heap[smallest]) < 0) smallest = left;
-        if (right < count && timer_compare(heap[right], heap[smallest]) < 0) smallest = right;
-        if (smallest == idx) break;
+        int left     = 2 * idx + 1;
+        int right    = 2 * idx + 2;
+        if (left < count && timer_compare(heap[left], heap[smallest]) < 0) {
+            smallest = left;
+        }
+        if (right < count && timer_compare(heap[right], heap[smallest]) < 0) {
+            smallest = right;
+        }
+        if (smallest == idx) {
+            break;
+        }
         timer_entry_t *tmp = heap[idx];
-        heap[idx] = heap[smallest];
-        heap[smallest] = tmp;
-        idx = smallest;
+        heap[idx]          = heap[smallest];
+        heap[smallest]     = tmp;
+        idx                = smallest;
     }
 }
 
 static void heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
 {
     if (loop->timer_count >= loop->timer_capacity) {
-        int new_cap = loop->timer_capacity * 2;
+        int             new_cap  = loop->timer_capacity * 2;
         timer_entry_t **new_heap = realloc(loop->timer_heap, sizeof(timer_entry_t *) * new_cap);
-        if (!new_heap) return;
-        loop->timer_heap = new_heap;
+        if (!new_heap) {
+            return;
+        }
+        loop->timer_heap     = new_heap;
         loop->timer_capacity = new_cap;
     }
     loop->timer_heap[loop->timer_count] = entry;
@@ -122,7 +140,9 @@ static void heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
 
 static timer_entry_t *heap_pop_min(cobalt_eventloop_t *loop)
 {
-    if (loop->timer_count == 0) return NULL;
+    if (loop->timer_count == 0) {
+        return NULL;
+    }
     timer_entry_t *min = loop->timer_heap[0];
     loop->timer_count--;
     loop->timer_heap[0] = loop->timer_heap[loop->timer_count];
@@ -142,7 +162,7 @@ static void get_time_now(struct timespec *ts)
 
 static int timer_expired(const struct timespec *a, const struct timespec *b)
 {
-    long secs = a->tv_sec - b->tv_sec;
+    long secs  = a->tv_sec - b->tv_sec;
     long nsecs = a->tv_nsec - b->tv_nsec;
     return secs > 0 || (secs == 0 && nsecs >= 0);
 }
@@ -151,7 +171,9 @@ static void process_expired_timers(cobalt_eventloop_t *loop, const struct timesp
 {
     while (loop->timer_count > 0) {
         timer_entry_t *timer = heap_peek(loop);
-        if (!timer || !timer->active || !timer_expired(&timer->next_fire, now)) break;
+        if (!timer || !timer->active || !timer_expired(&timer->next_fire, now)) {
+            break;
+        }
 
         heap_pop_min(loop);
 
@@ -175,14 +197,18 @@ static void process_expired_timers(cobalt_eventloop_t *loop, const struct timesp
 
 static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct timespec *now)
 {
-    int timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
-    const timer_entry_t *next = heap_peek(loop);
+    int                  timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
+    const timer_entry_t *next       = heap_peek(loop);
     if (next) {
-        long secs = next->next_fire.tv_sec - now->tv_sec;
+        long secs  = next->next_fire.tv_sec - now->tv_sec;
         long nsecs = next->next_fire.tv_nsec - now->tv_nsec;
         timeout_ms = (int)((secs * COBALT_MILLIS_PER_SEC) + (nsecs / COBALT_NANOS_PER_MILLI));
-        if (timeout_ms < 0) timeout_ms = 0;
-        if (timeout_ms > COBALT_EVENTLOOP_TIMEOUT_MAX) timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MAX;
+        if (timeout_ms < 0) {
+            timeout_ms = 0;
+        }
+        if (timeout_ms > COBALT_EVENTLOOP_TIMEOUT_MAX) {
+            timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MAX;
+        }
     }
     return timeout_ms;
 }
@@ -195,8 +221,8 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
 {
 #ifdef __linux__
     struct epoll_event ev = {0};
-    ev.events = events;
-    ev.data.fd = fd;
+    ev.events             = events;
+    ev.data.fd            = fd;
     return epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, fd, &ev);
 #elif __APPLE__
     struct kevent kev;
@@ -206,14 +232,17 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
     /* poll fallback: grow the pollfd array */
     int idx = fd;
     if (idx >= loop->pollfds_capacity) {
-        int new_cap = loop->pollfds_capacity == 0 ? COBALT_EVENTLOOP_DEFAULT_CAPACITY
-                                                  : loop->pollfds_capacity * 2;
+        int            new_cap  = loop->pollfds_capacity == 0 ? COBALT_EVENTLOOP_DEFAULT_CAPACITY
+                                                              : loop->pollfds_capacity * 2;
         struct pollfd *new_pfds = realloc(loop->pollfds, sizeof(struct pollfd) * new_cap);
-        if (!new_pfds) return -1;
+        if (!new_pfds) {
+            return -1;
+        }
         /* Zero-initialize any new slots */
-        memset(new_pfds + loop->pollfds_capacity, 0,
+        memset(new_pfds + loop->pollfds_capacity,
+               0,
                sizeof(struct pollfd) * (new_cap - loop->pollfds_capacity));
-        loop->pollfds         = new_pfds;
+        loop->pollfds          = new_pfds;
         loop->pollfds_capacity = new_cap;
     }
     loop->pollfds[idx].fd     = fd;
@@ -226,15 +255,17 @@ static int platform_mod_fd(cobalt_eventloop_t *loop, int fd, short events)
 {
 #ifdef __linux__
     struct epoll_event ev = {0};
-    ev.events = events;
-    ev.data.fd = fd;
+    ev.events             = events;
+    ev.data.fd            = fd;
     return epoll_ctl(loop->epoll_fd, EPOLL_CTL_MOD, fd, &ev);
 #elif __APPLE__
     struct kevent kev;
     EV_SET(&kev, fd, EVFILT_READ, EV_CHANGE, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
 #else
-    if (fd < 0 || fd >= loop->pollfds_capacity) return -1;
+    if (fd < 0 || fd >= loop->pollfds_capacity) {
+        return -1;
+    }
     loop->pollfds[fd].events = events;
     return 0;
 #endif
@@ -249,30 +280,31 @@ static int platform_del_fd(cobalt_eventloop_t *loop, int fd)
     EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
 #else
-    if (fd < 0 || fd >= loop->pollfds_capacity) return 0;
+    if (fd < 0 || fd >= loop->pollfds_capacity) {
+        return 0;
+    }
     loop->pollfds[fd].fd     = -1;
     loop->pollfds[fd].events = 0;
     return 0;
 #endif
 }
 
-static void platform_wait(cobalt_eventloop_t *loop, int *event_count_out,
-                          void **entries_out, int max_events)
+static void
+platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out, int max_events)
 {
 #ifdef __linux__
     int timeout_ms = calculate_timeout_ms(loop, NULL);
-    *event_count_out = epoll_wait(loop->epoll_fd, loop->epoll_events,
-                                  loop->epoll_capacity, timeout_ms);
+    *event_count_out =
+        epoll_wait(loop->epoll_fd, loop->epoll_events, loop->epoll_capacity, timeout_ms);
     *entries_out = loop->epoll_events;
 #elif __APPLE__
     struct timespec ts = {0, COBALT_NANOS_PER_MILLI};
-    struct kevent events[COBALT_EVENTLOOP_DEFAULT_CAPACITY];
-    *event_count_out = kevent(loop->kq, NULL, 0, events,
-                              COBALT_EVENTLOOP_DEFAULT_CAPACITY, &ts);
-    *entries_out = events;
+    struct kevent   events[COBALT_EVENTLOOP_DEFAULT_CAPACITY];
+    *event_count_out = kevent(loop->kq, NULL, 0, events, COBALT_EVENTLOOP_DEFAULT_CAPACITY, &ts);
+    *entries_out     = events;
 #else
     /* poll fallback: build the timeout from the timer heap */
-    int timeout_ms = calculate_timeout_ms(loop, NULL);
+    int timeout_ms   = calculate_timeout_ms(loop, NULL);
     *event_count_out = poll(loop->pollfds, (nfds_t)loop->pollfds_capacity, timeout_ms);
     *entries_out     = loop->pollfds;
     (void)max_events;
@@ -286,21 +318,33 @@ static void platform_wait(cobalt_eventloop_t *loop, int *event_count_out,
 cobalt_eventloop_t *cobalt_eventloop_create(void)
 {
     cobalt_eventloop_t *loop = calloc(1, sizeof(cobalt_eventloop_t));
-    if (!loop) return NULL;
+    if (!loop) {
+        return NULL;
+    }
 
 #ifdef __linux__
     loop->epoll_fd = epoll_create1(0);
-    if (loop->epoll_fd < 0) { free(loop); return NULL; }
+    if (loop->epoll_fd < 0) {
+        free(loop);
+        return NULL;
+    }
     loop->epoll_capacity = COBALT_EVENTLOOP_DEFAULT_CAPACITY;
-    loop->epoll_events = malloc(sizeof(struct epoll_event) * loop->epoll_capacity);
-    if (!loop->epoll_events) { close(loop->epoll_fd); free(loop); return NULL; }
+    loop->epoll_events   = malloc(sizeof(struct epoll_event) * loop->epoll_capacity);
+    if (!loop->epoll_events) {
+        close(loop->epoll_fd);
+        free(loop);
+        return NULL;
+    }
 #elif __APPLE__
     loop->kq = kqueue();
-    if (loop->kq < 0) { free(loop); return NULL; }
+    if (loop->kq < 0) {
+        free(loop);
+        return NULL;
+    }
 #endif
 
     loop->timer_capacity = COBALT_EVENTLOOP_TIMER_HEAP_INITIAL;
-    loop->timer_heap = malloc(sizeof(timer_entry_t *) * loop->timer_capacity);
+    loop->timer_heap     = malloc(sizeof(timer_entry_t *) * loop->timer_capacity);
     if (!loop->timer_heap) {
 #ifdef __linux__
         close(loop->epoll_fd);
@@ -318,13 +362,19 @@ cobalt_eventloop_t *cobalt_eventloop_create(void)
 
 void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
 {
-    if (!loop) return;
+    if (!loop) {
+        return;
+    }
 
 #ifdef __linux__
-    if (loop->epoll_fd >= 0) close(loop->epoll_fd);
+    if (loop->epoll_fd >= 0) {
+        close(loop->epoll_fd);
+    }
     free(loop->epoll_events);
 #elif __APPLE__
-    if (loop->kq >= 0) close(loop->kq);
+    if (loop->kq >= 0) {
+        close(loop->kq);
+    }
 #else
     free(loop->pollfds);
 #endif
@@ -343,17 +393,26 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
     free(loop);
 }
 
-int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd, cobalt_events_t events,
-                            fd_handler_t callback, void *user_data)
+int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
+                            cobalt_fd_t         fd,
+                            cobalt_events_t     events,
+                            fd_handler_t        callback,
+                            void               *user_data)
 {
-    if (!loop || fd < 0 || !callback) return -1;
-    if (platform_add_fd(loop, (int)fd, (short)events) < 0) return -1;
+    if (!loop || fd < 0 || !callback) {
+        return -1;
+    }
+    if (platform_add_fd(loop, (int)fd, (short)events) < 0) {
+        return -1;
+    }
 
     fd_entry_t *entry = calloc(1, sizeof(fd_entry_t));
-    if (!entry) return -1;
-    entry->fd       = (int)fd;
-    entry->events   = (short)events;
-    entry->callback = callback;
+    if (!entry) {
+        return -1;
+    }
+    entry->fd        = (int)fd;
+    entry->events    = (short)events;
+    entry->callback  = callback;
     entry->user_data = user_data;
 
     if (!loop->fd_head) {
@@ -365,55 +424,68 @@ int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd, cobalt_eve
     return 0;
 }
 
-int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd, cobalt_events_t events,
-                            fd_handler_t callback, void *user_data)
+int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
+                            cobalt_fd_t         fd,
+                            cobalt_events_t     events,
+                            fd_handler_t        callback,
+                            void               *user_data)
 {
-    if (!loop || fd < 0) return -1;
+    if (!loop || fd < 0) {
+        return -1;
+    }
     cobalt_eventloop_del_fd(loop, fd);
     return cobalt_eventloop_add_fd(loop, fd, events, callback, user_data);
 }
 
 int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd)
 {
-    if (!loop || fd < 0) return -1;
+    if (!loop || fd < 0) {
+        return -1;
+    }
     platform_del_fd(loop, (int)fd);
 
     fd_entry_t **prev = &loop->fd_head;
-    fd_entry_t *curr  = *prev;
+    fd_entry_t  *curr = *prev;
     while (curr) {
         if (curr->fd == (int)fd) {
             *prev = curr->next;
             free(curr);
             return 0;
         }
-        prev   = &curr->next;
-        curr   = curr->next;
+        prev = &curr->next;
+        curr = curr->next;
     }
     return -1;
 }
 
-uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t *loop, cobalt_timeout_ms_t timeout_ms,
+uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t  *loop,
+                                    cobalt_timeout_ms_t  timeout_ms,
                                     cobalt_interval_ms_t interval_ms,
-                                    timer_handler_t callback, void *user_data)
+                                    timer_handler_t      callback,
+                                    void                *user_data)
 {
-    if (!loop || !callback) return 0;
+    if (!loop || !callback) {
+        return 0;
+    }
 
-    uint64_t timer_id = ++loop->next_timer_id;
-    timer_entry_t *entry = calloc(1, sizeof(timer_entry_t));
-    if (!entry) return 0;
+    uint64_t       timer_id = ++loop->next_timer_id;
+    timer_entry_t *entry    = calloc(1, sizeof(timer_entry_t));
+    if (!entry) {
+        return 0;
+    }
 
-    entry->timer_id   = timer_id;
-    entry->timeout_ms = timeout_ms;
+    entry->timer_id    = timer_id;
+    entry->timeout_ms  = timeout_ms;
     entry->interval_ms = interval_ms;
-    entry->callback   = callback;
-    entry->user_data  = user_data;
-    entry->active     = 1;
+    entry->callback    = callback;
+    entry->user_data   = user_data;
+    entry->active      = 1;
 
     struct timespec now;
     get_time_now(&now);
-    entry->next_fire.tv_sec  = now.tv_sec + (long)(timeout_ms / COBALT_MILLIS_PER_SEC);
-    entry->next_fire.tv_nsec = (long)(now.tv_nsec +
-                       ((timeout_ms % COBALT_MILLIS_PER_SEC) * COBALT_NANOS_PER_MILLI));
+    entry->next_fire.tv_sec = now.tv_sec + (long)(timeout_ms / COBALT_MILLIS_PER_SEC);
+    entry->next_fire.tv_nsec =
+        (long)(now.tv_nsec + ((timeout_ms % COBALT_MILLIS_PER_SEC) * COBALT_NANOS_PER_MILLI));
     if (entry->next_fire.tv_nsec >= COBALT_NANOS_PER_SEC) {
         entry->next_fire.tv_sec++;
         entry->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
@@ -425,11 +497,13 @@ uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t *loop, cobalt_timeout_ms_
 
 int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
 {
-    if (!loop) return -1;
+    if (!loop) {
+        return -1;
+    }
     for (int i = 0; i < loop->timer_count; i++) {
         if (loop->timer_heap[i]->timer_id == timer_id) {
             loop->timer_count--;
-            loop->timer_heap[i]          = loop->timer_heap[loop->timer_count];
+            loop->timer_heap[i] = loop->timer_heap[loop->timer_count];
             heap_sift_down(loop->timer_heap, loop->timer_count, i);
             free(loop->timer_heap[loop->timer_count]);
             return 0;
@@ -440,9 +514,11 @@ int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
 
 void cobalt_eventloop_run(cobalt_eventloop_t *loop)
 {
-    if (!loop) return;
-    loop->running    = 1;
-    loop->stop_flag  = 0;
+    if (!loop) {
+        return;
+    }
+    loop->running   = 1;
+    loop->stop_flag = 0;
     while (loop->running && !loop->stop_flag) {
         cobalt_eventloop_iteration(loop);
     }
@@ -451,25 +527,29 @@ void cobalt_eventloop_run(cobalt_eventloop_t *loop)
 
 void cobalt_eventloop_stop(cobalt_eventloop_t *loop)
 {
-    if (loop) loop->stop_flag = 1;
+    if (loop) {
+        loop->stop_flag = 1;
+    }
 }
 
 int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
 {
-    if (!loop) return -1;
+    if (!loop) {
+        return -1;
+    }
 
     struct timespec now;
     get_time_now(&now);
     process_expired_timers(loop, &now);
 
-    int event_count = 0;
-    void *entries   = NULL;
+    int   event_count = 0;
+    void *entries     = NULL;
     platform_wait(loop, &event_count, &entries, 0);
 
 #ifdef __linux__
     for (int i = 0; i < event_count; i++) {
-        struct epoll_event *ev = (struct epoll_event *)entries;
-        fd_entry_t *entry = (fd_entry_t *)ev[i].data.ptr;
+        struct epoll_event *ev    = (struct epoll_event *)entries;
+        fd_entry_t         *entry = (fd_entry_t *)ev[i].data.ptr;
         if (entry && entry->callback) {
             entry->callback(entry->fd, (short)ev[i].events, entry->user_data);
         }
@@ -477,9 +557,11 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
 #elif __APPLE__
     struct kevent *events = (struct kevent *)entries;
     for (int i = 0; i < event_count; i++) {
-        int fd = (int)events[i].ident;
+        int         fd    = (int)events[i].ident;
         fd_entry_t *entry = loop->fd_head;
-        while (entry && entry->fd != fd) entry = entry->next;
+        while (entry && entry->fd != fd) {
+            entry = entry->next;
+        }
         if (entry && entry->callback) {
             short ev = (events[i].filter == EVFILT_READ) ? POLLIN : POLLOUT;
             entry->callback(fd, ev, entry->user_data);
@@ -489,10 +571,14 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
     /* poll fallback */
     struct pollfd *pfds = (struct pollfd *)entries;
     for (int i = 0; i < event_count; i++) {
-        if (pfds[i].revents == 0) continue;
-        int fd = pfds[i].fd;
+        if (pfds[i].revents == 0) {
+            continue;
+        }
+        int         fd    = pfds[i].fd;
         fd_entry_t *entry = loop->fd_head;
-        while (entry && entry->fd != fd) entry = entry->next;
+        while (entry && entry->fd != fd) {
+            entry = entry->next;
+        }
         if (entry && entry->callback) {
             short revents = (short)pfds[i].revents;
             entry->callback(fd, revents, entry->user_data);
