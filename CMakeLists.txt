@@ -30,6 +30,16 @@ if(COBALT_BUILD_COVERAGE)
     endif()
 endif()
 
+# clang-tidy & clang-format tools
+find_program(CLANG_TIDY_EXECUTABLE clang-tidy)
+find_program(CLANG_FORMAT_EXECUTABLE clang-format)
+
+# Source files for format/tidy (exclude build/ and tests/)
+file(GLOB_RECURSE ALL_SRC_FILES
+    ${CMAKE_SOURCE_DIR}/src/*.c
+    ${CMAKE_SOURCE_DIR}/include/**/*.h
+)
+
 # Source files
 set(SOURCES
     src/platform/platform.c
@@ -67,18 +77,6 @@ target_include_directories(cobalt PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-
-# Automatically run clang-format checks on build when COBALT_RUN_FORMAT is ON
-# Uses DEPENDS to only trigger when source files are modified
-if(COBALT_RUN_FORMAT AND CLANG_FORMAT_EXECUTABLE)
-    add_custom_command(
-        TARGET cobalt POST_BUILD
-        COMMAND ${CLANG_FORMAT_EXECUTABLE} --dry-run --Werror --style=file ${ALL_SRC_FILES}
-        COMMENT "Checking code formatting..."
-        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-        DEPENDS ${ALL_SRC_FILES}
-    )
-endif()
 
 # Examples
 if(COBALT_BUILD_EXAMPLES)
@@ -169,16 +167,7 @@ target_link_libraries(examples_simple_server cobalt)
 # ============================================================
 # clang-tidy & clang-format integration
 # ============================================================
-find_program(CLANG_TIDY_EXECUTABLE clang-tidy)
-find_program(CLANG_FORMAT_EXECUTABLE clang-format)
-
 if(CLANG_TIDY_EXECUTABLE)
-    # Collect all source and header files (exclude build/ and tests/)
-    file(GLOB_RECURSE ALL_SRC_FILES
-        ${CMAKE_SOURCE_DIR}/src/*.c
-        ${CMAKE_SOURCE_DIR}/include/**/*.h
-    )
-
     add_custom_target(tidy
         COMMAND ${CLANG_TIDY_EXECUTABLE}
             -p ${CMAKE_BINARY_DIR}
@@ -206,6 +195,17 @@ if(CLANG_FORMAT_EXECUTABLE)
             ${ALL_SRC_FILES}
         COMMENT "Fixing code formatting..."
     )
+
+    # Auto-run format check after building cobalt library (only when sources change)
+    if(COBALT_RUN_FORMAT)
+        add_custom_command(
+            TARGET cobalt POST_BUILD
+            COMMAND ${CLANG_FORMAT_EXECUTABLE} --dry-run --Werror --style=file ${ALL_SRC_FILES}
+            COMMENT "Checking code formatting..."
+            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+            DEPENDS ${ALL_SRC_FILES}
+        )
+    endif()
 else()
     message(WARNING "clang-format not found. Install it or skip: cmake --build . --target format")
 endif()
