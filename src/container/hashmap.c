@@ -231,6 +231,11 @@ static const cobalt_map_t hashmap_map_vtable = {
 /* Public iterator factory                                                    */
 /* -------------------------------------------------------------------------- */
 
+/// @brief Create a map iterator for this hash map
+/// @param map Hash map instance
+/// @return Iterator pointer, or NULL on failure
+/// @note Returns a cobalt_map_iterator_t compatible with the Map interface.
+///       Destroy with cobalt_map_iterator_destroy().
 cobalt_map_iterator_t *cobalt_hashmap_iterator_create(cobalt_hashmap_t *map)
 {
     if (!map) {

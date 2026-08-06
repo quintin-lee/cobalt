@@ -542,6 +542,11 @@ static const cobalt_map_t treemap_map_vtable = {
 /* Public iterator factory                                                    */
 /* ========================================================================= */
 
+/// @brief Create a map iterator for this tree map
+/// @param map Tree map instance
+/// @return Iterator pointer, or NULL on failure
+/// @note Returns a cobalt_map_iterator_t compatible with the Map interface.
+///       Destroy with cobalt_map_iterator_destroy().
 cobalt_map_iterator_t *cobalt_treemap_iterator_create(cobalt_treemap_t *map)
 {
     if (!map) {
