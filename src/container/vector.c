@@ -31,10 +31,10 @@ typedef struct {
  *          starting cobalt_sequence_t base.
  */
 struct cobalt_vector {
-    cobalt_sequence_t   base;
-    void             **items;
-    size_t              capacity;
-    size_t              size;
+    cobalt_sequence_t base;
+    void            **items;
+    size_t            capacity;
+    size_t            size;
 };
 
 /* ========================================================================= */
@@ -156,11 +156,11 @@ cobalt_vector_t *cobalt_vector_create(size_t initial_capacity)
     vec->size     = 0;
 
     /* Initialize the method table for the sequence (Sequence) interface */
-    vec->base.size        = vector_size_seq;
-    vec->base.is_empty    = vector_is_empty_seq;
-    vec->base.add         = vector_add_seq;
-    vec->base.remove      = vector_remove_seq;
-    vec->base.iterator    = vector_iterator_seq;
+    vec->base.size         = vector_size_seq;
+    vec->base.is_empty     = vector_is_empty_seq;
+    vec->base.add          = vector_add_seq;
+    vec->base.remove       = vector_remove_seq;
+    vec->base.iterator     = vector_iterator_seq;
     vec->base.get_at_index = vector_get_at_index_seq;
 
     return (cobalt_vector_t *)vec;

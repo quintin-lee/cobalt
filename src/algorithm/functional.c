@@ -36,13 +36,13 @@ cobalt_bsearch(const void *key, const void *base, size_t nmemb, size_t size, com
         return NULL;
     }
 
-    const char *arr = (const char *)base;
-    size_t left = 0;
-    size_t right = nmemb;
+    const char *arr   = (const char *)base;
+    size_t      left  = 0;
+    size_t      right = nmemb;
 
     while (left < right) {
         size_t mid = left + (right - left) / 2;
-        int cmp = compar(key, arr + mid * size);
+        int    cmp = compar(key, arr + mid * size);
 
         if (cmp == 0) {
             return (void *)(arr + mid * size);
@@ -84,29 +84,31 @@ void cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func
     }
 }
 
-int cobalt_map(const void *input, void *output, size_t nmemb, size_t size, map_func_t fn, void *user_data)
+int cobalt_map(
+    const void *input, void *output, size_t nmemb, size_t size, map_func_t fn, void *user_data)
 {
     if (!input || !output || nmemb == 0 || !fn) {
         return -1;
     }
 
     const char *src = (const char *)input;
-    char *dst = (char *)output;
+    char       *dst = (char *)output;
     for (size_t i = 0; i < nmemb; i++) {
         fn(src + i * size, dst + i * size, user_data);
     }
     return 0;
 }
 
-int cobalt_filter(const void *input, void *output, size_t *nmemb, size_t size, predicate_func_t pred)
+int cobalt_filter(
+    const void *input, void *output, size_t *nmemb, size_t size, predicate_func_t pred)
 {
     if (!input || !output || !nmemb || !pred) {
         return -1;
     }
 
-    const char *src = (const char *)input;
-    char *dst = (char *)output;
-    size_t count = 0;
+    const char *src   = (const char *)input;
+    char       *dst   = (char *)output;
+    size_t      count = 0;
 
     for (size_t i = 0; i < *nmemb; i++) {
         if (pred(src + i * size)) {
@@ -121,14 +123,15 @@ int cobalt_filter(const void *input, void *output, size_t *nmemb, size_t size, p
     return 0;
 }
 
-void *cobalt_fold(const void *input, size_t nmemb, size_t size, void *initial, fold_func_t fn, void *user_data)
+void *cobalt_fold(
+    const void *input, size_t nmemb, size_t size, void *initial, fold_func_t fn, void *user_data)
 {
     if (!input || !fn || nmemb == 0) {
         return initial;
     }
 
-    void *accumulator = initial;
-    const char *arr = (const char *)input;
+    void       *accumulator = initial;
+    const char *arr         = (const char *)input;
 
     for (size_t i = 0; i < nmemb; i++) {
         accumulator = fn(accumulator, arr + i * size, user_data);

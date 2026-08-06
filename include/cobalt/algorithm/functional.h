@@ -57,9 +57,10 @@ int predicate_nonnull(const void *item);
  *  Generic search and traversal algorithms
  * -------------------------------------------------------------------------- */
 
-void *cobalt_bsearch(const void *key, const void *base, size_t nmemb, size_t size, compare_func_t compar);
+void *
+cobalt_bsearch(const void *key, const void *base, size_t nmemb, size_t size, compare_func_t compar);
 void *cobalt_find_if(const void *base, size_t nmemb, size_t size, predicate_func_t pred);
-void cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func_t op);
+void  cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func_t op);
 
 /* -----------------------------------------------------------------------------
  *  Stream operators (map, filter, fold)
@@ -75,7 +76,8 @@ void cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func
  * @param user_data Optional data passed to transform function
  * @return 0 on success, -1 on failure
  */
-int cobalt_map(const void *input, void *output, size_t nmemb, size_t size, map_func_t fn, void *user_data);
+int cobalt_map(
+    const void *input, void *output, size_t nmemb, size_t size, map_func_t fn, void *user_data);
 
 /**
  * @brief Filter elements based on a predicate
@@ -86,7 +88,8 @@ int cobalt_map(const void *input, void *output, size_t nmemb, size_t size, map_f
  * @param pred Filter predicate
  * @return 0 on success, -1 on failure
  */
-int cobalt_filter(const void *input, void *output, size_t *nmemb, size_t size, predicate_func_t pred);
+int cobalt_filter(
+    const void *input, void *output, size_t *nmemb, size_t size, predicate_func_t pred);
 
 /**
  * @brief Fold/reduce array to a single value
@@ -98,7 +101,8 @@ int cobalt_filter(const void *input, void *output, size_t *nmemb, size_t size, p
  * @param user_data Optional data passed to fold function
  * @return Accumulated result (may be same as initial)
  */
-void *cobalt_fold(const void *input, size_t nmemb, size_t size, void *initial, fold_func_t fn, void *user_data);
+void *cobalt_fold(
+    const void *input, size_t nmemb, size_t size, void *initial, fold_func_t fn, void *user_data);
 
 /** @} */
 

@@ -30,8 +30,8 @@ typedef struct cobalt_iterator cobalt_iterator_t;
  * @brief Sequence structure definition (interface polymorphism)
  * @details Defines standard operations such as size query, element addition/removal, and iterator.
  * @note This interface does not provide indexed access (use container-specific APIs like
- *       cobalt_list_get or cobalt_vector_get for that); sequences are intentionally position-agnostic.
- * retrieval
+ *       cobalt_list_get or cobalt_vector_get for that); sequences are intentionally
+ * position-agnostic. retrieval
  */
 struct cobalt_sequence {
     /**

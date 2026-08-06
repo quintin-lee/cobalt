@@ -25,8 +25,8 @@ typedef struct cobalt_interface cobalt_interface_t;
  * their memory layout, to ensure the normal operation of polymorphism and reference counting.
  */
 typedef struct cobalt_object {
-    _Atomic uint64_t ref_count;  /**< Reference count for memory management (thread-safe) */
-    cobalt_class_t *class;       /**< Class pointer for RTTI and method dispatch */
+    _Atomic uint64_t ref_count; /**< Reference count for memory management (thread-safe) */
+    cobalt_class_t *class;      /**< Class pointer for RTTI and method dispatch */
 } cobalt_object_t;
 
 /**
