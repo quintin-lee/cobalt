@@ -3,9 +3,11 @@
  * @brief Implementation of general sorting algorithms
  */
 #include "cobalt/algorithm/sort.h"
+#include "cobalt/container/list.h"
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+/* compare_func_t is already defined in sort.h */
 
 /*
  * @brief Perform quicksort
@@ -59,16 +61,15 @@ void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t
     free(key);
 }
 
-/*
- * @brief Sort a linked list
- *
- * Plans to use merge sort to sort the linked list. Currently an unimplemented placeholder.
+/**
+ * @brief Sort a linked list using merge sort (stable, O(n log n))
+ * @details Delegates to cobalt_list_merge_sort() in list.c
  */
 void cobalt_list_sort(void **head, size_t *count, compare_func_t compar)
 {
-    // Avoid unused parameter warnings
-    (void)head;
-    (void)count;
-    (void)compar;
-    /* Merge sort on linked list - placeholder */
+    if (!head || !compar) {
+        return;
+    }
+    cobalt_list_node_t **list_head = (cobalt_list_node_t **)head;
+    cobalt_list_merge_sort(list_head, count, compar);
 }

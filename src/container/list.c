@@ -7,6 +7,7 @@
  */
 
 #include "cobalt/container/list.h"
+#include "cobalt/algorithm/sort.h"
 #include "cobalt/interface/iterator.h"
 #include "cobalt/runtime/error.h"
 #include <stdlib.h>
@@ -65,7 +66,7 @@ static int list_is_empty_seq(cobalt_sequence_t *self)
  */
 static void list_add_seq(cobalt_sequence_t *self, void *item)
 {
-    cobalt_list_t *list = (cobalt_list_t *)self;
+    cobalt_list_t      *list = (cobalt_list_t *)self;
     cobalt_list_node_t *node = malloc(sizeof(cobalt_list_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
@@ -93,7 +94,7 @@ static void list_remove_seq(cobalt_sequence_t *self, void *item)
     if (!self || !item) {
         return;
     }
-    cobalt_list_t *list = (cobalt_list_t *)self;
+    cobalt_list_t      *list = (cobalt_list_t *)self;
     cobalt_list_node_t *node = list->head;
     cobalt_list_node_t *prev = NULL;
 
@@ -150,14 +151,14 @@ cobalt_list_t *cobalt_list_create(void)
     }
 
     list->head = list->tail = NULL;
-    list->size             = 0;
+    list->size              = 0;
 
     /* Bind polymorphic sequence interface methods */
-    list->base.size        = list_size_seq;
-    list->base.is_empty    = list_is_empty_seq;
-    list->base.add         = list_add_seq;
-    list->base.remove      = list_remove_seq;
-    list->base.iterator    = list_iterator_seq;
+    list->base.size         = list_size_seq;
+    list->base.is_empty     = list_is_empty_seq;
+    list->base.add          = list_add_seq;
+    list->base.remove       = list_remove_seq;
+    list->base.iterator     = list_iterator_seq;
     list->base.get_at_index = list_get_at_index_seq;
 
     return list;
@@ -171,7 +172,7 @@ void cobalt_list_destroy(cobalt_list_t *list)
     if (!list) {
         return;
     }
-    cobalt_list_t *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = (cobalt_list_t *)list;
     cobalt_list_node_t *node = impl->head;
 
     while (node) {
@@ -190,15 +191,15 @@ int cobalt_list_push_front(cobalt_list_t *list, void *item)
     if (!list) {
         return -1;
     }
-    cobalt_list_t *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = (cobalt_list_t *)list;
     cobalt_list_node_t *node = malloc(sizeof(cobalt_list_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
     }
-    node->data     = item;
-    node->next     = impl->head;
-    node->prev     = NULL;
+    node->data = item;
+    node->next = impl->head;
+    node->prev = NULL;
 
     if (impl->head) {
         impl->head->prev = node;
@@ -218,15 +219,15 @@ int cobalt_list_push_back(cobalt_list_t *list, void *item)
     if (!list) {
         return -1;
     }
-    cobalt_list_t *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = (cobalt_list_t *)list;
     cobalt_list_node_t *node = malloc(sizeof(cobalt_list_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
     }
-    node->data   = item;
-    node->prev   = impl->tail;
-    node->next   = NULL;
+    node->data = item;
+    node->prev = impl->tail;
+    node->next = NULL;
 
     if (impl->tail) {
         impl->tail->next = node;
@@ -247,7 +248,7 @@ void *cobalt_list_pop_front(cobalt_list_t *list)
         cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
-    cobalt_list_t *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = (cobalt_list_t *)list;
     cobalt_list_node_t *node = impl->head;
 
     list->head = node->next;
@@ -271,7 +272,7 @@ void *cobalt_list_pop_back(cobalt_list_t *list)
         cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
-    cobalt_list_t *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = (cobalt_list_t *)list;
     cobalt_list_node_t *node = impl->tail;
 
     list->tail = node->prev;
@@ -342,7 +343,7 @@ int cobalt_list_is_empty(const cobalt_list_t *list)
  * @brief Iterator internal context structure, saves iteration progress
  */
 typedef struct {
-    cobalt_list_t *list;       /**< The iterated list itself (currently unused) */
+    cobalt_list_t      *list;    /**< The iterated list itself (currently unused) */
     cobalt_list_node_t *current; /**< Node currently pointed to */
 } list_iterator_impl_t;
 
@@ -365,7 +366,7 @@ static void *list_iterator_next(void *ctx)
         return NULL;
     }
 
-    void *data     = impl->current->data;
+    void *data    = impl->current->data;
     impl->current = impl->current->next;
     return data;
 }
@@ -426,7 +427,7 @@ int cobalt_list_remove(cobalt_list_t *list, void *item)
     if (!list || !item) {
         return -1;
     }
-    cobalt_list_t *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = (cobalt_list_t *)list;
     cobalt_list_node_t *node = impl->head;
     cobalt_list_node_t *prev = NULL;
 
@@ -462,7 +463,7 @@ int cobalt_list_remove_if(cobalt_list_t *list,
     if (!list || !predicate) {
         return -1;
     }
-    cobalt_list_t *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = (cobalt_list_t *)list;
     cobalt_list_node_t *node = impl->head;
     cobalt_list_node_t *prev = NULL;
 
@@ -486,4 +487,116 @@ int cobalt_list_remove_if(cobalt_list_t *list,
         node = node->next;
     }
     return -1;
+}
+
+/* ========================================================================= */
+/* Merge sort for linked list                                                */
+/* ========================================================================= */
+
+/**
+ * @brief Split a linked list into two halves (fast/slow pointer technique)
+ * @param head Pointer to the head pointer of the list
+ * @param front_ref Output: head of the first half
+ * @param back_ref Output: head of the second half
+ */
+static void list_split(cobalt_list_node_t **head_ref,
+                       cobalt_list_node_t **front_ref,
+                       cobalt_list_node_t **back_ref)
+{
+    if (*head_ref == NULL) {
+        *front_ref = *back_ref = NULL;
+        return;
+    }
+
+    cobalt_list_node_t *slow = *head_ref;
+    cobalt_list_node_t *fast = (*head_ref)->next;
+
+    while (fast != NULL) {
+        fast = fast->next;
+        if (fast != NULL) {
+            slow = slow->next;
+            fast = fast->next;
+        }
+    }
+
+    *front_ref = *head_ref;
+    *back_ref  = slow->next;
+    slow->next = NULL;
+}
+
+/**
+ * @brief Merge two sorted linked lists by data value
+ * @param a Head of first sorted list
+ * @param b Head of second sorted list
+ * @param compar Comparison function
+ * @return Head of the merged sorted list
+ */
+static cobalt_list_node_t *
+list_merge(cobalt_list_node_t *a, cobalt_list_node_t *b, compare_func_t compar)
+{
+    cobalt_list_node_t *result = NULL;
+
+    if (!a) {
+        return b;
+    }
+    if (!b) {
+        return a;
+    }
+
+    if (compar(a->data, b->data) <= 0) {
+        result       = a;
+        result->next = list_merge(a->next, b, compar);
+    } else {
+        result       = b;
+        result->next = list_merge(a, b->next, compar);
+    }
+    return result;
+}
+
+/**
+ * @brief Recursive merge sort
+ */
+static cobalt_list_node_t *list_mergesort(cobalt_list_node_t *head, compare_func_t compar)
+{
+    if (!head || !head->next) {
+        return head;
+    }
+
+    cobalt_list_node_t *a = NULL;
+    cobalt_list_node_t *b = NULL;
+    list_split(&head, &a, &b);
+    a = list_mergesort(a, compar);
+    b = list_mergesort(b, compar);
+    return list_merge(a, b, compar);
+}
+
+/**
+ * @brief Get the head node of the list
+ */
+cobalt_list_node_t *cobalt_list_get_head(const cobalt_list_t *list)
+{
+    return list ? list->head : NULL;
+}
+
+/**
+ * @brief Set the head and tail nodes of the list
+ */
+void cobalt_list_set_head(cobalt_list_t *list, cobalt_list_node_t *head, cobalt_list_node_t *tail)
+{
+    if (list) {
+        list->head = head;
+        list->tail = tail;
+    }
+}
+
+/**
+ * @brief Merge sort for the linked list nodes (exposed for algorithm layer)
+ */
+void cobalt_list_merge_sort(cobalt_list_node_t **head_ref, size_t *count, compare_func_t compar)
+{
+    if (!head_ref || !compar) {
+        return;
+    }
+    *head_ref = list_mergesort(*head_ref, compar);
+    (void)count;
 }

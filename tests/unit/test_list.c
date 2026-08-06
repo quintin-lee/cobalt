@@ -298,6 +298,8 @@ void test_list_remove_if(void)
     printf("  List remove_if test passed\n");
 }
 
+void test_list_sort(void);
+
 void test_list(void)
 {
     printf("Testing list...\n");
@@ -308,5 +310,47 @@ void test_list(void)
     test_list_iterator();
     test_list_remove();
     test_list_remove_if();
+    test_list_sort();
     printf("  List tests completed\n");
+}
+
+static int cmp_int_asc(const void *a, const void *b)
+{
+    int x = *(const int *)a, y = *(const int *)b;
+    return (x > y) - (x < y);
+}
+
+void test_list_sort(void)
+{
+    printf("Testing list sort (merge sort)...\n");
+    cobalt_list_t *list = cobalt_list_create();
+    TEST_ASSERT(list != NULL);
+
+    int vals[] = {5, 3, 8, 1, 9, 2, 7, 4, 6};
+    for (int i = 0; i < 9; i++) {
+        TEST_ASSERT(cobalt_list_push_back(list, &vals[i]) == 0);
+    }
+    TEST_ASSERT(cobalt_list_size(list) == 9);
+
+    /* cobalt_list_sort works on the internal node head pointer */
+    cobalt_list_node_t *node = cobalt_list_get_head(list);
+    cobalt_list_sort((void **)&node, NULL, cmp_int_asc);
+    cobalt_list_set_head(list, node, node); /* tail = node (will be updated by sort) */
+
+    /* Verify sorted order by iterating */
+    int                expected[] = {1, 2, 3, 4, 5, 6, 7, 8, 9};
+    cobalt_iterator_t *iter       = cobalt_list_iterator_create(list);
+    TEST_ASSERT(iter != NULL);
+    int idx = 0;
+    while (cobalt_iterator_has_next(iter)) {
+        int *got = (int *)cobalt_iterator_next(iter);
+        TEST_ASSERT(got != NULL);
+        TEST_EQUAL(*got, expected[idx]);
+        idx++;
+    }
+    cobalt_iterator_destroy(iter);
+    TEST_EQUAL(idx, 9);
+
+    cobalt_list_destroy(list);
+    printf("  list sort: OK\n");
 }

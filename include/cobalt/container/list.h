@@ -10,6 +10,7 @@
  * polymorphic sequence operations.
  */
 
+#include "cobalt/algorithm/sort.h"
 #include "cobalt/interface/sequence.h"
 
 /**
@@ -135,12 +136,36 @@ int cobalt_list_remove(cobalt_list_t *list, void *item);
  * @param list Pointer to the target list
  * @param predicate Function that returns non-zero for elements to remove
  * @param user_data Opaque pointer passed to the predicate
- * @return Returns 0 on success; returns -1 if list is NULL, predicate is NULL, or no element matches.
+ * @return Returns 0 on success; returns -1 if list is NULL, predicate is NULL, or no element
+ * matches.
  */
 int cobalt_list_remove_if(cobalt_list_t *list,
                           int (*predicate)(const void *item, void *user_data),
                           void *user_data);
 
 /** @} */
+
+/**
+ * @brief Get the head node of the list (for use with cobalt_list_sort)
+ * @param list Pointer to the list
+ * @return Pointer to the head node, or NULL if empty
+ */
+cobalt_list_node_t *cobalt_list_get_head(const cobalt_list_t *list);
+
+/**
+ * @brief Set the head and tail nodes of the list (used after cobalt_list_sort)
+ * @param list Pointer to the list
+ * @param head New head node
+ * @param tail New tail node
+ */
+void cobalt_list_set_head(cobalt_list_t *list, cobalt_list_node_t *head, cobalt_list_node_t *tail);
+
+/**
+ * @brief Merge sort for the internal linked list nodes (exposed for algorithm layer)
+ * @param head_ref Pointer to the head node pointer of the list
+ * @param count Pointer to element count (optional)
+ * @param compar Comparison function
+ */
+void cobalt_list_merge_sort(cobalt_list_node_t **head_ref, size_t *count, compare_func_t compar);
 
 #endif /* LIST_H */
