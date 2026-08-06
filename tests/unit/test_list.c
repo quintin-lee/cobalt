@@ -254,6 +254,50 @@ void test_list_remove(void)
     printf("  List remove test passed\n");
 }
 
+static int predicate_gte2(const void *item, void *user_data)
+{
+    (void)user_data;
+    return *(const int *)item >= 2;
+}
+
+void test_list_remove_if(void)
+{
+    printf("Testing list_remove_if...\n");
+
+    cobalt_list_t *list = cobalt_list_create();
+    TEST_ASSERT(list != NULL);
+
+    int a = 1, b = 2, c = 3, d = 4;
+    TEST_ASSERT(cobalt_list_push_back(list, &a) == 0);
+    TEST_ASSERT(cobalt_list_push_back(list, &b) == 0);
+    TEST_ASSERT(cobalt_list_push_back(list, &c) == 0);
+    TEST_ASSERT(cobalt_list_push_back(list, &d) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 4);
+
+    /* Remove first element >= 2 (should remove b=2) */
+    TEST_ASSERT(cobalt_list_remove_if(list, predicate_gte2, NULL) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 3);
+    TEST_ASSERT(cobalt_list_get(list, 0) == &a);
+    TEST_ASSERT(cobalt_list_get(list, 1) == &c);
+    TEST_ASSERT(cobalt_list_get(list, 2) == &d);
+
+    /* Remove all elements >= 2 (removes c=3, then d=4) */
+    while (cobalt_list_remove_if(list, predicate_gte2, NULL) == 0)
+        ;
+    TEST_ASSERT(cobalt_list_size(list) == 1);
+    TEST_ASSERT(cobalt_list_get(list, 0) == &a);
+
+    /* No more matches */
+    TEST_ASSERT(cobalt_list_remove_if(list, predicate_gte2, NULL) == -1);
+
+    /* NULL predicate should fail */
+    TEST_ASSERT(cobalt_list_remove_if(list, NULL, NULL) == -1);
+    TEST_ASSERT(cobalt_list_remove_if(NULL, predicate_gte2, NULL) == -1);
+
+    cobalt_list_destroy(list);
+    printf("  List remove_if test passed\n");
+}
+
 void test_list(void)
 {
     printf("Testing list...\n");
@@ -263,5 +307,6 @@ void test_list(void)
     test_list_get();
     test_list_iterator();
     test_list_remove();
+    test_list_remove_if();
     printf("  List tests completed\n");
 }

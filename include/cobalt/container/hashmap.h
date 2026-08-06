@@ -17,26 +17,12 @@
  */
 
 /**
- * @brief Hash map node type definition
+ * @brief Opaque type definition for the hash map node
  */
 typedef struct cobalt_hashmap_node cobalt_hashmap_node_t;
 
 /**
- * @brief Hash map node structure
- * @details Linked list node used to resolve collisions via separate chaining within the same
- * bucket.
- */
-struct cobalt_hashmap_node {
-    const char *key;   /**< The string key of the node */
-    void       *value; /**< Pointer to the value stored in the node */
-    cobalt_hashmap_node_t
-        *next; /**< Pointer to the next collision node (for the collision chain) */
-};
-
-/**
  * @brief Opaque type definition for the hash map structure
- * @details Simplified implementation: currently there is no Map interface layer. The actual
- * implementation is hidden in the .c file.
  */
 typedef struct cobalt_hashmap cobalt_hashmap_t;
 

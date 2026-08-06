@@ -154,6 +154,18 @@ cobalt_iterator_t *cobalt_list_iterator_create(cobalt_list_t *list);
  */
 int cobalt_list_remove(cobalt_list_t *list, void *item);
 
+/**
+ * @brief Remove the first element for which the predicate returns non-zero
+ *
+ * @param list Pointer to the target list
+ * @param predicate Function that returns non-zero for elements to remove
+ * @param user_data Opaque pointer passed to the predicate
+ * @return Returns 0 on success; returns -1 if list is NULL, predicate is NULL, or no element matches.
+ */
+int cobalt_list_remove_if(cobalt_list_t *list,
+                          int (*predicate)(const void *item, void *user_data),
+                          void *user_data);
+
 /** @} */
 
 #endif /* LIST_H */

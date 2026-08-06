@@ -31,6 +31,15 @@ typedef struct {
 } hashmap_impl_t;
 
 /**
+ * @brief Opaque hash map node structure
+ */
+struct cobalt_hashmap_node {
+    char               *key;
+    void               *value;
+    cobalt_hashmap_node_t *next;
+};
+
+/**
  * @brief Hash map type definition, encapsulating the specific implementation
  */
 struct cobalt_hashmap {

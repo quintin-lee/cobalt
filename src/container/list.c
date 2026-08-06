@@ -67,6 +67,7 @@ static void list_add_seq(cobalt_sequence_t *self, void *item)
     cobalt_list_impl_t *list = (cobalt_list_impl_t *)self;
     list_node_t        *node = malloc(sizeof(list_node_t));
     if (!node) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return;
     }
     node->data = item;
@@ -436,6 +437,39 @@ int cobalt_list_remove(cobalt_list_t *list, void *item)
 
     while (node) {
         if (node->data == item) {
+            if (prev) {
+                prev->next = node->next;
+            } else {
+                impl->head = node->next;
+            }
+            if (node->next) {
+                node->next->prev = prev;
+            } else {
+                impl->tail = prev;
+            }
+            free(node);
+            impl->size--;
+            return 0;
+        }
+        prev = node;
+        node = node->next;
+    }
+    return -1;
+}
+
+int cobalt_list_remove_if(cobalt_list_t *list,
+                          int (*predicate)(const void *item, void *user_data),
+                          void *user_data)
+{
+    if (!list || !predicate) {
+        return -1;
+    }
+    cobalt_list_impl_t *impl = (cobalt_list_impl_t *)list;
+    list_node_t        *node = impl->head;
+    list_node_t        *prev = NULL;
+
+    while (node) {
+        if (predicate(node->data, user_data)) {
             if (prev) {
                 prev->next = node->next;
             } else {

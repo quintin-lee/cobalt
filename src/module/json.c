@@ -3,8 +3,8 @@
  * @brief Implementation of JSON query and memory management interfaces
  */
 #include "cobalt/module/json.h"
-#include "json_parse.c"
-#include "json_serialize.c"
+#include <stdlib.h>
+#include <string.h>
 
 /*
  * @brief Safely get the numeric value of a JSON node
