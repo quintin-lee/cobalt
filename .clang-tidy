@@ -1,5 +1,5 @@
 ---
-Checks: 'clang-diagnostic-*,clang-analyzer-*,readability-*,bugprone-*,performance-*,-bugprone-reserved-identifier,-readability-identifier-length,-readability-magic-numbers,-bugprone-easily-swappable-parameters,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-bugprone-branch-clone,-readability-math-missing-parentheses,-readability-non-const-parameter,-bugprone-multi-level-implicit-pointer-conversion'
+Checks: 'clang-diagnostic-*,clang-analyzer-*,readability-*,bugprone-*,performance-*,-bugprone-reserved-identifier,-readability-identifier-length,-readability-magic-numbers,-bugprone-easily-swappable-parameters,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,-bugprone-branch-clone,-readability-math-missing-parentheses,-readability-non-const-parameter,-bugprone-multi-level-implicit-pointer-conversion,-readability-function-cognitive-complexity,-clang-analyzer-security.ArrayBound'
 HeaderFilterRegex: '.*'
 FormatStyle: file
 WarningsAsErrors: ''

@@ -122,13 +122,13 @@ static void heap_sift_down(timer_entry_t **heap, int count, int idx)
     }
 }
 
-static void heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
+static int heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
 {
     if (loop->timer_count >= loop->timer_capacity) {
         int             new_cap  = loop->timer_capacity * 2;
         timer_entry_t **new_heap = realloc(loop->timer_heap, sizeof(timer_entry_t *) * new_cap);
         if (!new_heap) {
-            return;
+            return -1;
         }
         loop->timer_heap     = new_heap;
         loop->timer_capacity = new_cap;
@@ -136,6 +136,7 @@ static void heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
     loop->timer_heap[loop->timer_count] = entry;
     heap_sift_up(loop->timer_heap, loop->timer_count);
     loop->timer_count++;
+    return 0;
 }
 
 static timer_entry_t *heap_pop_min(cobalt_eventloop_t *loop)
@@ -199,7 +200,7 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
 {
     int                  timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
     const timer_entry_t *next       = heap_peek(loop);
-    if (next) {
+    if (next && now) {
         long secs  = next->next_fire.tv_sec - now->tv_sec;
         long nsecs = next->next_fire.tv_nsec - now->tv_nsec;
         timeout_ms = (int)((secs * COBALT_MILLIS_PER_SEC) + (nsecs / COBALT_NANOS_PER_MILLI));
@@ -491,7 +492,10 @@ uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t  *loop,
         entry->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
     }
 
-    heap_push(loop, entry);
+    if (heap_push(loop, entry) != 0) {
+        free(entry);
+        return 0;
+    }
     return timer_id;
 }
 

@@ -46,7 +46,8 @@ cobalt_bsearch(const void *key, const void *base, size_t nmemb, size_t size, com
 
         if (cmp == 0) {
             return (void *)(arr + mid * size);
-        } else if (cmp < 0) {
+        }
+        if (cmp < 0) {
             right = mid;
         } else {
             left = mid + 1;

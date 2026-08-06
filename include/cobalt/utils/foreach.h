@@ -18,9 +18,9 @@
  * @param seq  cobalt_sequence_t* (or any type that casts to it)
  */
 #define cobalt_foreach(var, seq)                                                                   \
-    for (cobalt_iterator_t *_foreach_iter = cobalt_iterator_new((cobalt_sequence_t *)(seq));       \
+    for (cobalt_iterator_t *_foreach_iter = cobalt_iterator_new(((cobalt_sequence_t *)(seq)));     \
          _foreach_iter != NULL &&                                                                  \
-         (var = cobalt_iterator_next(_foreach_iter), _foreach_iter != NULL);                       \
+         ((var) = cobalt_iterator_next(_foreach_iter), _foreach_iter != NULL);                     \
          cobalt_iterator_destroy(_foreach_iter), _foreach_iter = NULL)
 
 /**
@@ -29,9 +29,11 @@
  * @param seq   cobalt_vector_t*
  */
 #define cobalt_foreach_rev(var, seq)                                                               \
-    for (size_t _foreach_idx = cobalt_vector_size((cobalt_vector_t *)(seq)); _foreach_idx > 0;     \
+    for (size_t _foreach_idx = cobalt_vector_size(((cobalt_vector_t *)(seq))); _foreach_idx > 0;   \
          --_foreach_idx)                                                                           \
-        for (var = cobalt_vector_get((cobalt_vector_t *)(seq), _foreach_idx - 1); var != NULL;     \
-             var = (void *)0)
+        for (((var)) =                                                                             \
+                 cobalt_vector_get(((cobalt_vector_t *)(seq)), ((_foreach_idx) - (size_t)1));      \
+             (var) != NULL;                                                                        \
+             (var) = (void *)0)
 
 #endif /* COBALT_FOREACH_H */

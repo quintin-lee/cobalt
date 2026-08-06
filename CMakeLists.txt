@@ -69,12 +69,14 @@ target_include_directories(cobalt PUBLIC
 )
 
 # Automatically run clang-format checks on build when COBALT_RUN_FORMAT is ON
+# Uses DEPENDS to only trigger when source files are modified
 if(COBALT_RUN_FORMAT AND CLANG_FORMAT_EXECUTABLE)
     add_custom_command(
         TARGET cobalt POST_BUILD
         COMMAND ${CLANG_FORMAT_EXECUTABLE} --dry-run --Werror --style=file ${ALL_SRC_FILES}
         COMMENT "Checking code formatting..."
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        DEPENDS ${ALL_SRC_FILES}
     )
 endif()
 

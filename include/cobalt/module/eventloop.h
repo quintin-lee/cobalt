@@ -64,7 +64,7 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop);
  * @return Returns 0 on success, -1 on failure
  */
 int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
-                            cobalt_fd_t         file_descriptor,
+                            cobalt_fd_t         fd,
                             cobalt_events_t     events,
                             fd_handler_t        callback,
                             void               *user_data);
@@ -72,14 +72,14 @@ int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
 /**
  * @brief Modify the listening events of an already registered file descriptor
  * @param loop Event loop object
- * @param file_descriptor Already registered file descriptor
+ * @param fd Already registered file descriptor
  * @param events New listening event type
  * @param callback New callback function
  * @param user_data New user data to pass to the callback function
  * @return Returns 0 on success, -1 on failure
  */
 int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
-                            cobalt_fd_t         file_descriptor,
+                            cobalt_fd_t         fd,
                             cobalt_events_t     events,
                             fd_handler_t        callback,
                             void               *user_data);
@@ -87,10 +87,10 @@ int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
 /**
  * @brief Remove a file descriptor event listener
  * @param loop Event loop object
- * @param file_descriptor File descriptor to remove
+ * @param fd File descriptor to remove
  * @return Returns 0 on success, -1 on failure
  */
-int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t file_descriptor);
+int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd);
 
 /**
  * @brief Add a timer

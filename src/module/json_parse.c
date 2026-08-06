@@ -22,8 +22,8 @@ struct json_node {
  */
 typedef struct {
     const char *str; /**< The JSON string to be parsed */
-    int         pos; /**< The current character position being parsed */
-    int         len; /**< Total length of the string */
+    size_t      pos; /**< The current character position being parsed */
+    size_t      len; /**< Total length of the string */
 } json_parse_ctx_t;
 
 static inline int is_space(int c)
@@ -315,20 +315,20 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
     }
 
     if (c == '-' || isdigit((unsigned char)c)) {
-        int start = ctx->pos;
+        size_t start = ctx->pos;
         // Simple handling: skip all digits, minus sign, decimal point
         while (ctx->pos < ctx->len &&
                (isdigit((unsigned char)ctx->str[ctx->pos]) || ctx->str[ctx->pos] == '.')) {
             ctx->pos++;
         }
-        int   num_len = ctx->pos - start;
-        char *num_str = malloc(num_len + 1);
+        size_t num_len = ctx->pos - start;
+        char  *num_str = malloc(num_len + 1);
         if (!num_str) {
             return NULL;
         }
         strncpy(num_str, ctx->str + start, num_len);
         num_str[num_len] = '\0';
-        double val       = atof(num_str);
+        double val       = strtod(num_str, NULL);
         free(num_str);
 
         json_node_t *node  = json_node_create(JSON_NUMBER);
@@ -362,7 +362,7 @@ json_node_t *json_parse(const char *text)
     if (!text) {
         return NULL;
     }
-    int len = strlen(text);
+    size_t len = strlen(text);
     if (len == 0) {
         return NULL;
     }

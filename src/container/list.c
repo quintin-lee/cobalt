@@ -133,7 +133,7 @@ static void *list_get_at_index_seq(cobalt_sequence_t *self, size_t index)
 static cobalt_iterator_t *list_iterator_seq(cobalt_sequence_t *self)
 {
     cobalt_list_t *list = (cobalt_list_t *)self;
-    return cobalt_list_iterator_create((cobalt_list_t *)list);
+    return cobalt_list_iterator_create(list);
 }
 
 /* ========================================================================= */
@@ -172,7 +172,7 @@ void cobalt_list_destroy(cobalt_list_t *list)
     if (!list) {
         return;
     }
-    cobalt_list_t      *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = list;
     cobalt_list_node_t *node = impl->head;
 
     while (node) {
@@ -191,7 +191,7 @@ int cobalt_list_push_front(cobalt_list_t *list, void *item)
     if (!list) {
         return -1;
     }
-    cobalt_list_t      *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = list;
     cobalt_list_node_t *node = malloc(sizeof(cobalt_list_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
@@ -219,7 +219,7 @@ int cobalt_list_push_back(cobalt_list_t *list, void *item)
     if (!list) {
         return -1;
     }
-    cobalt_list_t      *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = list;
     cobalt_list_node_t *node = malloc(sizeof(cobalt_list_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
@@ -248,7 +248,7 @@ void *cobalt_list_pop_front(cobalt_list_t *list)
         cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
-    cobalt_list_t      *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = list;
     cobalt_list_node_t *node = impl->head;
 
     list->head = node->next;
@@ -272,7 +272,7 @@ void *cobalt_list_pop_back(cobalt_list_t *list)
         cobalt_error_set(NULL, COBALT_ERROR_EMPTY_CONTAINER);
         return NULL;
     }
-    cobalt_list_t      *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = list;
     cobalt_list_node_t *node = impl->tail;
 
     list->tail = node->prev;
@@ -296,7 +296,7 @@ void *cobalt_list_get(const cobalt_list_t *list, size_t index)
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
         return NULL;
     }
-    cobalt_list_t *impl = (cobalt_list_t *)list;
+    const cobalt_list_t *impl = list;
     if (index >= impl->size) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_BOUNDS);
         return NULL;
@@ -397,7 +397,7 @@ cobalt_iterator_t *cobalt_list_iterator_create(cobalt_list_t *list)
         return NULL;
     }
 
-    cobalt_list_t        *impl      = (cobalt_list_t *)list;
+    cobalt_list_t        *impl      = list;
     list_iterator_impl_t *iter_data = malloc(sizeof(list_iterator_impl_t));
     if (!iter_data) {
         return NULL;
@@ -427,7 +427,7 @@ int cobalt_list_remove(cobalt_list_t *list, void *item)
     if (!list || !item) {
         return -1;
     }
-    cobalt_list_t      *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = list;
     cobalt_list_node_t *node = impl->head;
     cobalt_list_node_t *prev = NULL;
 
@@ -463,7 +463,7 @@ int cobalt_list_remove_if(cobalt_list_t *list,
     if (!list || !predicate) {
         return -1;
     }
-    cobalt_list_t      *impl = (cobalt_list_t *)list;
+    cobalt_list_t      *impl = list;
     cobalt_list_node_t *node = impl->head;
     cobalt_list_node_t *prev = NULL;
 
