@@ -6,6 +6,7 @@
 #include "cobalt/container/treemap.h"
 #include "cobalt/platform/debug_assert.h"
 #include "cobalt/utils/string.h"
+#include "cobalt/runtime/error.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -29,10 +30,12 @@ static treemap_node_t *create_node(const char *key, void *value)
 {
     treemap_node_t *node = malloc(sizeof(treemap_node_t));
     if (!node) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     node->key = cobalt_strdup(key);
     if (!node->key) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         free(node);
         return NULL;
     }
@@ -158,6 +161,7 @@ cobalt_treemap_t *cobalt_treemap_create(void)
 {
     cobalt_treemap_t *map = malloc(sizeof(cobalt_treemap_t));
     if (!map) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     map->impl.root = NULL;

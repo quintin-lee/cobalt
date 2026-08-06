@@ -30,6 +30,7 @@ cobalt_set_t *cobalt_set_create(size_t initial_capacity)
 {
     cobalt_set_t *set = malloc(sizeof(cobalt_set_t));
     if (!set) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
 
