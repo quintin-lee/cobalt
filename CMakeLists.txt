@@ -56,6 +56,7 @@ set(SOURCES
     src/module/json_serialize.c
     src/module/eventloop.c
     src/interface/iterator.c
+    src/interface/map.c
     src/utils/string.c
 )
 

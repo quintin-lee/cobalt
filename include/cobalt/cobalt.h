@@ -30,6 +30,7 @@
 /* --- Abstract interfaces --- */
 #include <cobalt/interface/iterator.h>
 #include <cobalt/interface/sequence.h>
+#include <cobalt/interface/map.h>
 #include <cobalt/utils/foreach.h>
 #include <cobalt/utils/string.h>
 

@@ -24,6 +24,7 @@ void test_queue(void);
 void test_set(void);
 void test_deque(void);
 void test_iterator(void);
+void test_map_interface(void);
 
 /* Test function registry */
 typedef struct {
@@ -54,6 +55,7 @@ static const TestEntry test_registry[] = {
     {"set", test_set},
     {"deque", test_deque},
     {"iterator", test_iterator},
+    {"map", test_map_interface},
 };
 
 static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);
