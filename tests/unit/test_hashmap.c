@@ -4,6 +4,7 @@
  */
 
 #include "cobalt/container/hashmap.h"
+#include "cobalt/container/set.h"
 #include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -135,4 +136,102 @@ void test_hashmap(void)
     test_hashmap_zero_initial_capacity();
     test_hashmap_resize_stress();
     printf("  Hashmap tests completed\n");
+}
+
+/* -------------------------------------------------------------------------- */
+/* Generic (ext) API tests                                                    */
+/* -------------------------------------------------------------------------- */
+
+/* Djb2 hash for int keys */
+static unsigned int hash_int(const void *key, size_t key_len)
+{
+    (void)key_len;
+    const int *k = (const int *)key;
+    unsigned int h = 5381;
+    for (size_t i = 0; i < sizeof(int); i++) {
+        h = h * 33 + ((const unsigned char *)k)[i];
+    }
+    return h;
+}
+
+static int equal_int(const void *a, const void *b, size_t key_len)
+{
+    (void)key_len;
+    return *(const int *)a == *(const int *)b;
+}
+
+void test_hashmap_ext_int_keys(void)
+{
+    printf("Testing hashmap ext with int keys...\n");
+    cobalt_hashmap_t *map = cobalt_hashmap_create_ext(8, hash_int, equal_int);
+    TEST_ASSERT(map != NULL);
+
+    int key1 = 42, key2 = 99;
+    static int val_a = 100, val_b = 200;
+
+    TEST_ASSERT(cobalt_hashmap_put_ext(map, &key1, sizeof(int), &val_a) == 0);
+    TEST_ASSERT(cobalt_hashmap_put_ext(map, &key2, sizeof(int), &val_b) == 0);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 2);
+
+    int *got = (int *)cobalt_hashmap_get_ext(map, &key1, sizeof(int));
+    TEST_ASSERT(got != NULL);
+    TEST_EQUAL(*got, 100);
+
+    got = (int *)cobalt_hashmap_get_ext(map, &key2, sizeof(int));
+    TEST_ASSERT(got != NULL);
+    TEST_EQUAL(*got, 200);
+
+    /* Update existing key */
+    static int val_a2 = 999;
+    TEST_ASSERT(cobalt_hashmap_put_ext(map, &key1, sizeof(int), &val_a2) == 0);
+    got = (int *)cobalt_hashmap_get_ext(map, &key1, sizeof(int));
+    TEST_ASSERT(got != NULL);
+    TEST_EQUAL(*got, 999);
+
+    /* Remove */
+    TEST_ASSERT(cobalt_hashmap_remove_ext(map, &key1, sizeof(int)) == 0);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 1);
+    TEST_ASSERT(cobalt_hashmap_get_ext(map, &key1, sizeof(int)) == NULL);
+
+    cobalt_hashmap_destroy(map);
+    printf("  hashmap ext int keys: OK\n");
+}
+
+void test_hashmap_ext_null_callbacks(void)
+{
+    printf("Testing hashmap ext with NULL callbacks (string mode)...\n");
+    cobalt_hashmap_t *map = cobalt_hashmap_create_ext(8, NULL, NULL);
+    TEST_ASSERT(map != NULL);
+
+    static int val = 77;
+    TEST_ASSERT(cobalt_hashmap_put(map, "hello", &val) == 0);
+    int *got = (int *)cobalt_hashmap_get(map, "hello");
+    TEST_ASSERT(got != NULL);
+    TEST_EQUAL(*got, 77);
+
+    cobalt_hashmap_destroy(map);
+    printf("  hashmap ext NULL callbacks: OK\n");
+}
+
+void test_set_ext_int_elements(void)
+{
+    printf("Testing set ext with int elements...\n");
+    cobalt_set_t *set = cobalt_set_create_ext(8, hash_int, equal_int);
+    TEST_ASSERT(set != NULL);
+
+    int a = 10, b = 20, c = 10;
+    TEST_ASSERT(cobalt_set_insert_ext(set, &a, sizeof(int)) == 0);
+    TEST_ASSERT(cobalt_set_insert_ext(set, &b, sizeof(int)) == 0);
+    TEST_ASSERT(cobalt_set_insert_ext(set, &c, sizeof(int)) == 0); /* duplicate */
+    TEST_ASSERT(cobalt_set_size(set) == 2);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &a, sizeof(int)) == 1);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &b, sizeof(int)) == 1);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &c, sizeof(int)) == 1);
+
+    TEST_ASSERT(cobalt_set_remove_ext(set, &a, sizeof(int)) == 0);
+    TEST_ASSERT(cobalt_set_size(set) == 1);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &a, sizeof(int)) == 0);
+
+    cobalt_set_destroy(set);
+    printf("  set ext int elements: OK\n");
 }
