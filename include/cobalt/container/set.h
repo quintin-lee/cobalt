@@ -138,4 +138,14 @@ int cobalt_set_is_empty(const cobalt_set_t *set);
  */
 cobalt_map_iterator_t *cobalt_set_iterator_create(cobalt_set_t *set);
 
+/**
+ * @brief Get the value associated with an element (via map interface sentinel)
+ * @param set Set instance
+ * @param item Element to look up
+ * @return Non-NULL pointer if element exists (returns internal sentinel), NULL if not found
+ * @note This function exists for API symmetry with HashMap/TreeMap.
+ *       Use cobalt_set_contains() to check existence without the sentinel.
+ */
+void *cobalt_set_get(const cobalt_set_t *set, void *item);
+
 #endif /* SET_H */

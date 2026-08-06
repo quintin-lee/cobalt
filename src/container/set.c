@@ -197,10 +197,29 @@ int cobalt_set_is_empty(const cobalt_set_t *set)
     return set ? cobalt_hashmap_size(set->map) == 0 : 1;
 }
 
+/// @brief Get the internal sentinel pointer for an element (via map interface)
+/// @param set Set instance
+/// @param item Element to look up
+/// @return Non-NULL pointer if element exists (internal sentinel), NULL if not found
+/// @note Prefer cobalt_set_contains() for existence checks.
+void *cobalt_set_get(const cobalt_set_t *set, void *item)
+{
+    if (!set || !item) {
+        return NULL;
+    }
+    return cobalt_hashmap_get(set->map, (const char *)item);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Public iterator factory                                                    */
 /* -------------------------------------------------------------------------- */
 
+/// @brief Create a map iterator for this set
+/// @param set Set instance
+/// @return Iterator pointer, or NULL on failure
+/// @note Returns a cobalt_map_iterator_t compatible with the Map interface.
+///       The value field of each yielded pair is the internal sentinel.
+///       Destroy with cobalt_map_iterator_destroy().
 cobalt_map_iterator_t *cobalt_set_iterator_create(cobalt_set_t *set)
 {
     if (!set) {

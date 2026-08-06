@@ -73,6 +73,11 @@ add_executable(benchmark_vector benchmark/benchmark_vector.c)
 target_link_libraries(benchmark_vector cobalt)
 
 add_executable(benchmark_set benchmark/benchmark_set.c)
+add_executable(benchmark_set_map benchmark/benchmark_set_map.c)
+target_link_libraries(benchmark_set_map cobalt)
+
+add_test(NAME bench_set_map COMMAND benchmark_set_map
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
 target_link_libraries(benchmark_set cobalt)
 
 add_executable(benchmark_deque benchmark/benchmark_deque.c)
