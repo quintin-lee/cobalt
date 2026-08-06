@@ -25,10 +25,10 @@ HashMap and TreeMap share the same key-value operations (put/get/remove/size) bu
 ```c
 typedef struct cobalt_map cobalt_map_t;
 
-struct cobalt_map_pair {
+typedef struct cobalt_map_pair {
     const void *key;
     void       *value;
-};
+} cobalt_map_pair_t;
 
 struct cobalt_map {
     /* Get value for key. Returns NULL if not found. */
@@ -130,7 +130,7 @@ cobalt_hashmap_destroy((cobalt_hashmap_t *)map);
 | File | Change |
 |------|--------|
 | `include/cobalt/interface/map.h` | **New** — Map interface and iterator definitions |
-| `include/cobalt/interface/iterator.h` | Add map pair typedef |
+
 | `include/cobalt/container/hashmap.h` | Add iterator factory declaration |
 | `include/cobalt/container/treemap.h` | Add iterator factory declaration |
 | `src/container/hashmap.c` | Embed `cobalt_map_t base`, implement iterator |
