@@ -93,13 +93,12 @@ static void *deque_get_at_index_seq(cobalt_sequence_t *self, size_t index)
             node = node->next;
         }
         return node->data;
-    } else {
-        deque_node_t *node = deque->tail;
-        for (size_t i = deque->size - 1; i > index; i--) {
-            node = node->prev;
-        }
-        return node->data;
     }
+    deque_node_t *node = deque->tail;
+    for (size_t i = deque->size - 1; i > index; i--) {
+        node = node->prev;
+    }
+    return node->data;
 }
 
 static cobalt_iterator_t *deque_iterator_seq(cobalt_sequence_t *self)
@@ -139,13 +138,11 @@ void cobalt_deque_destroy(cobalt_deque_t *deque)
     }
 
     deque_node_t *node = deque->head;
-    // Iterate through the doubly-linked list, free the memory of each node
     while (node) {
         deque_node_t *next = node->next;
         free(node);
         node = next;
     }
-    // Free the queue structure itself
     free(deque);
 }
 
@@ -158,7 +155,6 @@ int cobalt_deque_push_front(cobalt_deque_t *deque, void *item)
         return -1;
     }
 
-    // Create a new node
     deque_node_t *node = malloc(sizeof(deque_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
@@ -167,17 +163,14 @@ int cobalt_deque_push_front(cobalt_deque_t *deque, void *item)
 
     node->data = item;
     node->prev = NULL;
-    node->next = deque->head; // New node points to current head node
+    node->next = deque->head;
 
-    // If the original queue is not empty, update the previous pointer of the original head node
     if (deque->head) {
         deque->head->prev = node;
     } else {
-        // If the original queue is empty, the tail node also points to the new node
         deque->tail = node;
     }
-
-    deque->head = node; // Update head node to new node
+    deque->head = node;
     deque->size++;
     return 0;
 }
@@ -191,7 +184,6 @@ int cobalt_deque_push_back(cobalt_deque_t *deque, void *item)
         return -1;
     }
 
-    // Create a new node
     deque_node_t *node = malloc(sizeof(deque_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
@@ -200,17 +192,14 @@ int cobalt_deque_push_back(cobalt_deque_t *deque, void *item)
 
     node->data = item;
     node->next = NULL;
-    node->prev = deque->tail; // Previous pointer of new node points to current tail node
+    node->prev = deque->tail;
 
-    // If the original queue is not empty, update the next pointer of the original tail node
     if (deque->tail) {
         deque->tail->next = node;
     } else {
-        // If the original queue is empty, the head node also points to the new node
         deque->head = node;
     }
-
-    deque->tail = node; // Update tail node to new node
+    deque->tail = node;
     deque->size++;
     return 0;
 }
@@ -228,16 +217,13 @@ void *cobalt_deque_pop_front(cobalt_deque_t *deque)
     deque_node_t *node = deque->head;
     void         *data = node->data;
 
-    // Move head pointer backward
     deque->head = node->next;
     if (deque->head) {
-        deque->head->prev = NULL; // Nullify previous pointer of the new head node
+        deque->head->prev = NULL;
     } else {
-        // If the queue is empty after removal, the tail pointer must also be nullified
         deque->tail = NULL;
     }
-
-    free(node); // Free the memory of the original head node
+    free(node);
     deque->size--;
     return data;
 }
@@ -255,16 +241,13 @@ void *cobalt_deque_pop_back(cobalt_deque_t *deque)
     deque_node_t *node = deque->tail;
     void         *data = node->data;
 
-    // Move tail pointer forward
     deque->tail = node->prev;
     if (deque->tail) {
-        deque->tail->next = NULL; // Nullify next pointer of the new tail node
+        deque->tail->next = NULL;
     } else {
-        // If the queue is empty after removal, the head pointer must also be nullified
         deque->head = NULL;
     }
-
-    free(node); // Free the memory of the original tail node
+    free(node);
     deque->size--;
     return data;
 }
@@ -306,6 +289,5 @@ size_t cobalt_deque_size(const cobalt_deque_t *deque)
  */
 int cobalt_deque_is_empty(const cobalt_deque_t *deque)
 {
-    // If deque is NULL, it is also treated as an empty queue and returns 1
     return deque ? deque->size == 0 : 1;
 }
