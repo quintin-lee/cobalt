@@ -8,6 +8,7 @@
  */
 
 #include <stddef.h>
+#include "cobalt/interface/map.h"
 
 /**
  * @defgroup treemap Tree Map (TreeMap)
@@ -80,5 +81,14 @@ const char *cobalt_treemap_max_key(cobalt_treemap_t *map);
 size_t cobalt_treemap_size(const cobalt_treemap_t *map);
 
 /** @} */
+
+/**
+ * @brief Create a map iterator for this tree map
+ * @param map Tree map instance
+ * @return Iterator pointer, or NULL on failure
+ * @note Returns a cobalt_map_iterator_t compatible with the Map interface.
+ *       Destroy with cobalt_map_iterator_destroy().
+ */
+cobalt_map_iterator_t *cobalt_treemap_iterator_create(cobalt_treemap_t *map);
 
 #endif /* TREEMAP_H */

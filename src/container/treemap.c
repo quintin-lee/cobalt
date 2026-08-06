@@ -509,15 +509,46 @@ static void treemap_map_destroy(cobalt_map_t *self)
     cobalt_treemap_destroy(map);
 }
 
+static int treemap_map_contains(cobalt_map_t *self, const void *key, size_t key_len)
+{
+    (void)key_len;
+    cobalt_treemap_t *map = (cobalt_treemap_t *)self;
+    return rb_find(map->impl.root, (const char *)key) != NULL;
+}
+
+static void treemap_map_clear(cobalt_map_t *self)
+{
+    cobalt_treemap_t *map = (cobalt_treemap_t *)self;
+    if (map->impl.root) {
+        rb_destroy_tree(map->impl.root);
+        map->impl.root = NULL;
+    }
+    map->impl.size = 0;
+}
+
 static const cobalt_map_t treemap_map_vtable = {
     .get      = treemap_map_get,
     .put      = treemap_map_put,
     .remove   = treemap_map_remove,
+    .contains = treemap_map_contains,
+    .clear    = treemap_map_clear,
     .size     = treemap_map_size,
     .is_empty = treemap_map_is_empty,
     .iterator = treemap_map_iterator,
     .destroy  = treemap_map_destroy,
 };
+
+/* ========================================================================= */
+/* Public iterator factory                                                    */
+/* ========================================================================= */
+
+cobalt_map_iterator_t *cobalt_treemap_iterator_create(cobalt_treemap_t *map)
+{
+    if (!map) {
+        return NULL;
+    }
+    return treemap_map_iterator((cobalt_map_t *)map);
+}
 
 /* ========================================================================= */
 /* Public API                                                                 */

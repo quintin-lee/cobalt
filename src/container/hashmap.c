@@ -181,15 +181,63 @@ static void hashmap_map_destroy(cobalt_map_t *self)
     cobalt_hashmap_destroy(map);
 }
 
+static int hashmap_map_contains(cobalt_map_t *self, const void *key, size_t key_len)
+{
+    cobalt_hashmap_t *map = (cobalt_hashmap_t *)self;
+    return cobalt_hashmap_get_ext(map, key, key_len) != NULL;
+}
+
+static void hashmap_free_node(hashmap_impl_t *impl, hashmap_node_t *node)
+{
+    if (node->key_owned) {
+        free(node->key);
+    }
+    free(node);
+    (void)impl;
+}
+
+static void hashmap_map_clear(cobalt_map_t *self)
+{
+    cobalt_hashmap_t *map = (cobalt_hashmap_t *)self;
+    hashmap_impl_t   *impl = &map->impl;
+    if (!impl->buckets) {
+        return;
+    }
+    for (size_t i = 0; i < impl->bucket_count; i++) {
+        hashmap_node_t *node = impl->buckets[i];
+        while (node) {
+            hashmap_node_t *next = node->next;
+            hashmap_free_node(impl, node);
+            node = next;
+        }
+        impl->buckets[i] = NULL;
+    }
+    impl->size = 0;
+}
+
 static const cobalt_map_t hashmap_map_vtable = {
     .get      = hashmap_map_get,
     .put      = hashmap_map_put,
     .remove   = hashmap_map_remove,
+    .contains = hashmap_map_contains,
+    .clear    = hashmap_map_clear,
     .size     = hashmap_map_size,
     .is_empty = hashmap_map_is_empty,
     .iterator = hashmap_map_iterator,
     .destroy  = hashmap_map_destroy,
 };
+
+/* -------------------------------------------------------------------------- */
+/* Public iterator factory                                                    */
+/* -------------------------------------------------------------------------- */
+
+cobalt_map_iterator_t *cobalt_hashmap_iterator_create(cobalt_hashmap_t *map)
+{
+    if (!map) {
+        return NULL;
+    }
+    return hashmap_map_iterator((cobalt_map_t *)map);
+}
 
 /* -------------------------------------------------------------------------- */
 /* Internal helpers                                                          */
@@ -241,14 +289,6 @@ static int hashmap_ensure_buckets(hashmap_impl_t *impl, size_t min_buckets)
     return 0;
 }
 
-static void hashmap_free_node(hashmap_impl_t *impl, hashmap_node_t *node)
-{
-    if (node->key_owned) {
-        free(node->key);
-    }
-    free(node);
-    (void)impl;
-}
 
 /* -------------------------------------------------------------------------- */
 /* Public API — string-based (backward compatible)                           */

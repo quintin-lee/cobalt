@@ -132,6 +132,8 @@ add_executable(examples_vector_demo examples/vector_demo.c)
 target_link_libraries(examples_vector_demo cobalt)
 
 add_executable(examples_hashmap_demo examples/hashmap_demo.c)
+add_executable(examples_map_demo examples/map_demo.c)
+target_link_libraries(examples_map_demo cobalt)
 target_link_libraries(examples_hashmap_demo cobalt)
 
 add_executable(examples_arena_allocator examples/arena_allocator.c)

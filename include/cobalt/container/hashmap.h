@@ -10,6 +10,7 @@
  */
 
 #include <stddef.h>
+#include "cobalt/interface/map.h"
 
 /**
  * @defgroup hashmap Hash Map (HashMap)
@@ -150,5 +151,14 @@ size_t cobalt_hashmap_size(const cobalt_hashmap_t *map);
 size_t cobalt_hashmap_capacity(const cobalt_hashmap_t *map);
 
 /** @} */
+
+/**
+ * @brief Create a map iterator for this hash map
+ * @param map Hash map instance
+ * @return Iterator pointer, or NULL on failure
+ * @note Returns a cobalt_map_iterator_t compatible with the Map interface.
+ *       Destroy with cobalt_map_iterator_destroy().
+ */
+cobalt_map_iterator_t *cobalt_hashmap_iterator_create(cobalt_hashmap_t *map);
 
 #endif /* HASHMAP_H */
