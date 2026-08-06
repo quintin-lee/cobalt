@@ -78,3 +78,15 @@ target_link_libraries(benchmark_deque cobalt)
 
 add_executable(benchmark_treemap benchmark/benchmark_treemap.c)
 target_link_libraries(benchmark_treemap cobalt)
+
+# Register benchmarks with CTest
+add_test(NAME bench_vector COMMAND benchmark_vector
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+add_test(NAME bench_hashmap COMMAND benchmark_hashmap
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+add_test(NAME bench_treemap COMMAND benchmark_treemap
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+add_test(NAME bench_set COMMAND benchmark_set
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+add_test(NAME bench_deque COMMAND benchmark_deque
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
