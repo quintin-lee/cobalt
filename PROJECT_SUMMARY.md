@@ -160,4 +160,4 @@ All core features implemented and tested. Future enhancements:
 4. ~~Publish to package managers~~ ✅ Done (vcpkg, Conan)
 5. Add Windows IOCP support for event loop
 6. Implement Stream Operators (map/filter/fold) per SPEC
-7. Add List value-based remove (FIXME in list.c)
+7. ~~Add List value-based remove~~ ✅ Done (cobalt_list_remove_if)
