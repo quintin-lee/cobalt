@@ -13,6 +13,13 @@ option(COBALT_BUILD_EXAMPLES "Build examples" ON)
 option(COBALT_RUN_TIDY "Run clang-tidy checks" OFF)
 option(COBALT_RUN_FORMAT "Run clang-format checks" OFF)
 option(COBALT_BUILD_COVERAGE "Build with coverage instrumentation" OFF)
+option(COBALT_RUN_ASAN "Build with AddressSanitizer" OFF)
+
+# ASAN build flags
+if(COBALT_RUN_ASAN)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+endif()
 
 # Coverage build flags
 if(COBALT_BUILD_COVERAGE)

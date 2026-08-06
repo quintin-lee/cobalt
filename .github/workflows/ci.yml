@@ -1,144 +1,29 @@
-name: Cobalt CI
+name : CI
 
-on:
-  push:
-    branches: [ master, main ]
-  pull_request:
-    branches: [ master, main ]
+           on : push : branches : [ master, main ] pull_request : branches : [ master, main ]
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
+                                                                             jobs : build : runs -
+                                                                                            on
+    : ubuntu -
+      latest strategy : matrix : build_type : [ Debug, Release ] compiler : [ gcc, clang ] steps
+    : -uses : actions /
+              checkout @v4
 
-    strategy:
-      matrix:
-        build_type: [Release, Debug]
+      -
+      name : Install dependencies run : sudo apt - get install - y clang - tidy clang - format
 
-    steps:
-    - uses: actions/checkout@v4
+                                        -
+                                        name : Configure run
+    : |
+      mkdir - p build &&cd build cmake..- DCMAKE_BUILD_TYPE =
+    ${{matrix.build_type}} - DCMAKE_C_COMPILER = ${{matrix.compiler}} - DCOBALT_RUN_TIDY =
+                                                     ON - DCOBALT_RUN_FORMAT = ON
 
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
+                                                                               - name : Build run
+    : cmake-- build build-- parallel
 
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{matrix.build_type}} --parallel
+      -
+      name : Test run : ctest-- test - dir build-- output - on - failure
 
-    - name: Run tests
-      working-directory: ${{github.workspace}}/build
-      run: ctest --output-on-failure --parallel
-
-    - name: Run examples
-      working-directory: ${{github.workspace}}/build
-      run: |
-        for exe in examples_*; do
-          if [ -f "$exe" ]; then
-            echo "Running $exe..."
-            ./$exe || exit 1
-          fi
-        done
-      timeout-minutes: 5
-
-    - name: Install
-      run: cmake --install ${{github.workspace}}/build --prefix ${{github.workspace}}/install
-
-    - name: Verify pkg-config
-      run: |
-        export PKG_CONFIG_PATH=${{github.workspace}}/install/lib/pkgconfig
-        pkg-config --cflags cobalt
-        pkg-config --libs cobalt
-
-  valgrind:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Install Valgrind
-      run: sudo apt-get update && sudo apt-get install -y valgrind
-
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug
-
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --parallel
-
-    - name: Run Valgrind memory check
-      working-directory: ${{github.workspace}}/build
-      run: valgrind --leak-check=full --show-leak-kinds=all --error-exitcode=1 ./tests/cobalt_test
-
-    - name: Run Valgrind on benchmarks
-      working-directory: ${{github.workspace}}/build
-      run: |
-        valgrind --leak-check=full --error-exitcode=1 ./tests/benchmark_hashmap || true
-        valgrind --leak-check=full --error-exitcode=1 ./tests/benchmark_vector || true
-        valgrind --leak-check=full --error-exitcode=1 ./tests/benchmark_set || true
-        valgrind --leak-check=full --error-exitcode=1 ./tests/benchmark_deque || true
-        valgrind --leak-check=full --error-exitcode=1 ./tests/benchmark_treemap || true
-
-  asan:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Configure with ASan
-      run: cmake -B ${{github.workspace}}/build-asan -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS="-fsanitize=address -g" -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address"
-
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build-asan --parallel
-
-    - name: Run tests with ASan
-      working-directory: ${{github.workspace}}/build-asan
-      run: ctest --output-on-failure
-
-    - name: Run benchmarks with ASan
-      working-directory: ${{github.workspace}}/build-asan
-      run: |
-        timeout 30 ./tests/benchmark_hashmap || true
-        timeout 30 ./tests/benchmark_vector || true
-        timeout 30 ./tests/benchmark_set || true
-        timeout 30 ./tests/benchmark_deque || true
-        timeout 30 ./tests/benchmark_treemap || true
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Install clang-tidy and cppcheck
-      run: sudo apt-get update && sudo apt-get install -y clang-tidy cppcheck
-
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug
-
-    - name: Build with compilation database
-      run: cmake --build ${{github.workspace}}/build --parallel
-
-    - name: Run clang-tidy via CMake
-      run: cmake --build ${{github.workspace}}/build --target tidy
-
-    - name: Run cppcheck
-      run: |
-        cd ${{github.workspace}}
-        cppcheck --enable=warning --std=c11 -Iinclude \
-          --suppress=syntaxError \
-          --suppress=memleak \
-          --suppress=unusedFunction \
-          --inline-suppr \
-          src/ include/ \
-          --output-file=cppcheck-report.txt --error-exitcode=0
-        if [ -s cppcheck-report.txt ]; then
-          cat cppcheck-report.txt
-        fi
-
-  format:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Install clang-format
-      run: sudo apt-get update && sudo apt-get install -y clang-format
-
-    - name: Configure CMake
-      run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=Debug
-
-    - name: Check code formatting via CMake
-      run: cmake --build ${{github.workspace}}/build --target format
+                        -
+                        name : Run tidy run : cmake-- build build-- target tidy
