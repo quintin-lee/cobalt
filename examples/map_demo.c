@@ -3,7 +3,7 @@
  * @brief Demonstrates polymorphic map usage via the cobalt_map_t interface
  *
  * Shows:
- * - Creating HashMap and TreeMap through cobalt_map_t *
+ * - Creating HashMap, TreeMap, and Set through cobalt_map_t *
  * - Using convenience functions (cobalt_map_get/put/remove/contains/clear)
  * - Iterating with cobalt_map_iterator_t
  * - Casting back to concrete types for type-specific operations
@@ -59,16 +59,18 @@ int main(void)
 {
     cobalt_logger_init(stdout, LOG_LEVEL_INFO);
 
-    /* Polymorphic: use same code for both types */
+    /* Polymorphic: use same code for all three types */
     cobalt_hashmap_t *hm = cobalt_hashmap_create(8);
     cobalt_treemap_t *tm = cobalt_treemap_create();
-    if (!hm || !tm) {
+    cobalt_set_t     *st = cobalt_set_create(8);
+    if (!hm || !tm || !st) {
         fprintf(stderr, "Failed to create maps\n");
         return 1;
     }
 
     demonstrate_map((cobalt_map_t *)hm, "HashMap");
     demonstrate_map((cobalt_map_t *)tm, "TreeMap");
+    demonstrate_map((cobalt_map_t *)st, "Set");
 
     /* Type-specific: TreeMap ordering via concrete API */
     printf("\n=== TreeMap ordering (concrete API) ===\n");
@@ -94,6 +96,21 @@ int main(void)
         cobalt_map_iterator_destroy(iter);
     }
     cobalt_hashmap_destroy(hm);
+
+    /* Type-specific: Set iterator factory */
+    printf("\n=== Set iterator factory ===\n");
+    st = cobalt_set_create(8);
+    cobalt_set_insert(st, "alpha");
+    cobalt_set_insert(st, "beta");
+    cobalt_map_iterator_t *iter2 = cobalt_set_iterator_create(st);
+    if (iter2) {
+        while (cobalt_map_iterator_has_next(iter2)) {
+            cobalt_map_pair_t pair = cobalt_map_iterator_next(iter2);
+            printf("  key=%s value=%p\n", (const char *)pair.key, pair.value);
+        }
+        cobalt_map_iterator_destroy(iter2);
+    }
+    cobalt_set_destroy(st);
 
     cobalt_info("Map demo complete!\n");
     return 0;
