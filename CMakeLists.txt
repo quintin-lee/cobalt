@@ -68,6 +68,16 @@ target_include_directories(cobalt PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 
+# Automatically run clang-format checks on build when COBALT_RUN_FORMAT is ON
+if(COBALT_RUN_FORMAT AND CLANG_FORMAT_EXECUTABLE)
+    add_custom_command(
+        TARGET cobalt POST_BUILD
+        COMMAND ${CLANG_FORMAT_EXECUTABLE} --dry-run --Werror --style=file ${ALL_SRC_FILES}
+        COMMENT "Checking code formatting..."
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    )
+endif()
+
 # Examples
 if(COBALT_BUILD_EXAMPLES)
     add_executable(examples_basic_usage examples/basic_usage.c)
