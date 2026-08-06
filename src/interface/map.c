@@ -44,3 +44,47 @@ void cobalt_map_iterator_destroy(cobalt_map_iterator_t *iter)
     }
     free(iter);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Convenience API                                                            */
+/* -------------------------------------------------------------------------- */
+
+void *cobalt_map_get(cobalt_map_t *map, const void *key, size_t key_len)
+{
+    if (!map || !map->get) {
+        return NULL;
+    }
+    return map->get(map, key, key_len);
+}
+
+int cobalt_map_put(cobalt_map_t *map, const void *key, size_t key_len, void *value)
+{
+    if (!map || !map->put) {
+        return -1;
+    }
+    return map->put(map, key, key_len, value);
+}
+
+int cobalt_map_remove(cobalt_map_t *map, const void *key, size_t key_len)
+{
+    if (!map || !map->remove) {
+        return -1;
+    }
+    return map->remove(map, key, key_len);
+}
+
+size_t cobalt_map_size(cobalt_map_t *map)
+{
+    if (!map || !map->size) {
+        return 0;
+    }
+    return map->size(map);
+}
+
+int cobalt_map_is_empty(cobalt_map_t *map)
+{
+    if (!map || !map->is_empty) {
+        return 1;
+    }
+    return map->is_empty(map);
+}

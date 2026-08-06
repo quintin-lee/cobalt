@@ -12,7 +12,7 @@
 #include <string.h>
 
 /* -------------------------------------------------------------------------- */
-/* Helper: run map tests against a given factory                              */
+/* Helper: run map tests against a given factory (vtable-style access)        */
 /* -------------------------------------------------------------------------- */
 
 static void run_map_tests(cobalt_map_t *map, const char *name)
@@ -88,6 +88,60 @@ static void run_map_tests(cobalt_map_t *map, const char *name)
 }
 
 /* -------------------------------------------------------------------------- */
+/* Convenience API tests (cobalt_map_get/put/remove/size/is_empty)             */
+/* -------------------------------------------------------------------------- */
+
+static void run_map_convenience_tests(cobalt_map_t *map, const char *name)
+{
+    printf("  Testing convenience API on %s...\n", name);
+
+    static int v1 = 10, v2 = 20, v3 = 30;
+
+    /* put via convenience function */
+    TEST_ASSERT(cobalt_map_put(map, "alpha", strlen("alpha"), &v1) == 0);
+    TEST_ASSERT(cobalt_map_put(map, "beta", strlen("beta"), &v2) == 0);
+    TEST_ASSERT(cobalt_map_put(map, "gamma", strlen("gamma"), &v3) == 0);
+    TEST_ASSERT(cobalt_map_size(map) == 3);
+    TEST_ASSERT(!cobalt_map_is_empty(map));
+
+    /* get via convenience function */
+    int *got = (int *)cobalt_map_get(map, "alpha", strlen("alpha"));
+    TEST_ASSERT(got != NULL);
+    TEST_EQUAL(*got, 10);
+    got = (int *)cobalt_map_get(map, "beta", strlen("beta"));
+    TEST_ASSERT(got != NULL);
+    TEST_EQUAL(*got, 20);
+
+    /* remove via convenience function */
+    TEST_ASSERT(cobalt_map_remove(map, "beta", strlen("beta")) == 0);
+    TEST_ASSERT(cobalt_map_size(map) == 2);
+    TEST_ASSERT(cobalt_map_get(map, "beta", strlen("beta")) == NULL);
+
+    /* update via put */
+    static int v1_new = 99;
+    TEST_ASSERT(cobalt_map_put(map, "alpha", strlen("alpha"), &v1_new) == 0);
+    got = (int *)cobalt_map_get(map, "alpha", strlen("alpha"));
+    TEST_ASSERT(got != NULL);
+    TEST_EQUAL(*got, 99);
+
+    /* empty */
+    cobalt_map_remove(map, "alpha", strlen("alpha"));
+    cobalt_map_remove(map, "gamma", strlen("gamma"));
+    TEST_ASSERT(cobalt_map_size(map) == 0);
+    TEST_ASSERT(cobalt_map_is_empty(map));
+
+    /* NULL safety */
+    TEST_ASSERT(cobalt_map_get(NULL, "x", 1) == NULL);
+    TEST_ASSERT(cobalt_map_put(NULL, "x", 1, &v1) == -1);
+    TEST_ASSERT(cobalt_map_remove(NULL, "x", 1) == -1);
+    TEST_ASSERT(cobalt_map_size(NULL) == 0);
+    TEST_ASSERT(cobalt_map_is_empty(NULL) == 1);
+
+    map->destroy(map);
+    printf("    %s convenience API: PASS\n", name);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Generic key tests (int keys via HashMap)                                   */
 /* -------------------------------------------------------------------------- */
 
@@ -157,15 +211,24 @@ void test_map_interface(void)
 {
     printf("Testing map interface...\n");
 
-    /* HashMap polymorphic tests */
+    /* HashMap polymorphic tests (vtable-style) */
     cobalt_hashmap_t *hm = cobalt_hashmap_create(8);
     TEST_ASSERT(hm != NULL);
     run_map_tests((cobalt_map_t *)hm, "hashmap");
 
-    /* TreeMap polymorphic tests */
+    /* TreeMap polymorphic tests (vtable-style) */
     cobalt_treemap_t *tm = cobalt_treemap_create();
     TEST_ASSERT(tm != NULL);
     run_map_tests((cobalt_map_t *)tm, "treemap");
+
+    /* Convenience API tests on both concrete types */
+    hm = cobalt_hashmap_create(8);
+    TEST_ASSERT(hm != NULL);
+    run_map_convenience_tests((cobalt_map_t *)hm, "hashmap");
+
+    tm = cobalt_treemap_create();
+    TEST_ASSERT(tm != NULL);
+    run_map_convenience_tests((cobalt_map_t *)tm, "treemap");
 
     /* Generic key tests — only HashMap supports ext API */
     cobalt_hashmap_t *hm_ext = cobalt_hashmap_create_ext(8, hash_int, equal_int);

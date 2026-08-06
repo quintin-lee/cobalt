@@ -70,6 +70,10 @@ struct cobalt_map_iterator {
     void *data;
 };
 
+/* -------------------------------------------------------------------------- */
+/* Map Iterator API                                                           */
+/* -------------------------------------------------------------------------- */
+
 /**
  * @brief Create a map iterator
  * @param map Map instance
@@ -92,6 +96,52 @@ cobalt_map_pair_t cobalt_map_iterator_next(cobalt_map_iterator_t *iter);
  * @brief Destroy the iterator
  */
 void cobalt_map_iterator_destroy(cobalt_map_iterator_t *iter);
+
+/* -------------------------------------------------------------------------- */
+/* Convenience API                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @brief Get a value from a map
+ * @param map Map instance
+ * @param key Key to look up
+ * @param key_len Length of the key in bytes
+ * @return Value pointer, or NULL if not found
+ */
+void *cobalt_map_get(cobalt_map_t *map, const void *key, size_t key_len);
+
+/**
+ * @brief Insert or update a key-value pair in a map
+ * @param map Map instance
+ * @param key Key to insert
+ * @param key_len Length of the key in bytes
+ * @param value Value to store
+ * @return 0 on success, -1 on failure
+ */
+int cobalt_map_put(cobalt_map_t *map, const void *key, size_t key_len, void *value);
+
+/**
+ * @brief Remove a key-value pair from a map
+ * @param map Map instance
+ * @param key Key to remove
+ * @param key_len Length of the key in bytes
+ * @return 0 on success, -1 if not found
+ */
+int cobalt_map_remove(cobalt_map_t *map, const void *key, size_t key_len);
+
+/**
+ * @brief Get the number of entries in a map
+ * @param map Map instance
+ * @return Number of entries, or 0 if map is NULL
+ */
+size_t cobalt_map_size(cobalt_map_t *map);
+
+/**
+ * @brief Check if a map is empty
+ * @param map Map instance
+ * @return Non-zero if empty, 0 otherwise
+ */
+int cobalt_map_is_empty(cobalt_map_t *map);
 
 /** @} */
 
