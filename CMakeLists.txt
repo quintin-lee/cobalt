@@ -12,6 +12,16 @@ option(COBALT_BUILD_TESTS "Build tests" ON)
 option(COBALT_BUILD_EXAMPLES "Build examples" ON)
 option(COBALT_RUN_TIDY "Run clang-tidy checks" OFF)
 option(COBALT_RUN_FORMAT "Run clang-format checks" OFF)
+option(COBALT_BUILD_COVERAGE "Build with coverage instrumentation" OFF)
+
+# Coverage build flags
+if(COBALT_BUILD_COVERAGE)
+    if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage -O0 -g")
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Clang")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fprofile-instr-generate -fcoverage-mapping -O0 -g")
+    endif()
+endif()
 
 # Source files
 set(SOURCES
@@ -177,6 +187,28 @@ if(CLANG_FORMAT_EXECUTABLE)
 else()
     message(WARNING "clang-format not found. Install it or skip: cmake --build . --target format")
 endif()
+
+# Coverage target
+add_custom_target(coverage
+    COMMAND cmake --build . --parallel
+    COMMAND ctest --output-on-failure
+    COMMAND lcov --capture --directory . --output-file coverage.info --rc branch_coverage=1 --ignore-errors negative
+    COMMAND genhtml coverage.info --output-directory coverage_report --rc genhtml_branch_coverage=1
+    DEPENDS cobalt cobalt_test
+    COMMENT "Building, running tests, and generating coverage report..."
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+# Also generate a summary to stdout
+add_custom_target(coverage-summary
+    COMMAND cmake --build . --parallel
+    COMMAND ctest --output-on-failure
+    COMMAND lcov --capture --directory . --rc branch_coverage=1 -o coverage.info --ignore-errors negative
+    COMMAND genhtml coverage.info --output-directory coverage_report --rc genhtml_branch_coverage=1
+    COMMAND tail -5 coverage_report/index.html | grep -oE '[0-9]+\.[0-9]+%' || true
+    DEPENDS cobalt cobalt_test
+    COMMENT "Running coverage and printing summary..."
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
 
 # Convenience: run both tidy and format as a single check target
 if(CLANG_TIDY_EXECUTABLE AND CLANG_FORMAT_EXECUTABLE)
