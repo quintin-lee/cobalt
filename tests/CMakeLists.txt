@@ -79,6 +79,11 @@ add_executable(benchmark_deque benchmark/benchmark_deque.c)
 target_link_libraries(benchmark_deque cobalt)
 
 add_executable(benchmark_treemap benchmark/benchmark_treemap.c)
+add_executable(benchmark_map benchmark/benchmark_map.c)
+target_link_libraries(benchmark_map cobalt)
+
+add_test(NAME bench_map COMMAND benchmark_map
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
 target_link_libraries(benchmark_treemap cobalt)
 
 # Register benchmarks with CTest
