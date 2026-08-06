@@ -190,7 +190,7 @@ int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value)
     return 0;
 }
 
-void *cobalt_treemap_get(cobalt_treemap_t *map, const char *key)
+void *cobalt_treemap_get(const cobalt_treemap_t *map, const char *key)
 {
     if (!map || !key) {
         return NULL;
@@ -229,7 +229,7 @@ const char *cobalt_treemap_max_key(cobalt_treemap_t *map)
     return node ? node->key : NULL;
 }
 
-size_t cobalt_treemap_size(cobalt_treemap_t *map)
+size_t cobalt_treemap_size(const cobalt_treemap_t *map)
 {
     return map ? map->impl.size : 0;
 }

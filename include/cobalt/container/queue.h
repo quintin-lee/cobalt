@@ -72,7 +72,7 @@ void *cobalt_queue_peek(cobalt_queue_t *queue);
  * @param queue Pointer to the target queue
  * @return The number of elements in the queue; returns 0 if queue is NULL.
  */
-size_t cobalt_queue_size(cobalt_queue_t *queue);
+size_t cobalt_queue_size(const cobalt_queue_t *queue);
 
 /**
  * @brief Check if the queue is empty
@@ -81,7 +81,7 @@ size_t cobalt_queue_size(cobalt_queue_t *queue);
  * @return Returns 1 if the queue is not NULL and the number of elements is 0; otherwise returns 0.
  * If queue is NULL, returns 0.
  */
-int cobalt_queue_is_empty(cobalt_queue_t *queue);
+int cobalt_queue_is_empty(const cobalt_queue_t *queue);
 
 /** @} */
 

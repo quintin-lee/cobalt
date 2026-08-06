@@ -61,7 +61,7 @@ int cobalt_vector_push(cobalt_vector_t *vec, void *item);
  * @return Returns the element pointer at the specified position on success; returns NULL if vec is
  * empty or the index is out of bounds.
  */
-void *cobalt_vector_get(cobalt_vector_t *vec, size_t index);
+void *cobalt_vector_get(const cobalt_vector_t *vec, size_t index);
 
 /**
  * @brief Set the element at the specified index
@@ -80,7 +80,7 @@ int cobalt_vector_set(cobalt_vector_t *vec, size_t index, void *item);
  * @param vec Pointer to the target dynamic array
  * @return The number of elements in the dynamic array. If vec is NULL, returns 0.
  */
-size_t cobalt_vector_size(cobalt_vector_t *vec);
+size_t cobalt_vector_size(const cobalt_vector_t *vec);
 
 /**
  * @brief Check if the dynamic array is empty
@@ -89,7 +89,7 @@ size_t cobalt_vector_size(cobalt_vector_t *vec);
  * @return If the dynamic array is empty (i.e., size is 0), returns a non-zero value (1); otherwise
  * returns 0. If vec is NULL, also returns 0.
  */
-int cobalt_vector_is_empty(cobalt_vector_t *vec);
+int cobalt_vector_is_empty(const cobalt_vector_t *vec);
 
 /** @} */
 

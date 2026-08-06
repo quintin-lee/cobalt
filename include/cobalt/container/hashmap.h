@@ -62,7 +62,7 @@ int cobalt_hashmap_put(cobalt_hashmap_t *map, const char *key, void *value);
  * occurs.
  * @note If not found, the error code COBALT_ERROR_NOT_FOUND will be set.
  */
-void *cobalt_hashmap_get(cobalt_hashmap_t *map, const char *key);
+void *cobalt_hashmap_get(const cobalt_hashmap_t *map, const char *key);
 
 /**
  * @brief Remove a specified key-value pair from the hash map
@@ -77,7 +77,7 @@ int cobalt_hashmap_remove(cobalt_hashmap_t *map, const char *key);
  * @param map Pointer to the hash map
  * @return The number of key-value pairs (size), or 0 if map is NULL.
  */
-size_t cobalt_hashmap_size(cobalt_hashmap_t *map);
+size_t cobalt_hashmap_size(const cobalt_hashmap_t *map);
 
 /**
  * @brief Get the current number of buckets (capacity) of the hash map

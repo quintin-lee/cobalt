@@ -99,7 +99,7 @@ void *cobalt_deque_peek_back(cobalt_deque_t *deque);
  * @param deque Pointer to the target double-ended queue
  * @return The number of elements in the double-ended queue; returns 0 if deque is NULL.
  */
-size_t cobalt_deque_size(cobalt_deque_t *deque);
+size_t cobalt_deque_size(const cobalt_deque_t *deque);
 
 /**
  * @brief Check if the double-ended queue is empty
@@ -107,7 +107,7 @@ size_t cobalt_deque_size(cobalt_deque_t *deque);
  * @param deque Pointer to the target double-ended queue
  * @return Returns 1 if the queue is empty; otherwise returns 0. If deque is NULL, also returns 1.
  */
-int cobalt_deque_is_empty(cobalt_deque_t *deque);
+int cobalt_deque_is_empty(const cobalt_deque_t *deque);
 
 /** @} */
 

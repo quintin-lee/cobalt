@@ -255,7 +255,7 @@ int cobalt_hashmap_put(cobalt_hashmap_t *map, const char *key, void *value)
  * @param key The key to look up
  * @return Returns the corresponding value if found, NULL if not found.
  */
-void *cobalt_hashmap_get(cobalt_hashmap_t *map, const char *key)
+void *cobalt_hashmap_get(const cobalt_hashmap_t *map, const char *key)
 {
     if (!map || !key) {
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
@@ -325,7 +325,7 @@ int cobalt_hashmap_remove(cobalt_hashmap_t *map, const char *key)
  * @param map The hash map
  * @return Returns the total number of stored key-value pairs
  */
-size_t cobalt_hashmap_size(cobalt_hashmap_t *map)
+size_t cobalt_hashmap_size(const cobalt_hashmap_t *map)
 {
     if (!map) {
         return 0;

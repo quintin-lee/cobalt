@@ -49,7 +49,7 @@ int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value);
  * @param key String key
  * @return The found value pointer, or NULL if not found
  */
-void *cobalt_treemap_get(cobalt_treemap_t *map, const char *key);
+void *cobalt_treemap_get(const cobalt_treemap_t *map, const char *key);
 
 /**
  * @brief Remove a specified key-value pair
@@ -78,7 +78,7 @@ const char *cobalt_treemap_max_key(cobalt_treemap_t *map);
  * @param map Pointer to the map
  * @return The number of key-value pairs
  */
-size_t cobalt_treemap_size(cobalt_treemap_t *map);
+size_t cobalt_treemap_size(const cobalt_treemap_t *map);
 
 /** @} */
 

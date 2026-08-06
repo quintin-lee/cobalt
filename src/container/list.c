@@ -296,7 +296,7 @@ void *cobalt_list_pop_back(cobalt_list_t *list)
  * or the tail based on whether the index is in the first or second half, with a maximum time
  * complexity of O(N/2).
  */
-void *cobalt_list_get(cobalt_list_t *list, size_t index)
+void *cobalt_list_get(const cobalt_list_t *list, size_t index)
 {
     if (!list) {
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
@@ -328,7 +328,7 @@ void *cobalt_list_get(cobalt_list_t *list, size_t index)
 /**
  * @brief Get the number of elements in the list
  */
-size_t cobalt_list_size(cobalt_list_t *list)
+size_t cobalt_list_size(const cobalt_list_t *list)
 {
     return list ? ((cobalt_list_impl_t *)list)->size : 0;
 }
@@ -336,7 +336,7 @@ size_t cobalt_list_size(cobalt_list_t *list)
 /**
  * @brief Check if the list is empty
  */
-int cobalt_list_is_empty(cobalt_list_t *list)
+int cobalt_list_is_empty(const cobalt_list_t *list)
 {
     return list && ((cobalt_list_impl_t *)list)->size == 0;
 }

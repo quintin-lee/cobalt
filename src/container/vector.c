@@ -187,7 +187,7 @@ int cobalt_vector_push(cobalt_vector_t *vec, void *item)
 /**
  * @brief Get the element at the specified index
  */
-void *cobalt_vector_get(cobalt_vector_t *vec, size_t index)
+void *cobalt_vector_get(const cobalt_vector_t *vec, size_t index)
 {
     if (!vec) {
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
@@ -217,7 +217,7 @@ int cobalt_vector_set(cobalt_vector_t *vec, size_t index, void *item)
 /**
  * @brief Get the number of elements currently stored in the dynamic array
  */
-size_t cobalt_vector_size(cobalt_vector_t *vec)
+size_t cobalt_vector_size(const cobalt_vector_t *vec)
 {
     return vec ? ((cobalt_vector_impl_t *)vec)->size : 0;
 }
@@ -225,7 +225,7 @@ size_t cobalt_vector_size(cobalt_vector_t *vec)
 /**
  * @brief Check if the dynamic array is empty
  */
-int cobalt_vector_is_empty(cobalt_vector_t *vec)
+int cobalt_vector_is_empty(const cobalt_vector_t *vec)
 {
     return vec && ((cobalt_vector_impl_t *)vec)->size == 0;
 }

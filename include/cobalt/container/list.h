@@ -117,7 +117,7 @@ void *cobalt_list_pop_back(cobalt_list_t *list);
  * @return Returns the data pointer at the specified index on success; returns NULL if the index is
  * out of bounds or the list is empty.
  */
-void *cobalt_list_get(cobalt_list_t *list, size_t index);
+void *cobalt_list_get(const cobalt_list_t *list, size_t index);
 
 /**
  * @brief Get the number of elements in the list
@@ -125,7 +125,7 @@ void *cobalt_list_get(cobalt_list_t *list, size_t index);
  * @param list Pointer to the target list
  * @return The number of elements in the list; if list is NULL, returns 0.
  */
-size_t cobalt_list_size(cobalt_list_t *list);
+size_t cobalt_list_size(const cobalt_list_t *list);
 
 /**
  * @brief Check if the list is empty
@@ -134,7 +134,7 @@ size_t cobalt_list_size(cobalt_list_t *list);
  * @return Returns 1 if the list is empty (length is 0); otherwise returns 0. If list is NULL, also
  * returns 0.
  */
-int cobalt_list_is_empty(cobalt_list_t *list);
+int cobalt_list_is_empty(const cobalt_list_t *list);
 
 /**
  * @brief Create a specific iterator for the list

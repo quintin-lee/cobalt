@@ -132,7 +132,7 @@ void *cobalt_queue_peek(cobalt_queue_t *queue)
 /**
  * @brief Get the number of elements in the queue
  */
-size_t cobalt_queue_size(cobalt_queue_t *queue)
+size_t cobalt_queue_size(const cobalt_queue_t *queue)
 {
     return queue ? queue->size : 0;
 }
@@ -140,7 +140,7 @@ size_t cobalt_queue_size(cobalt_queue_t *queue)
 /**
  * @brief Check if the queue is empty
  */
-int cobalt_queue_is_empty(cobalt_queue_t *queue)
+int cobalt_queue_is_empty(const cobalt_queue_t *queue)
 {
     return queue && queue->size == 0;
 }

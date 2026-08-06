@@ -64,14 +64,14 @@ void *cobalt_stack_peek(cobalt_stack_t *stack);
  * @param stack Pointer to the stack
  * @return The number of elements in the stack. Returns 0 if stack is NULL.
  */
-size_t cobalt_stack_size(cobalt_stack_t *stack);
+size_t cobalt_stack_size(const cobalt_stack_t *stack);
 
 /**
  * @brief Check if the stack is empty
  * @param stack Pointer to the stack
  * @return Returns 1 if the stack's size is 0, returns 0 if it is not empty or stack is NULL.
  */
-int cobalt_stack_is_empty(cobalt_stack_t *stack);
+int cobalt_stack_is_empty(const cobalt_stack_t *stack);
 
 /** @} */
 
