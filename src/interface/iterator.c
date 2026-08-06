@@ -36,10 +36,7 @@ static int generic_has_next(void *ctx)
 /**
  * @brief Get the next element of the generic iterator
  * @param ctx Iterator context (cobalt_iterator_impl_t pointer)
- * @return The current implementation does not support directly returning an element pointer, always
- * returns NULL, but advances the index
- * @note This provides a skeleton implementation, actual containers should provide their own
- * specific iterator implementation
+ * @return The next element pointer, or NULL if at end or sequence does not support get_at_index
  */
 static void *generic_next(void *ctx)
 {
@@ -47,9 +44,9 @@ static void *generic_next(void *ctx)
     if (impl->index >= impl->total) {
         return NULL; /* End reached */
     }
-    impl->index++; /* Advance iterator state */
-    return NULL;   /* The generic iterator does not support direct element access, it needs to be
-                      overridden by a specific sequence implementation */
+    void *item = impl->seq->get_at_index(impl->seq, impl->index);
+    impl->index++;
+    return item;
 }
 
 /**

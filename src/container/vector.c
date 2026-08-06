@@ -121,6 +121,15 @@ static void vector_remove_seq(cobalt_sequence_t *self, void *item)
  * @param self Sequence base class pointer
  * @return Returns a pointer to the newly created iterator
  */
+static void *vector_get_at_index_seq(cobalt_sequence_t *self, size_t index)
+{
+    cobalt_vector_impl_t *vec = (cobalt_vector_impl_t *)self;
+    if (index >= vec->size) {
+        return NULL;
+    }
+    return vec->items[index];
+}
+
 static cobalt_iterator_t *vector_iterator_seq(cobalt_sequence_t *self)
 {
     cobalt_vector_impl_t *vec = (cobalt_vector_impl_t *)self;
@@ -147,11 +156,12 @@ cobalt_vector_t *cobalt_vector_create(size_t initial_capacity)
     vec->size     = 0;
 
     /* Initialize the method table for the sequence (Sequence) interface */
-    vec->base.size     = vector_size_seq;
-    vec->base.is_empty = vector_is_empty_seq;
-    vec->base.add      = vector_add_seq;
-    vec->base.remove   = vector_remove_seq;
-    vec->base.iterator = vector_iterator_seq;
+    vec->base.size        = vector_size_seq;
+    vec->base.is_empty    = vector_is_empty_seq;
+    vec->base.add         = vector_add_seq;
+    vec->base.remove      = vector_remove_seq;
+    vec->base.iterator    = vector_iterator_seq;
+    vec->base.get_at_index = vector_get_at_index_seq;
 
     return (cobalt_vector_t *)vec;
 }

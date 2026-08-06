@@ -123,6 +123,12 @@ static void list_remove_seq(cobalt_sequence_t *self, void *item)
  * @param self Sequence base class pointer
  * @return Pointer to list-specific iterator
  */
+static void *list_get_at_index_seq(cobalt_sequence_t *self, size_t index)
+{
+    cobalt_list_t *list = (cobalt_list_t *)self;
+    return cobalt_list_get(list, index);
+}
+
 static cobalt_iterator_t *list_iterator_seq(cobalt_sequence_t *self)
 {
     cobalt_list_t *list = (cobalt_list_t *)self;
@@ -147,11 +153,12 @@ cobalt_list_t *cobalt_list_create(void)
     list->size             = 0;
 
     /* Bind polymorphic sequence interface methods */
-    list->base.size     = list_size_seq;
-    list->base.is_empty = list_is_empty_seq;
-    list->base.add      = list_add_seq;
-    list->base.remove   = list_remove_seq;
-    list->base.iterator = list_iterator_seq;
+    list->base.size        = list_size_seq;
+    list->base.is_empty    = list_is_empty_seq;
+    list->base.add         = list_add_seq;
+    list->base.remove      = list_remove_seq;
+    list->base.iterator    = list_iterator_seq;
+    list->base.get_at_index = list_get_at_index_seq;
 
     return list;
 }

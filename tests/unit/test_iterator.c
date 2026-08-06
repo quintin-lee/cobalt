@@ -54,6 +54,15 @@ static void test_seq_remove(cobalt_sequence_t *self, void *item)
     }
 }
 
+static void *test_seq_get_at_index(cobalt_sequence_t *self, size_t index)
+{
+    test_seq_t *seq = (test_seq_t *)self;
+    if (index >= seq->count) {
+        return NULL;
+    }
+    return &seq->data[index];
+}
+
 static cobalt_iterator_t *test_seq_iterator(cobalt_sequence_t *self)
 {
     return cobalt_iterator_new(self);
@@ -69,11 +78,12 @@ static cobalt_sequence_t *test_seq_create(void)
     seq->count    = 0;
     seq->capacity = 0;
 
-    seq->base.size     = test_seq_size;
-    seq->base.is_empty = test_seq_is_empty;
-    seq->base.add      = test_seq_add;
-    seq->base.remove   = test_seq_remove;
-    seq->base.iterator = test_seq_iterator;
+    seq->base.size        = test_seq_size;
+    seq->base.is_empty    = test_seq_is_empty;
+    seq->base.add         = test_seq_add;
+    seq->base.remove      = test_seq_remove;
+    seq->base.iterator    = test_seq_iterator;
+    seq->base.get_at_index = test_seq_get_at_index;
 
     return (cobalt_sequence_t *)seq;
 }

@@ -68,6 +68,14 @@ struct cobalt_sequence {
      * @return Returns a pointer to the iterator instance on success, or NULL on failure
      */
     cobalt_iterator_t *(*iterator)(cobalt_sequence_t *self);
+
+    /**
+     * @brief Get element at the specified index
+     * @param self Sequence instance pointer
+     * @param index Zero-based index
+     * @return Pointer to the element, or NULL if index is out of bounds
+     */
+    void *(*get_at_index)(cobalt_sequence_t *self, size_t index);
 };
 
 /**

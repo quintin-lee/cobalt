@@ -30,6 +30,7 @@
 /* --- Abstract interfaces --- */
 #include <cobalt/interface/iterator.h>
 #include <cobalt/interface/sequence.h>
+#include <cobalt/utils/string.h>
 
 /* --- Container components --- */
 #include <cobalt/container/deque.h>
