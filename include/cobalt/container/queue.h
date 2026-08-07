@@ -9,6 +9,7 @@
  * suitable for scenarios such as task scheduling and message buffering.
  */
 
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -28,6 +29,7 @@ typedef struct cobalt_queue cobalt_queue_t;
  * allocation fails.
  */
 cobalt_queue_t *cobalt_queue_create(void);
+cobalt_queue_t *cobalt_queue_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy a queue and free its memory

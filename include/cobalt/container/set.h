@@ -11,6 +11,7 @@
  */
 
 #include "cobalt/interface/map.h"
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -49,6 +50,12 @@ cobalt_set_t *cobalt_set_create(size_t initial_capacity);
  * @return Returns set pointer on success, NULL on failure
  * @note Elements are NOT copied — caller must ensure element lifetime exceeds the set's lifetime.
  */
+cobalt_set_t *cobalt_set_create_with_allocator(size_t initial_capacity, cobalt_allocator_t *alloc);
+cobalt_set_t *cobalt_set_create_ext_with_allocator(size_t                  initial_capacity,
+                                                   cobalt_set_hash_func_t  hash_func,
+                                                   cobalt_set_equal_func_t equal_func,
+                                                   cobalt_allocator_t     *alloc);
+
 cobalt_set_t *cobalt_set_create_ext(size_t                  initial_capacity,
                                     cobalt_set_hash_func_t  hash_func,
                                     cobalt_set_equal_func_t equal_func);

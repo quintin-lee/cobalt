@@ -25,10 +25,11 @@ typedef struct deque_node {
  * @brief Internal structure implementation of the double-ended queue
  */
 struct cobalt_deque {
-    cobalt_sequence_t base; /**< Base sequence interface (for polymorphism) */
-    deque_node_t     *head; /**< Queue head node pointer */
-    deque_node_t     *tail; /**< Queue tail node pointer */
-    size_t            size; /**< Current number of elements in the queue */
+    cobalt_sequence_t   base; /**< Base sequence interface (for polymorphism) */
+    cobalt_allocator_t *alloc;
+    deque_node_t       *head; /**< Queue head node pointer */
+    deque_node_t       *tail; /**< Queue tail node pointer */
+    size_t              size; /**< Current number of elements in the queue */
 };
 
 /* ========================================================================= */
@@ -72,7 +73,7 @@ static void deque_remove_seq(cobalt_sequence_t *self, void *item)
             } else {
                 deque->tail = node->prev;
             }
-            free(node);
+            deque->alloc->free(deque->alloc, node);
             deque->size--;
             return;
         }
@@ -112,7 +113,15 @@ static cobalt_iterator_t *deque_iterator_seq(cobalt_sequence_t *self)
  */
 cobalt_deque_t *cobalt_deque_create(void)
 {
-    cobalt_deque_t *deque = malloc(sizeof(cobalt_deque_t));
+    return cobalt_deque_create_with_allocator(cobalt_allocator_get_system());
+}
+
+cobalt_deque_t *cobalt_deque_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_deque_t *deque = (cobalt_deque_t *)alloc->alloc(alloc, sizeof(cobalt_deque_t));
     if (!deque) {
         return NULL;
     }
@@ -125,6 +134,7 @@ cobalt_deque_t *cobalt_deque_create(void)
     deque->head              = NULL;
     deque->tail              = NULL;
     deque->size              = 0;
+    deque->alloc             = alloc;
     return deque;
 }
 
@@ -140,10 +150,10 @@ void cobalt_deque_destroy(cobalt_deque_t *deque)
     deque_node_t *node = deque->head;
     while (node) {
         deque_node_t *next = node->next;
-        free(node);
+        deque->alloc->free(deque->alloc, node);
         node = next;
     }
-    free(deque);
+    deque->alloc->free(deque->alloc, deque);
 }
 
 /**
@@ -155,7 +165,7 @@ int cobalt_deque_push_front(cobalt_deque_t *deque, void *item)
         return -1;
     }
 
-    deque_node_t *node = malloc(sizeof(deque_node_t));
+    deque_node_t *node = (deque_node_t *)deque->alloc->alloc(deque->alloc, sizeof(deque_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
@@ -184,7 +194,7 @@ int cobalt_deque_push_back(cobalt_deque_t *deque, void *item)
         return -1;
     }
 
-    deque_node_t *node = malloc(sizeof(deque_node_t));
+    deque_node_t *node = (deque_node_t *)deque->alloc->alloc(deque->alloc, sizeof(deque_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
@@ -223,7 +233,7 @@ void *cobalt_deque_pop_front(cobalt_deque_t *deque)
     } else {
         deque->tail = NULL;
     }
-    free(node);
+    deque->alloc->free(deque->alloc, node);
     deque->size--;
     return data;
 }
@@ -247,7 +257,7 @@ void *cobalt_deque_pop_back(cobalt_deque_t *deque)
     } else {
         deque->head = NULL;
     }
-    free(node);
+    deque->alloc->free(deque->alloc, node);
     deque->size--;
     return data;
 }

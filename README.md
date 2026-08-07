@@ -91,7 +91,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 25 tests passing
+ctest --output-on-failure  # 27 tests passing
 # or with verbose output
 ctest --verbose
 ```
@@ -140,7 +140,7 @@ cd build
 
 | Category | Count |
 |----------|-------|
-| Source files (.c) | 25 |
+| 28 | 25 |
 | Header files (.h) | 27 |
 | Test files (.c) | 23 |
 | Benchmark files (.c) | 5 |
@@ -151,7 +151,7 @@ cd build
 |--------|-------|
 | Total lines of code | 10,130 |
 | Git commits | 226 |
-| Tests passing | 25/25 |
+| 27/27 | 27/27 |
 
 ## License
 

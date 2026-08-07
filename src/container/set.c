@@ -8,6 +8,7 @@
 #include "cobalt/container/set.h"
 #include "cobalt/container/hashmap.h"
 #include "cobalt/interface/map.h"
+#include "cobalt/memory/allocator.h"
 #include "cobalt/runtime/error.h"
 #include "cobalt/utils/string.h"
 #include <stdlib.h>
@@ -20,8 +21,9 @@ static const int set_sentinel = 1;
 /* -------------------------------------------------------------------------- */
 
 struct cobalt_set {
-    cobalt_map_t      base;
-    cobalt_hashmap_t *map;
+    cobalt_map_t        base;
+    cobalt_hashmap_t   *map;
+    cobalt_allocator_t *alloc;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -61,7 +63,7 @@ static void set_map_clear(cobalt_map_t *self)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
     cobalt_hashmap_destroy(set->map);
-    set->map = cobalt_hashmap_create(0);
+    set->map = cobalt_hashmap_create_with_allocator(0, set->alloc);
     if (!set->map) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
     }
@@ -109,17 +111,26 @@ static const cobalt_map_t set_map_vtable = {
 
 cobalt_set_t *cobalt_set_create(size_t initial_capacity)
 {
-    cobalt_set_t *set = malloc(sizeof(cobalt_set_t));
+    return cobalt_set_create_with_allocator(initial_capacity, cobalt_allocator_get_system());
+}
+
+cobalt_set_t *cobalt_set_create_with_allocator(size_t initial_capacity, cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_set_t *set = (cobalt_set_t *)alloc->alloc(alloc, sizeof(cobalt_set_t));
     if (!set) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     set->base = set_map_vtable;
-    set->map  = cobalt_hashmap_create(initial_capacity);
+    set->map  = cobalt_hashmap_create_with_allocator(initial_capacity, alloc);
     if (!set->map) {
-        free(set);
+        alloc->free(alloc, set);
         return NULL;
     }
+    set->alloc = alloc;
     return set;
 }
 
@@ -127,7 +138,19 @@ cobalt_set_t *cobalt_set_create_ext(size_t                  initial_capacity,
                                     cobalt_set_hash_func_t  hash_func,
                                     cobalt_set_equal_func_t equal_func)
 {
-    cobalt_set_t *set = malloc(sizeof(cobalt_set_t));
+    return cobalt_set_create_ext_with_allocator(
+        initial_capacity, hash_func, equal_func, cobalt_allocator_get_system());
+}
+
+cobalt_set_t *cobalt_set_create_ext_with_allocator(size_t                  initial_capacity,
+                                                   cobalt_set_hash_func_t  hash_func,
+                                                   cobalt_set_equal_func_t equal_func,
+                                                   cobalt_allocator_t     *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_set_t *set = (cobalt_set_t *)alloc->alloc(alloc, sizeof(cobalt_set_t));
     if (!set) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
@@ -136,9 +159,10 @@ cobalt_set_t *cobalt_set_create_ext(size_t                  initial_capacity,
     set->map  = cobalt_hashmap_create_ext(
         initial_capacity, (cobalt_hash_func_t)hash_func, (cobalt_equal_func_t)equal_func);
     if (!set->map) {
-        free(set);
+        alloc->free(alloc, set);
         return NULL;
     }
+    set->alloc = alloc;
     return set;
 }
 
@@ -146,7 +170,7 @@ void cobalt_set_destroy(cobalt_set_t *set)
 {
     if (set) {
         cobalt_hashmap_destroy(set->map);
-        free(set);
+        set->alloc->free(set->alloc, set);
     }
 }
 

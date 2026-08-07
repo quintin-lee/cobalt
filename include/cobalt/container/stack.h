@@ -8,6 +8,7 @@
  * storing void* type pointer data.
  */
 
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -26,6 +27,7 @@ typedef struct cobalt_stack cobalt_stack_t;
  * @return Returns the stack pointer on success, or NULL if memory allocation fails.
  */
 cobalt_stack_t *cobalt_stack_create(void);
+cobalt_stack_t *cobalt_stack_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy the stack and free memory

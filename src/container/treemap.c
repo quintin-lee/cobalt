@@ -5,6 +5,7 @@
 
 #include "cobalt/container/treemap.h"
 #include "cobalt/interface/map.h"
+#include "cobalt/memory/allocator.h"
 #include "cobalt/platform/debug_assert.h"
 #include "cobalt/runtime/error.h"
 #include "cobalt/utils/string.h"
@@ -24,8 +25,9 @@ typedef struct treemap_node {
 } treemap_node_t;
 
 typedef struct {
-    treemap_node_t *root;
-    size_t          size;
+    treemap_node_t     *root;
+    size_t              size;
+    cobalt_allocator_t *alloc;
 } treemap_impl_t;
 
 struct cobalt_treemap {
@@ -37,9 +39,13 @@ struct cobalt_treemap {
 /* Node helpers                                                               */
 /* ========================================================================= */
 
-static treemap_node_t *rb_node_create(const char *key, void *value)
+static treemap_node_t *rb_node_create(treemap_impl_t *impl, const char *key, void *value)
 {
-    treemap_node_t *node = malloc(sizeof(treemap_node_t));
+    if (!impl) {
+        return NULL;
+    }
+    treemap_node_t *node =
+        (treemap_node_t *)impl->alloc->alloc(impl->alloc, sizeof(treemap_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
@@ -47,7 +53,7 @@ static treemap_node_t *rb_node_create(const char *key, void *value)
     node->key = cobalt_strdup(key);
     if (!node->key) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
-        free(node);
+        impl->alloc->free(impl->alloc, node);
         return NULL;
     }
     node->value = value;
@@ -56,22 +62,25 @@ static treemap_node_t *rb_node_create(const char *key, void *value)
     return node;
 }
 
-static void rb_node_free(treemap_node_t *node)
+static void rb_node_free(treemap_impl_t *impl, treemap_node_t *node)
 {
-    if (node) {
-        free(node->key);
-        free(node);
-    }
-}
-
-static void rb_destroy_tree(treemap_node_t *node)
-{
-    if (!node) {
+    if (!node || !impl) {
         return;
     }
-    rb_destroy_tree(node->left);
-    rb_destroy_tree(node->right);
-    rb_node_free(node);
+    if (node->key) {
+        impl->alloc->free(impl->alloc, node->key);
+    }
+    impl->alloc->free(impl->alloc, node);
+}
+
+static void rb_destroy_tree(treemap_impl_t *impl, treemap_node_t *node)
+{
+    if (!node || !impl) {
+        return;
+    }
+    rb_destroy_tree(impl, node->left);
+    rb_destroy_tree(impl, node->right);
+    rb_node_free(impl, node);
 }
 
 /* ========================================================================= */
@@ -175,7 +184,7 @@ static void rb_insert(treemap_impl_t *tree, treemap_node_t *z)
         } else {
             /* Duplicate key — update value, discard new node */
             x->value = z->value;
-            rb_node_free(z);
+            rb_node_free(tree, z);
             return;
         }
     }
@@ -312,7 +321,7 @@ static void rb_delete(treemap_impl_t *tree, treemap_node_t *z)
         y->color = z->color;
     }
 
-    rb_node_free(z);
+    rb_node_free(tree, z);
     tree->size--;
 
     if (y_original_color == RB_BLACK) {
@@ -431,8 +440,8 @@ static void treemap_map_iter_destroy(void *ctx)
 {
     if (ctx) {
         treemap_map_iter_t *iter = (treemap_map_iter_t *)ctx;
-        free(iter->stack);
-        free(iter);
+        cobalt_allocator_get_system()->free(cobalt_allocator_get_system(), iter->stack);
+        cobalt_allocator_get_system()->free(cobalt_allocator_get_system(), iter);
     }
 }
 
@@ -456,9 +465,10 @@ static cobalt_map_iterator_t *treemap_map_iterator(cobalt_map_t *self)
     iter_state->stack_cap = 0;
     iter_state->finished  = 0;
 
-    cobalt_map_iterator_t *iter = malloc(sizeof(cobalt_map_iterator_t));
+    cobalt_map_iterator_t *iter = (cobalt_map_iterator_t *)cobalt_allocator_get_system()->alloc(
+        cobalt_allocator_get_system(), sizeof(cobalt_map_iterator_t));
     if (!iter) {
-        free(iter_state);
+        cobalt_allocator_get_system()->free(cobalt_allocator_get_system(), iter_state);
         return NULL;
     }
     iter->vtable = &treemap_map_iter_vtable;
@@ -520,7 +530,7 @@ static void treemap_map_clear(cobalt_map_t *self)
 {
     cobalt_treemap_t *map = (cobalt_treemap_t *)self;
     if (map->impl.root) {
-        rb_destroy_tree(map->impl.root);
+        rb_destroy_tree(&map->impl, map->impl.root);
         map->impl.root = NULL;
     }
     map->impl.size = 0;
@@ -559,16 +569,26 @@ cobalt_map_iterator_t *cobalt_treemap_iterator_create(cobalt_treemap_t *map)
 /* Public API                                                                 */
 /* ========================================================================= */
 
+cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc);
 cobalt_treemap_t *cobalt_treemap_create(void)
 {
-    cobalt_treemap_t *map = malloc(sizeof(cobalt_treemap_t));
+    return cobalt_treemap_create_with_allocator(cobalt_allocator_get_system());
+}
+
+cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_treemap_t *map = (cobalt_treemap_t *)alloc->alloc(alloc, sizeof(cobalt_treemap_t));
     if (!map) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
-    map->base      = treemap_map_vtable;
-    map->impl.root = NULL;
-    map->impl.size = 0;
+    map->base       = treemap_map_vtable;
+    map->impl.root  = NULL;
+    map->impl.size  = 0;
+    map->impl.alloc = alloc;
     return map;
 }
 
@@ -578,9 +598,9 @@ void cobalt_treemap_destroy(cobalt_treemap_t *map)
         return;
     }
     if (map->impl.root) {
-        rb_destroy_tree(map->impl.root);
+        rb_destroy_tree(&map->impl, map->impl.root);
     }
-    free(map);
+    map->impl.alloc->free(map->impl.alloc, map);
 }
 
 int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value)
@@ -593,7 +613,7 @@ int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value)
         existing->value = value;
         return 0;
     }
-    treemap_node_t *node = rb_node_create(key, value);
+    treemap_node_t *node = rb_node_create(&map->impl, key, value);
     if (!node) {
         return -1;
     }

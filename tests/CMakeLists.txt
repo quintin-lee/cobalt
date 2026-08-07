@@ -6,6 +6,8 @@ add_executable(cobalt_test
     unit/test_atomic.c
     unit/test_allocator.c
     unit/test_arena.c
+    unit/test_pool.c
+    unit/test_slab.c
     unit/test_error.c
     unit/test_logger.c
     unit/test_object.c
@@ -47,6 +49,8 @@ add_test(NAME test_platform COMMAND cobalt_test --filter platform)
 add_test(NAME test_atomic COMMAND cobalt_test --filter atomic)
 add_test(NAME test_allocator COMMAND cobalt_test --filter allocator)
 add_test(NAME test_arena COMMAND cobalt_test --filter arena)
+add_test(NAME test_pool COMMAND cobalt_test --filter pool)
+add_test(NAME test_slab COMMAND cobalt_test --filter slab)
 add_test(NAME test_error COMMAND cobalt_test --filter error)
 add_test(NAME test_logger COMMAND cobalt_test --filter logger)
 add_test(NAME test_object COMMAND cobalt_test --filter object)

@@ -46,11 +46,11 @@ void      cobalt_atomic_decrement(cobalt_atomic_t *a);
 
 All atomic operations use LOCK-FREE instructions where supported by the target architecture. This is critical for reference-counted object lifecycles in multithreaded contexts.
 
-## 4. Alignment Utilities (Planned)
+## 4. Alignment Utilities (Planned — cobalt_align macro)
 
 Future extension: `cobalt_align(value, boundary)` macro/function for portable aligned allocation, important for SIMD instructions and structure packing.
 
-## 5. Endian Conversion (Planned)
+## 5. Endian Conversion (Planned — cobalt_host_to_le32 helper)
 
 Future extension: `cobalt_host_to_le32()`, `le32_to_host()` helpers for cross-platform binary data interchange.
 
@@ -58,6 +58,6 @@ Future extension: `cobalt_host_to_le32()`, `le32_to_host()` helpers for cross-pl
 
 Future extension: direct file descriptor interfaces for high-throughput scenarios, bypassing OS buffering where needed.
 
-## 7. Thread Primitives (Planned)
+## 7. Thread Primitives (Implemented)
 
-Future extension: mutex, condition variable, and thread-local storage wrappers above native threading APIs (pthread on Unix, Windows threads on Win32).
+Implemented: cobalt_mutex_t, cobalt_cond_t, cobalt_thread_t with pthreads (Unix) and Win32 compatibility. See include/cobalt/platform/thread.h.

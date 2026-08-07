@@ -47,6 +47,8 @@ set(SOURCES
     src/platform/thread.c
     src/memory/allocator.c
     src/memory/arena.c
+    src/memory/pool.c
+    src/memory/slab.c
     src/runtime/error.c
     src/runtime/logger.c
     src/core/object.c

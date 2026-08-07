@@ -6,6 +6,8 @@ void test_platform(void);
 void test_atomic(void);
 void test_allocator(void);
 void test_arena(void);
+void test_pool(void);
+void test_slab(void);
 void test_error(void);
 void test_logger(void);
 void test_object(void);
@@ -39,6 +41,8 @@ static const TestEntry test_registry[] = {
     {"atomic", test_atomic},
     {"allocator", test_allocator},
     {"arena", test_arena},
+    {"pool", test_pool},
+    {"slab", test_slab},
     {"error", test_error},
     {"logger", test_logger},
     {"object", test_object},

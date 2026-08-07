@@ -7,6 +7,7 @@
 
 #include "cobalt/container/hashmap.h"
 #include "cobalt/interface/map.h"
+#include "cobalt/memory/allocator.h"
 #include "cobalt/runtime/error.h"
 #include "cobalt/utils/string.h"
 #include <stdlib.h>
@@ -44,6 +45,7 @@ typedef struct {
     size_t              size;
     cobalt_hash_func_t  hash_func;
     cobalt_equal_func_t equal_func;
+    cobalt_allocator_t *alloc; /* For destroy only; internal alloc uses stdlib */
 } hashmap_impl_t;
 
 struct cobalt_hashmap {
@@ -189,11 +191,13 @@ static int hashmap_map_contains(cobalt_map_t *self, const void *key, size_t key_
 
 static void hashmap_free_node(hashmap_impl_t *impl, hashmap_node_t *node)
 {
-    if (node->key_owned) {
-        free(node->key);
+    if (!impl || !node) {
+        return;
     }
-    free(node);
-    (void)impl;
+    if (node->key_owned) {
+        impl->alloc->free(impl->alloc, node->key);
+    }
+    impl->alloc->free(impl->alloc, node);
 }
 
 static void hashmap_map_clear(cobalt_map_t *self)
@@ -270,12 +274,14 @@ static int hashmap_ensure_buckets(hashmap_impl_t *impl, size_t min_buckets)
     if (impl->bucket_count >= min_buckets) {
         return 0;
     }
-    size_t           new_count   = min_buckets > 0 ? min_buckets : 16;
-    hashmap_node_t **new_buckets = calloc(new_count, sizeof(hashmap_node_t *));
+    size_t           new_count = min_buckets > 0 ? min_buckets : 16;
+    hashmap_node_t **new_buckets =
+        (hashmap_node_t **)impl->alloc->alloc(impl->alloc, new_count * sizeof(hashmap_node_t *));
     if (!new_buckets) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
     }
+    memset(new_buckets, 0, new_count * sizeof(hashmap_node_t *));
     if (impl->buckets) {
         for (size_t i = 0; i < impl->bucket_count; i++) {
             hashmap_node_t *node = impl->buckets[i];
@@ -287,7 +293,7 @@ static int hashmap_ensure_buckets(hashmap_impl_t *impl, size_t min_buckets)
                 node                    = next;
             }
         }
-        free(impl->buckets);
+        impl->alloc->free(impl->alloc, impl->buckets);
     }
     impl->buckets      = new_buckets;
     impl->bucket_count = new_count;
@@ -322,6 +328,20 @@ cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets)
     impl->size       = 0;
     impl->hash_func  = NULL;
     impl->equal_func = NULL;
+    impl->alloc      = cobalt_allocator_get_system();
+    return map;
+}
+
+cobalt_hashmap_t *cobalt_hashmap_create_with_allocator(size_t              initial_buckets,
+                                                       cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_hashmap_t *map = cobalt_hashmap_create(initial_buckets);
+    if (map) {
+        map->impl.alloc = alloc;
+    }
     return map;
 }
 
@@ -444,7 +464,7 @@ void cobalt_hashmap_destroy(cobalt_hashmap_t *map)
                 node = next;
             }
         }
-        free(impl->buckets);
+        impl->alloc->free(impl->alloc, impl->buckets);
     }
     free(map);
 }

@@ -8,6 +8,7 @@
 
 #include "cobalt/container/vector.h"
 #include "cobalt/interface/iterator.h"
+#include "cobalt/memory/allocator.h"
 #include "cobalt/runtime/error.h"
 #include <stdlib.h>
 #include <string.h>
@@ -18,9 +19,10 @@
 typedef struct {
     cobalt_sequence_t base; /**< Base sequence interface, must be placed at the beginning of the
                                structure to support polymorphic conversion */
-    void **items;
-    size_t capacity;
-    size_t size;
+    cobalt_allocator_t *alloc;
+    void              **items;
+    size_t              capacity;
+    size_t              size;
 } cobalt_vector_impl_t;
 
 /**
@@ -31,10 +33,11 @@ typedef struct {
  *          starting cobalt_sequence_t base.
  */
 struct cobalt_vector {
-    cobalt_sequence_t base;
-    void            **items;
-    size_t            capacity;
-    size_t            size;
+    cobalt_sequence_t   base;
+    cobalt_allocator_t *alloc;
+    void              **items;
+    size_t              capacity;
+    size_t              size;
 };
 
 /* ========================================================================= */
@@ -77,8 +80,9 @@ static void vector_add_seq(cobalt_sequence_t *self, void *item)
     // Check if expansion is needed
     if (vec->size >= vec->capacity) {
         // Capacity doubling strategy; if current capacity is 0, initially allocate 1
-        size_t new_cap   = (vec->capacity == 0) ? 1 : vec->capacity * 2;
-        void **new_items = (void **)realloc(vec->items, new_cap * sizeof(void *));
+        size_t new_cap = (vec->capacity == 0) ? 1 : vec->capacity * 2;
+        void **new_items =
+            (void **)vec->alloc->realloc(vec->alloc, vec->items, new_cap * sizeof(void *));
         if (!new_items) {
             cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
             return;
@@ -145,13 +149,23 @@ static cobalt_iterator_t *vector_iterator_seq(cobalt_sequence_t *self)
  */
 cobalt_vector_t *cobalt_vector_create(size_t initial_capacity)
 {
-    cobalt_vector_impl_t *vec = malloc(sizeof(cobalt_vector_impl_t));
+    return cobalt_vector_create_with_allocator(initial_capacity, cobalt_allocator_get_system());
+}
+
+cobalt_vector_t *cobalt_vector_create_with_allocator(size_t              initial_capacity,
+                                                     cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_vector_impl_t *vec =
+        (cobalt_vector_impl_t *)alloc->alloc(alloc, sizeof(cobalt_vector_impl_t));
     if (!vec) {
         return NULL;
     }
-
-    // Initialize internal array
-    vec->items    = initial_capacity > 0 ? malloc(initial_capacity * sizeof(void *)) : NULL;
+    vec->alloc = alloc;
+    vec->items =
+        initial_capacity > 0 ? alloc->alloc(alloc, initial_capacity * sizeof(void *)) : NULL;
     vec->capacity = initial_capacity;
     vec->size     = 0;
 
@@ -173,8 +187,8 @@ void cobalt_vector_destroy(cobalt_vector_t *vec)
 {
     if (vec) {
         cobalt_vector_impl_t *impl = (cobalt_vector_impl_t *)vec;
-        free(impl->items);
-        free(impl);
+        impl->alloc->free(impl->alloc, impl->items);
+        impl->alloc->free(impl->alloc, impl);
     }
 }
 

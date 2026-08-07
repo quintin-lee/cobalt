@@ -10,6 +10,7 @@
  */
 
 #include "cobalt/interface/map.h"
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -68,6 +69,8 @@ cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets);
 cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t              initial_buckets,
                                             cobalt_hash_func_t  hash_func,
                                             cobalt_equal_func_t equal_func);
+cobalt_hashmap_t *cobalt_hashmap_create_with_allocator(size_t              initial_buckets,
+                                                       cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy the hash map and free memory

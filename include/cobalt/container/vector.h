@@ -10,6 +10,7 @@
  */
 
 #include "cobalt/interface/sequence.h"
+#include "cobalt/memory/allocator.h"
 
 /**
  * @brief Opaque type definition for the dynamic array structure.
@@ -32,6 +33,8 @@ typedef struct cobalt_vector cobalt_vector_t;
  * allocation fails.
  */
 cobalt_vector_t *cobalt_vector_create(size_t initial_capacity);
+cobalt_vector_t *cobalt_vector_create_with_allocator(size_t              initial_capacity,
+                                                     cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy a dynamic array and free its memory

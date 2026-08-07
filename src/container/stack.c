@@ -6,6 +6,7 @@
  */
 
 #include "cobalt/container/stack.h"
+#include "cobalt/memory/allocator.h"
 #include "cobalt/runtime/error.h"
 #include <stdlib.h>
 
@@ -22,8 +23,9 @@ typedef struct stack_node {
  * @brief Internal representation structure of the stack
  */
 struct cobalt_stack {
-    stack_node_t *top;  /* Pointer to the top node of the stack */
-    size_t        size; /* Total number of elements in the stack */
+    cobalt_allocator_t *alloc;
+    stack_node_t       *top;  /* Pointer to the top node of the stack */
+    size_t              size; /* Total number of elements in the stack */
 };
 
 /**
@@ -33,12 +35,24 @@ struct cobalt_stack {
  */
 cobalt_stack_t *cobalt_stack_create(void)
 {
-    cobalt_stack_t *stack = malloc(sizeof(cobalt_stack_t));
+    return cobalt_stack_create_with_allocator(cobalt_allocator_get_system());
+}
+
+/**
+ * @brief Create and initialize an empty stack with a custom allocator
+ */
+cobalt_stack_t *cobalt_stack_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_stack_t *stack = (cobalt_stack_t *)alloc->alloc(alloc, sizeof(cobalt_stack_t));
     if (!stack) {
         return NULL;
     }
-    stack->top  = NULL;
-    stack->size = 0;
+    stack->top   = NULL;
+    stack->size  = 0;
+    stack->alloc = alloc;
     return stack;
 }
 
@@ -59,10 +73,10 @@ void cobalt_stack_destroy(cobalt_stack_t *stack)
     // Iterate and free every node in the linked list
     while (node) {
         stack_node_t *next = node->next;
-        free(node);
+        stack->alloc->free(stack->alloc, node);
         node = next;
     }
-    free(stack);
+    stack->alloc->free(stack->alloc, stack);
 }
 
 /**
@@ -79,7 +93,7 @@ int cobalt_stack_push(cobalt_stack_t *stack, void *item)
         return -1;
     }
 
-    stack_node_t *node = malloc(sizeof(stack_node_t));
+    stack_node_t *node = (stack_node_t *)stack->alloc->alloc(stack->alloc, sizeof(stack_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
@@ -110,7 +124,7 @@ void *cobalt_stack_pop(cobalt_stack_t *stack)
     void         *data = node->data;
     stack->top         = node->next; // Move stack top down
     stack->size--;
-    free(node); // Free original top node
+    stack->alloc->free(stack->alloc, node);
     return data;
 }
 

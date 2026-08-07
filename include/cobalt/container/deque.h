@@ -10,6 +10,7 @@
  */
 
 #include "cobalt/interface/sequence.h"
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -30,6 +31,7 @@ typedef struct cobalt_deque cobalt_deque_t;
  * memory allocation fails.
  */
 cobalt_deque_t *cobalt_deque_create(void);
+cobalt_deque_t *cobalt_deque_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy a double-ended queue and free its memory

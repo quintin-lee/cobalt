@@ -12,6 +12,7 @@
 
 #include "cobalt/algorithm/sort.h"
 #include "cobalt/interface/sequence.h"
+#include "cobalt/memory/allocator.h"
 
 /**
  * @brief Forward declaration of list node type
@@ -35,6 +36,7 @@ typedef struct cobalt_list cobalt_list_t;
  * fails.
  */
 cobalt_list_t *cobalt_list_create(void);
+cobalt_list_t *cobalt_list_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy a doubly-linked list and free its memory

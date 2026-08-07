@@ -8,6 +8,7 @@
  */
 
 #include "cobalt/interface/map.h"
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**

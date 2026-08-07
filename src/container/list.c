@@ -27,6 +27,7 @@ struct cobalt_list_node {
  */
 struct cobalt_list {
     cobalt_sequence_t   base; /**< Base sequence interface (for polymorphism) */
+    cobalt_allocator_t *alloc;
     cobalt_list_node_t *head; /**< Pointer to the list head node */
     cobalt_list_node_t *tail; /**< Pointer to the list tail node */
     size_t              size; /**< Number of elements currently stored in the list */
@@ -67,7 +68,8 @@ static int list_is_empty_seq(cobalt_sequence_t *self)
 static void list_add_seq(cobalt_sequence_t *self, void *item)
 {
     cobalt_list_t      *list = (cobalt_list_t *)self;
-    cobalt_list_node_t *node = malloc(sizeof(cobalt_list_node_t));
+    cobalt_list_node_t *node =
+        (cobalt_list_node_t *)list->alloc->alloc(list->alloc, sizeof(cobalt_list_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return;
@@ -110,7 +112,7 @@ static void list_remove_seq(cobalt_sequence_t *self, void *item)
             } else {
                 list->tail = prev;
             }
-            free(node);
+            list->alloc->free(list->alloc, node);
             list->size--;
             return;
         }
@@ -145,13 +147,21 @@ static cobalt_iterator_t *list_iterator_seq(cobalt_sequence_t *self)
  */
 cobalt_list_t *cobalt_list_create(void)
 {
-    cobalt_list_t *list = malloc(sizeof(cobalt_list_t));
+    return cobalt_list_create_with_allocator(cobalt_allocator_get_system());
+}
+
+cobalt_list_t *cobalt_list_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_list_t *list = (cobalt_list_t *)alloc->alloc(alloc, sizeof(cobalt_list_t));
     if (!list) {
         return NULL;
     }
-
     list->head = list->tail = NULL;
     list->size              = 0;
+    list->alloc             = alloc;
 
     /* Bind polymorphic sequence interface methods */
     list->base.size         = list_size_seq;
@@ -177,10 +187,10 @@ void cobalt_list_destroy(cobalt_list_t *list)
 
     while (node) {
         cobalt_list_node_t *next = node->next;
-        free(node);
+        list->alloc->free(list->alloc, node);
         node = next;
     }
-    free(list);
+    list->alloc->free(list->alloc, list);
 }
 
 /**
@@ -192,7 +202,8 @@ int cobalt_list_push_front(cobalt_list_t *list, void *item)
         return -1;
     }
     cobalt_list_t      *impl = list;
-    cobalt_list_node_t *node = malloc(sizeof(cobalt_list_node_t));
+    cobalt_list_node_t *node =
+        (cobalt_list_node_t *)list->alloc->alloc(list->alloc, sizeof(cobalt_list_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
@@ -220,7 +231,8 @@ int cobalt_list_push_back(cobalt_list_t *list, void *item)
         return -1;
     }
     cobalt_list_t      *impl = list;
-    cobalt_list_node_t *node = malloc(sizeof(cobalt_list_node_t));
+    cobalt_list_node_t *node =
+        (cobalt_list_node_t *)list->alloc->alloc(list->alloc, sizeof(cobalt_list_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
@@ -258,7 +270,7 @@ void *cobalt_list_pop_front(cobalt_list_t *list)
         list->tail = NULL;
     }
     void *data = node->data;
-    free(node);
+    list->alloc->free(list->alloc, node);
     impl->size--;
     return data;
 }
@@ -282,7 +294,7 @@ void *cobalt_list_pop_back(cobalt_list_t *list)
         list->head = NULL;
     }
     void *data = node->data;
-    free(node);
+    list->alloc->free(list->alloc, node);
     impl->size--;
     return data;
 }
@@ -398,7 +410,8 @@ cobalt_iterator_t *cobalt_list_iterator_create(cobalt_list_t *list)
     }
 
     cobalt_list_t        *impl      = list;
-    list_iterator_impl_t *iter_data = malloc(sizeof(list_iterator_impl_t));
+    list_iterator_impl_t *iter_data = (list_iterator_impl_t *)cobalt_allocator_get_system()->alloc(
+        cobalt_allocator_get_system(), sizeof(list_iterator_impl_t));
     if (!iter_data) {
         return NULL;
     }
@@ -408,7 +421,8 @@ cobalt_iterator_t *cobalt_list_iterator_create(cobalt_list_t *list)
     iter_data->current = impl->head;
 
     // Create common iterator structure and bind method table
-    cobalt_iterator_t *iter = malloc(sizeof(cobalt_iterator_t));
+    cobalt_iterator_t *iter = (cobalt_iterator_t *)cobalt_allocator_get_system()->alloc(
+        cobalt_allocator_get_system(), sizeof(cobalt_iterator_t));
     if (!iter) {
         free(iter_data);
         return NULL;
@@ -443,7 +457,7 @@ int cobalt_list_remove(cobalt_list_t *list, void *item)
             } else {
                 impl->tail = prev;
             }
-            free(node);
+            list->alloc->free(list->alloc, node);
             impl->size--;
             return 0;
         }
@@ -479,7 +493,7 @@ int cobalt_list_remove_if(cobalt_list_t *list,
             } else {
                 impl->tail = prev;
             }
-            free(node);
+            list->alloc->free(list->alloc, node);
             impl->size--;
             return 0;
         }

@@ -8,6 +8,7 @@
  */
 
 #include "cobalt/container/queue.h"
+#include "cobalt/memory/allocator.h"
 #include "cobalt/runtime/error.h"
 #include <stdlib.h>
 
@@ -23,9 +24,10 @@ typedef struct queue_node {
  * @brief Internal structure implementation of the queue
  */
 struct cobalt_queue {
-    queue_node_t *head; /**< Queue head node pointer, used for dequeue */
-    queue_node_t *tail; /**< Queue tail node pointer, used for enqueue */
-    size_t        size; /**< Current number of elements in the queue */
+    cobalt_allocator_t *alloc;
+    queue_node_t       *head; /**< Queue head node pointer, used for dequeue */
+    queue_node_t       *tail; /**< Queue tail node pointer, used for enqueue */
+    size_t              size; /**< Current number of elements in the queue */
 };
 
 /**
@@ -33,12 +35,21 @@ struct cobalt_queue {
  */
 cobalt_queue_t *cobalt_queue_create(void)
 {
-    cobalt_queue_t *queue = malloc(sizeof(cobalt_queue_t));
+    return cobalt_queue_create_with_allocator(cobalt_allocator_get_system());
+}
+
+cobalt_queue_t *cobalt_queue_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_queue_t *queue = (cobalt_queue_t *)alloc->alloc(alloc, sizeof(cobalt_queue_t));
     if (!queue) {
         return NULL;
     }
     queue->head = queue->tail = NULL;
     queue->size               = 0;
+    queue->alloc              = alloc;
     return queue;
 }
 
@@ -55,11 +66,11 @@ void cobalt_queue_destroy(cobalt_queue_t *queue)
     // Iterate through the singly-linked list, free the memory of each node
     while (node) {
         queue_node_t *next = node->next;
-        free(node);
+        queue->alloc->free(queue->alloc, node);
         node = next;
     }
     // Free the queue structure itself
-    free(queue);
+    queue->alloc->free(queue->alloc, queue);
 }
 
 /**
@@ -72,7 +83,7 @@ int cobalt_queue_enqueue(cobalt_queue_t *queue, void *item)
     }
 
     // Create a new node
-    queue_node_t *node = malloc(sizeof(queue_node_t));
+    queue_node_t *node = (queue_node_t *)queue->alloc->alloc(queue->alloc, sizeof(queue_node_t));
     if (!node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
@@ -113,7 +124,7 @@ void *cobalt_queue_dequeue(cobalt_queue_t *queue)
         queue->tail = NULL;
     }
     queue->size--;
-    free(node); // Free the memory of the original head node
+    queue->alloc->free(queue->alloc, node);
     return data;
 }
 
