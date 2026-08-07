@@ -13,6 +13,7 @@
  * @{
  */
 
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -28,6 +29,19 @@ typedef struct cobalt_slab cobalt_slab_t;
  * @return Newly created slab, or NULL on failure
  */
 cobalt_slab_t *cobalt_slab_create(const size_t *sizes, const size_t *counts, size_t class_count);
+
+/**
+ * @brief Create a new slab allocator with custom allocator
+ * @param sizes       Array of object sizes (in bytes) for each class
+ * @param counts      Array of block counts for each corresponding size class
+ * @param class_count Number of size classes
+ * @param alloc       Custom allocator to use (must not be NULL)
+ * @return Newly created slab, or NULL on failure
+ */
+cobalt_slab_t *cobalt_slab_create_with_allocator(const size_t       *sizes,
+                                                 const size_t       *counts,
+                                                 size_t              class_count,
+                                                 cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy the slab and free all associated memory

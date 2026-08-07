@@ -13,6 +13,7 @@
  * @{
  */
 
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -27,6 +28,16 @@ typedef struct cobalt_pool cobalt_pool_t;
  * @return Newly created pool, or NULL on failure
  */
 cobalt_pool_t *cobalt_pool_create(size_t block_size, size_t block_count);
+
+/**
+ * @brief Create a new fixed-size block pool using a custom allocator
+ * @param block_size   Size of each block in bytes (must be >= sizeof(void*) for free-list)
+ * @param block_count  Number of blocks to pre-allocate
+ * @param alloc        Custom allocator to use (must not be NULL)
+ * @return Newly created pool, or NULL on failure
+ */
+cobalt_pool_t *
+cobalt_pool_create_with_allocator(size_t block_size, size_t block_count, cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy the pool and free all associated memory

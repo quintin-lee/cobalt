@@ -12,6 +12,8 @@
 #include "cobalt/container/treemap.h"
 #include "cobalt/container/vector.h"
 #include "cobalt/memory/allocator.h"
+#include "cobalt/memory/pool.h"
+#include "cobalt/memory/slab.h"
 #include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -211,6 +213,59 @@ void test_allocator_alloc_failure(void)
     printf("  Vector alloc failure: OK\n");
 }
 
+void test_allocator_inject_pool(void)
+{
+    printf("Testing pool with injected allocator...\n");
+    mock_alloc_count = 0;
+    mock_free_count  = 0;
+    mock_offset      = 0;
+
+    cobalt_pool_t *pool = cobalt_pool_create_with_allocator(sizeof(int), 8, &mock_allocator);
+    TEST_ASSERT(pool != NULL);
+    TEST_ASSERT(mock_alloc_count >= 2); /* pool struct + memory block */
+
+    int *a = (int *)cobalt_pool_alloc(pool);
+    TEST_ASSERT(a != NULL);
+    *a = 42;
+    TEST_ASSERT(*a == 42);
+
+    cobalt_pool_free(pool, a);
+    int *b = (int *)cobalt_pool_alloc(pool);
+    TEST_ASSERT(b != NULL);
+    TEST_ASSERT(cobalt_pool_free_count(pool) == 7);
+
+    cobalt_pool_destroy(pool);
+    TEST_ASSERT(mock_free_count >= 2);
+    printf("  Pool with injected allocator: OK\n");
+}
+
+void test_allocator_inject_slab(void)
+{
+    printf("Testing slab with injected allocator...\n");
+    mock_alloc_count = 0;
+    mock_free_count  = 0;
+    mock_offset      = 0;
+
+    size_t         sizes[]  = {sizeof(int), sizeof(double)};
+    size_t         counts[] = {4, 4};
+    cobalt_slab_t *slab     = cobalt_slab_create_with_allocator(sizes, counts, 2, &mock_allocator);
+    TEST_ASSERT(slab != NULL);
+    TEST_ASSERT(mock_alloc_count >= 3); /* slab struct + 2 class memories */
+
+    int    *a = (int *)cobalt_slab_alloc(slab, sizeof(int));
+    double *b = (double *)cobalt_slab_alloc(slab, sizeof(double));
+    TEST_ASSERT(a != NULL && b != NULL);
+    *a = 99;
+    *b = 3.14;
+    TEST_ASSERT(*a == 99);
+    TEST_ASSERT((*b > 3.0) && (*b < 4.0));
+
+    cobalt_slab_free(slab, a);
+    cobalt_slab_free(slab, b);
+    cobalt_slab_destroy(slab);
+    printf("  Slab with injected allocator: OK\n");
+}
+
 void test_allocator_inject(void)
 {
     printf("Testing allocator injection...\n");
@@ -221,6 +276,8 @@ void test_allocator_inject(void)
     test_allocator_inject_queue();
     test_allocator_inject_set();
     test_allocator_inject_deque();
+    test_allocator_inject_pool();
+    test_allocator_inject_slab();
     test_allocator_alloc_failure();
     printf("  Allocator injection tests completed\n");
 }

@@ -4,41 +4,50 @@
  */
 
 #include "cobalt/memory/pool.h"
+#include "cobalt/memory/allocator.h"
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 struct cobalt_pool {
-    size_t block_size;
-    size_t block_count;
-    size_t free_count;
-    void  *memory;    /**< Contiguous block of memory */
-    void  *free_list; /**< Linked list of free blocks */
+    size_t              block_size;
+    size_t              block_count;
+    size_t              free_count;
+    void               *memory;    /**< Contiguous block of memory */
+    void               *free_list; /**< Linked list of free blocks */
+    cobalt_allocator_t *alloc;     /**< Allocator instance */
 };
 
 cobalt_pool_t *cobalt_pool_create(size_t block_size, size_t block_count)
 {
-    if (block_size == 0 || block_count == 0) {
+    return cobalt_pool_create_with_allocator(
+        block_size, block_count, cobalt_allocator_get_system());
+}
+
+cobalt_pool_t *
+cobalt_pool_create_with_allocator(size_t block_size, size_t block_count, cobalt_allocator_t *alloc)
+{
+    if (block_size == 0 || block_count == 0 || !alloc) {
         return NULL;
     }
     if (block_size < sizeof(void *)) {
         block_size = sizeof(void *);
     }
 
-    cobalt_pool_t *pool = (cobalt_pool_t *)malloc(sizeof(cobalt_pool_t));
+    cobalt_pool_t *pool = (cobalt_pool_t *)alloc->alloc(alloc, sizeof(cobalt_pool_t));
     if (!pool) {
         return NULL;
     }
 
-    pool->memory = malloc(block_size * block_count);
+    pool->memory = alloc->alloc(alloc, block_size * block_count);
     if (!pool->memory) {
-        free(pool);
+        alloc->free(alloc, pool);
         return NULL;
     }
 
     pool->block_size  = block_size;
     pool->block_count = block_count;
     pool->free_count  = block_count;
+    pool->alloc       = alloc;
 
     /* Build free-list: chain blocks together */
     pool->free_list     = pool->memory;
@@ -59,8 +68,8 @@ void cobalt_pool_destroy(cobalt_pool_t *pool)
     if (!pool) {
         return;
     }
-    free(pool->memory);
-    free(pool);
+    pool->alloc->free(pool->alloc, pool->memory);
+    pool->alloc->free(pool->alloc, pool);
 }
 
 void *cobalt_pool_alloc(cobalt_pool_t *pool)
