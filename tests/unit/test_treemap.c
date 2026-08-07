@@ -22,7 +22,9 @@ void test_treemap_basic(void)
     TEST_ASSERT(cobalt_treemap_size(map) == 0);
     printf("  Empty tree size: OK\n");
 
-    int val1 = 1, val2 = 2, val3 = 3;
+    int val1 = 1;
+    int val2 = 2;
+    int val3 = 3;
     TEST_ASSERT(cobalt_treemap_put(map, "b", &val1) == 0);
     TEST_ASSERT(cobalt_treemap_put(map, "a", &val2) == 0);
     TEST_ASSERT(cobalt_treemap_put(map, "c", &val3) == 0);
@@ -54,7 +56,9 @@ void test_treemap_remove(void)
     cobalt_treemap_t *map = cobalt_treemap_create();
     TEST_ASSERT(map != NULL);
 
-    int a = 1, b = 2, c = 3;
+    int a = 1;
+    int b = 2;
+    int c = 3;
     TEST_ASSERT(cobalt_treemap_put(map, "a", &a) == 0);
     TEST_ASSERT(cobalt_treemap_put(map, "b", &b) == 0);
     TEST_ASSERT(cobalt_treemap_put(map, "c", &c) == 0);
@@ -177,7 +181,9 @@ void test_treemap_iterator(void)
     printf("  Empty tree iterator: OK\n");
 
     /* Insert and iterate */
-    int v1 = 1, v2 = 2, v3 = 3;
+    int v1 = 1;
+    int v2 = 2;
+    int v3 = 3;
     TEST_ASSERT(cobalt_treemap_put(map, "b", &v1) == 0);
     TEST_ASSERT(cobalt_treemap_put(map, "a", &v2) == 0);
     TEST_ASSERT(cobalt_treemap_put(map, "c", &v3) == 0);
@@ -268,7 +274,9 @@ void test_treemap_duplicate_keys(void)
     cobalt_treemap_t *map = cobalt_treemap_create();
     TEST_ASSERT(map != NULL);
 
-    int v1 = 1, v2 = 2, v3 = 3;
+    int v1 = 1;
+    int v2 = 2;
+    int v3 = 3;
     TEST_ASSERT(cobalt_treemap_put(map, "key", &v1) == 0);
     TEST_ASSERT(cobalt_treemap_size(map) == 1);
     TEST_ASSERT(*((int *)cobalt_treemap_get(map, "key")) == 1);
