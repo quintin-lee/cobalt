@@ -2,6 +2,23 @@
 
 This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH).
 
+## v2.2.0 (2026-08-07) — Interface & Documentation Release
+
+### Added
+- **Sequence convenience API**: `cobalt_sequence_size`, `cobalt_sequence_is_empty`, `cobalt_sequence_add`, `cobalt_sequence_remove`
+- **Deque implements `cobalt_sequence_t`**: polymorphic sequence usage for Deque
+- **`docs/API/`**: Added core.md, memory.md, interfaces.md, runtime.md, platform.md
+- **CI hardening**: Added format gate, ASan job, and Valgrind memory-check job
+
+### Changed
+- Moved `find_program` and `ALL_SRC_FILES` to top of CMakeLists.txt (fixes POST_BUILD format hang)
+- Updated test count: 22 → 25
+
+### Fixed
+- fix(build): POST_BUILD format no longer hangs when variables are undefined
+- style(container): fix readability-else-after-return in deque.c
+
+---
 ## v2.1.0 (2026-08-02) — Feature Expansion Release
 
 ### Added

@@ -44,6 +44,7 @@ file(GLOB_RECURSE ALL_SRC_FILES
 set(SOURCES
     src/platform/platform.c
     src/platform/atomic.c
+    src/platform/thread.c
     src/memory/allocator.c
     src/memory/arena.c
     src/runtime/error.c

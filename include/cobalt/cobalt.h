@@ -13,6 +13,7 @@
 /* --- Platform and atomic operations --- */
 #include <cobalt/platform/atomic.h>
 #include <cobalt/platform/platform.h>
+#include <cobalt/platform/thread.h>
 
 /* --- Memory management --- */
 #include <cobalt/memory/allocator.h>
