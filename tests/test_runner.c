@@ -9,6 +9,7 @@ void test_arena(void);
 void test_pool(void);
 void test_slab(void);
 void test_error(void);
+void test_error_stack(void);
 void test_logger(void);
 void test_object(void);
 void test_class(void);
@@ -45,6 +46,7 @@ static const TestEntry test_registry[] = {
     {"pool", test_pool},
     {"slab", test_slab},
     {"error", test_error},
+    {"error_stack", test_error_stack},
     {"logger", test_logger},
     {"object", test_object},
     {"class", test_class},

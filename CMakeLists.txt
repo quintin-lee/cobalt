@@ -50,6 +50,7 @@ set(SOURCES
     src/memory/pool.c
     src/memory/slab.c
     src/runtime/error.c
+    src/runtime/error_stack.c
     src/runtime/logger.c
     src/core/object.c
     src/core/class.c

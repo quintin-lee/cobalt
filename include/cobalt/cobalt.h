@@ -22,6 +22,7 @@
 
 /* --- Runtime and error handling --- */
 #include <cobalt/runtime/error.h>
+#include <cobalt/runtime/error_stack.h>
 #include <cobalt/runtime/logger.h>
 
 /* --- Core object-oriented system --- */

@@ -9,6 +9,7 @@ add_executable(cobalt_test
     unit/test_pool.c
     unit/test_slab.c
     unit/test_error.c
+    unit/test_error_stack.c
     unit/test_logger.c
     unit/test_object.c
     unit/test_class.c
@@ -53,6 +54,7 @@ add_test(NAME test_arena COMMAND cobalt_test --filter arena)
 add_test(NAME test_pool COMMAND cobalt_test --filter pool)
 add_test(NAME test_slab COMMAND cobalt_test --filter slab)
 add_test(NAME test_error COMMAND cobalt_test --filter error)
+add_test(NAME test_error_stack COMMAND cobalt_test --filter error_stack)
 add_test(NAME test_logger COMMAND cobalt_test --filter logger)
 add_test(NAME test_object COMMAND cobalt_test --filter object)
 add_test(NAME test_class COMMAND cobalt_test --filter class)
