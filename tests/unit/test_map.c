@@ -54,7 +54,9 @@ static void run_map_tests(cobalt_map_t *map, const char *name)
     /* iterator */
     cobalt_map_iterator_t *iter = map->iterator(map);
     TEST_ASSERT(iter != NULL);
-    TEST_ASSERT(map->iterator(map) != NULL); /* sanity: can create multiple */
+    cobalt_map_iterator_t *iter_sanity = map->iterator(map);
+    TEST_ASSERT(iter_sanity != NULL);
+    cobalt_map_iterator_destroy(iter_sanity);
 
     int count = 0;
     while (cobalt_map_iterator_has_next(iter)) {
@@ -126,7 +128,7 @@ static void run_map_convenience_tests(cobalt_map_t *map, const char *name)
 
     /* contains */
     TEST_ASSERT(cobalt_map_contains(map, "alpha", strlen("alpha")) != 0);
-    TEST_ASSERT(cobalt_map_contains(map, "beta",  strlen("beta"))  == 0);
+    TEST_ASSERT(cobalt_map_contains(map, "beta", strlen("beta")) == 0);
     TEST_ASSERT(cobalt_map_contains(map, "gamma", strlen("gamma")) != 0);
 
     /* clear */

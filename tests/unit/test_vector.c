@@ -6,10 +6,10 @@
 #include "cobalt/container/vector.h"
 #include "cobalt/interface/iterator.h"
 #include "test_framework.h"
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
 
 void test_vector_basic(void)
 {
@@ -312,10 +312,12 @@ void test_vector_alternating_push_set(void)
 
     int replacements[] = {100, 101, 102, 103, 104};
 
+    int *orig[5];
     for (int i = 0; i < 5; i++) {
         int *v = malloc(sizeof(int));
         TEST_ASSERT(v != NULL);
-        *v = i + 1;
+        *v      = i + 1;
+        orig[i] = v;
         TEST_ASSERT(cobalt_vector_push(vec, v) == 0);
     }
     TEST_ASSERT(cobalt_vector_size(vec) == 5);
@@ -329,6 +331,9 @@ void test_vector_alternating_push_set(void)
     }
 
     TEST_ASSERT(cobalt_vector_size(vec) == 5);
+    for (int i = 0; i < 5; i++) {
+        free(orig[i]);
+    }
     cobalt_vector_destroy(vec);
     printf("  Alternating push/set test passed\n");
 }
