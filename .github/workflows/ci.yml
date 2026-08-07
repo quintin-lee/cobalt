@@ -19,7 +19,16 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy clang-format valgrind lcov
+          sudo apt-get install -y clang-tidy clang-format valgrind lcov ccache
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ matrix.compiler }}-${{ matrix.build_type }}-${{ hashFiles('**/*.c', '**/*.h') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.compiler }}-${{ matrix.build_type }}-
+            ${{ runner.os }}-ccache-
 
       - name: Configure
         run: |
@@ -50,7 +59,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy clang-format
+          sudo apt-get install -y clang-tidy clang-format ccache
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-asan-${{ hashFiles('**/*.c', '**/*.h') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-asan-
 
       - name: Configure with ASan
         run: |
@@ -69,6 +86,41 @@ jobs:
       - name: Test with ASan
         run: ctest --test-dir build-asan --output-on-failure
 
+  ubsan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ccache
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-ubsan-${{ hashFiles('**/*.c', '**/*.h') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-ubsan-
+
+      - name: Configure with UBsan
+        run: |
+          mkdir -p build-ubsan
+          cmake -B build-ubsan \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_C_FLAGS="-fsanitize=undefined -g" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=undefined" \
+            -DCOBALT_RUN_TIDY=OFF \
+            -DCOBALT_RUN_FORMAT=OFF
+
+      - name: Build
+        run: cmake --build build-ubsan --parallel
+
+      - name: Test with UBsan
+        run: ctest --test-dir build-ubsan --output-on-failure
+
   valgrind:
     runs-on: ubuntu-latest
     steps:
@@ -77,7 +129,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy clang-format valgrind
+          sudo apt-get install -y clang-tidy clang-format valgrind ccache
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-valgrind-${{ hashFiles('**/*.c', '**/*.h') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-valgrind-
 
       - name: Configure
         run: |
@@ -102,7 +162,15 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y lcov
+          sudo apt-get install -y lcov ccache
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-coverage-${{ hashFiles('**/*.c', '**/*.h') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-coverage-
 
       - name: Configure with coverage
         run: |
