@@ -166,3 +166,27 @@ Available via popular package managers:
 | vcpkg | `vcpkg install cobalt` |
 | Conan | `conan install --requires=cobalt/2.0.0` |
 | pkg-config | `pkg-config --cflags --libs cobalt` |
+
+## Performance
+
+Benchmark results (Ubuntu 22.04, GCC 13, Release build, 100k operations, 3 iterations averaged):
+
+| Operation | Time | Notes |
+|-----------|------|-------|
+| Vector push (100k) | ~5.5 ms | Contiguous memory, cache-friendly |
+| Vector get (100k) | ~7.7 ms | O(1) random access |
+| HashMap put (100k) | ~125 ms | String key hashing overhead |
+| HashMap get (100k) | ~176 ms | Hash + pointer chase |
+| TreeMap put (100k) | ~240 ms | BST traversal, cache misses |
+| TreeMap get (100k) | ~338 ms | O(log n) lookup |
+| List push_back (100k) | ~33 ms | Linked list allocation overhead |
+| Deque push_front (100k) | ~16 ms | Efficient front insertion |
+| Stack push (100k) | ~17 ms | LIFO, minimal overhead |
+| Queue enqueue (100k) | ~17 ms | FIFO, circular buffer |
+| Set insert (100k) | ~15 ms | Hash-based deduplication |
+
+Run benchmarks locally:
+```bash
+cd build && cmake .. -DCOBALT_RUN_TIDY=OFF -DCOBALT_RUN_FORMAT=OFF && make -j8
+./tests/bench_runner
+```
