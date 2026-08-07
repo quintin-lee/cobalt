@@ -46,13 +46,13 @@ void      cobalt_atomic_decrement(cobalt_atomic_t *a);
 
 All atomic operations use LOCK-FREE instructions where supported by the target architecture. This is critical for reference-counted object lifecycles in multithreaded contexts.
 
-## 4. Alignment Utilities (Planned — cobalt_align macro)
+## 4. Alignment Utilities (Implemented)
 
-Future extension: `cobalt_align(value, boundary)` macro/function for portable aligned allocation, important for SIMD instructions and structure packing.
+Implemented: cobalt_align, cobalt_align_offset, cobalt_is_aligned macros in include/cobalt/platform/utils.h.
 
-## 5. Endian Conversion (Planned — cobalt_host_to_le32 helper)
+## 5. Endian Conversion (Implemented)
 
-Future extension: `cobalt_host_to_le32()`, `le32_to_host()` helpers for cross-platform binary data interchange.
+Implemented: cobalt_host_to_net16/32/64, cobalt_net_to_host16/32/64, cobalt_swap16/32/64 in include/cobalt/platform/utils.h.
 
 ## 6. Direct I/O Support (Planned)
 

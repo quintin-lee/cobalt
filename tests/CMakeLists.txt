@@ -29,6 +29,7 @@ add_executable(cobalt_test
     unit/test_iterator.c
     unit/test_map.c
     unit/test_thread.c
+    unit/test_platform_utils.c
 )
 
 target_include_directories(cobalt_test PRIVATE
@@ -72,6 +73,7 @@ add_test(NAME test_sequence COMMAND cobalt_test --filter sequence)
 add_test(NAME test_iterator COMMAND cobalt_test --filter iterator)
 add_test(NAME test_map COMMAND cobalt_test --filter map)
 add_test(NAME test_thread COMMAND cobalt_test --filter thread)
+add_test(NAME test_platform_utils COMMAND cobalt_test --filter platform_utils)
 
 # Benchmarks
 add_executable(benchmark_hashmap benchmark/benchmark_hashmap.c)
