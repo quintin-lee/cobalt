@@ -5,12 +5,12 @@
 
 #include "cobalt/module/eventloop.h"
 #include "test_framework.h"
+#include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <poll.h>
 
 static int  timer_called  = 0;
 static int  fd_called     = 0;
@@ -28,7 +28,20 @@ static void on_timer(uint64_t id, void *user_data)
     if (g_fired_order) {
         g_fired_order[g_fire_idx++] = (int)id;
     }
-    printf("  Timer %lu fired (call #%d)\n", (unsigned long)id, timer_called);
+    if (timer_called <= 3) {
+        if (timer_called <= 2) {
+            printf("  Timer %lu fired (call #%d)\n", (unsigned long)id, timer_called);
+        }
+    }
+}
+
+static void on_timer_quiet(uint64_t id, void *user_data)
+{
+    (void)id;
+    int *counter = (int *)user_data;
+    if (counter) {
+        (*counter)++;
+    }
 }
 
 static void on_fd(int fd, short events, void *user_data)
@@ -37,6 +50,10 @@ static void on_fd(int fd, short events, void *user_data)
     fd_called++;
     printf("  FD %d ready (call #%d)\n", fd, fd_called);
 }
+
+/* Forward declarations for new tests */
+void test_eventloop_timer_edge_cases(void);
+void test_eventloop_fd_edge_cases(void);
 
 void test_eventloop_create_destroy(void)
 {
@@ -248,8 +265,8 @@ void test_eventloop_timing(void)
 
     clock_gettime(CLOCK_MONOTONIC, &end);
 
-    long elapsed_ms = (end.tv_sec - start.tv_sec) * 1000L +
-                      (end.tv_nsec - start.tv_nsec) / 1000000L;
+    long elapsed_ms =
+        (end.tv_sec - start.tv_sec) * 1000L + (end.tv_nsec - start.tv_nsec) / 1000000L;
 
     printf("  10 iterations took %ld ms\n", elapsed_ms);
     /* The bug caused 1s per iteration; should be well under 1000ms total */
@@ -257,6 +274,95 @@ void test_eventloop_timing(void)
 
     cobalt_eventloop_destroy(loop);
     printf("  Eventloop timing test passed\n");
+}
+
+void test_eventloop_timer_edge_cases(void)
+{
+    printf("Testing eventloop timer edge cases...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    /* Zero timeout timer */
+    uint64_t id_zero = cobalt_eventloop_add_timer(loop, 0, 0, on_timer, NULL);
+    TEST_ASSERT(id_zero != 0);
+    cobalt_eventloop_iteration(loop);
+    printf("  Zero timeout timer: OK\n");
+
+    /* Delete timer immediately after add */
+    uint64_t id_del = cobalt_eventloop_add_timer(loop, 100, 0, on_timer, NULL);
+    TEST_ASSERT(id_del != 0);
+    int ret = cobalt_eventloop_del_timer(loop, id_del);
+    TEST_ASSERT(ret == 0);
+    printf("  Immediate timer delete: OK\n");
+
+    /* Delete non-existent timer */
+    ret = cobalt_eventloop_del_timer(loop, 99999);
+    TEST_ASSERT(ret == -1);
+    printf("  Delete non-existent timer: OK\n");
+
+    /* Delete timer from NULL loop */
+    ret = cobalt_eventloop_del_timer(NULL, 1);
+    TEST_ASSERT(ret == -1);
+    printf("  Delete from NULL loop: OK\n");
+
+    /* Add timer to NULL loop */
+    id_del = cobalt_eventloop_add_timer(NULL, 100, 0, on_timer, NULL);
+    TEST_ASSERT(id_del == 0);
+    printf("  Add timer to NULL loop: OK\n");
+
+    cobalt_eventloop_destroy(loop);
+    printf("  Timer edge cases passed\n");
+}
+
+void test_eventloop_fd_edge_cases(void)
+{
+    printf("Testing eventloop FD edge cases...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    int pipefd[2];
+    if (pipe(pipefd) == 0) {
+        /* Delete non-existent FD */
+        int ret = cobalt_eventloop_del_fd(loop, pipefd[0]);
+        TEST_ASSERT(ret == -1);
+        printf("  Delete non-existent FD: OK\n");
+
+        /* Mod non-existent FD */
+        ret = cobalt_eventloop_mod_fd(loop, pipefd[0], POLLIN, on_fd, NULL);
+        TEST_ASSERT(ret == 0);
+        printf("  Mod non-existent FD (creates new): OK\n");
+
+        /* Add same FD twice */
+        ret = cobalt_eventloop_add_fd(loop, pipefd[0], POLLIN, on_fd, NULL);
+        TEST_ASSERT(ret != 0);
+        ret = cobalt_eventloop_add_fd(loop, pipefd[0], POLLIN, on_fd, NULL);
+        TEST_ASSERT(ret != 0); /* Duplicate add should fail */
+        printf("  Duplicate FD add: OK\n");
+
+        /* Delete FD, then delete again */
+        ret = cobalt_eventloop_del_fd(loop, pipefd[0]);
+        TEST_ASSERT(ret == 0);
+        ret = cobalt_eventloop_del_fd(loop, pipefd[0]);
+        TEST_ASSERT(ret == -1);
+        printf("  Double delete FD: OK\n");
+
+        close(pipefd[0]);
+        close(pipefd[1]);
+    }
+
+    /* NULL loop tests */
+    int ret = cobalt_eventloop_add_fd(NULL, 0, POLLIN, on_fd, NULL);
+    TEST_ASSERT(ret == -1);
+    ret = cobalt_eventloop_mod_fd(NULL, 0, POLLIN, on_fd, NULL);
+    TEST_ASSERT(ret == -1);
+    ret = cobalt_eventloop_del_fd(NULL, 0);
+    TEST_ASSERT(ret == -1);
+    printf("  NULL loop operations: OK\n");
+
+    cobalt_eventloop_destroy(loop);
+    printf("  FD edge cases passed\n");
 }
 
 void test_eventloop(void)
@@ -269,5 +375,34 @@ void test_eventloop(void)
     test_eventloop_multiple_timers();
     test_eventloop_timer_heap_order();
     test_eventloop_timing();
+    test_eventloop_timer_edge_cases();
+    test_eventloop_fd_edge_cases();
     printf("  Eventloop tests completed\n");
+}
+
+void test_eventloop_timer_periodic(void)
+{
+    printf("Testing eventloop periodic timer...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    int fire_count = 0;
+
+    /* Add a periodic timer with 10ms interval */
+    uint64_t id = cobalt_eventloop_add_timer(loop, 10, 10, on_timer, &fire_count);
+    TEST_ASSERT(id != 0);
+    printf("  Periodic timer added: id=%lu\n", (unsigned long)id);
+
+    /* Run iterations with small delays */
+    for (int i = 0; i < 5; i++) {
+        cobalt_eventloop_iteration(loop);
+        usleep(5000);
+    }
+
+    printf("  Periodic timer fired %d times\n", fire_count);
+    TEST_ASSERT(fire_count >= 1);
+
+    cobalt_eventloop_destroy(loop);
+    printf("  Periodic timer test passed\n");
 }
