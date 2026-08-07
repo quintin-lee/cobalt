@@ -25,7 +25,7 @@
  * @return A pointer to the newly allocated string copy; returns NULL if the source string is NULL
  * or memory allocation fails
  */
-char *cobalt_strdup(const char *s);
+char *cobalt_strdup(const char *str_src);
 
 /** @} */
 

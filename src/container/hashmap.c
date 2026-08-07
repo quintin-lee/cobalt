@@ -13,18 +13,24 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* FNV-1a parameters */
+enum { COBALT_FNV1A_OFFSET_BASIS = 2166136261U };
+enum { COBALT_FNV1A_PRIME = 16777619U };
+/* Default bucket count for lazy init */
+enum { COBALT_HASHMAP_DEFAULT_BUCKETS = 16 };
+
 /* -------------------------------------------------------------------------- */
 /* FNV-1a hash for string keys                                               */
 /* -------------------------------------------------------------------------- */
 
 static unsigned int hash_string(const char *str)
 {
-    unsigned int h = 2166136261U;
+    unsigned int hash_val = COBALT_FNV1A_OFFSET_BASIS;
     while (*str) {
-        h = (h ^ (unsigned char)*str) * 16777619U;
+        hash_val = (hash_val ^ (unsigned char)*str) * COBALT_FNV1A_PRIME;
         str++;
     }
-    return h;
+    return hash_val;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -274,14 +280,16 @@ static int hashmap_ensure_buckets(hashmap_impl_t *impl, size_t min_buckets)
     if (impl->bucket_count >= min_buckets) {
         return 0;
     }
-    size_t           new_count = min_buckets > 0 ? min_buckets : 16;
-    hashmap_node_t **new_buckets =
-        (hashmap_node_t **)impl->alloc->alloc(impl->alloc, new_count * sizeof(hashmap_node_t *));
+    size_t new_count = min_buckets > 0 ? min_buckets : COBALT_HASHMAP_DEFAULT_BUCKETS;
+    void  *tmp_alloc = impl->alloc->alloc(impl->alloc, new_count * sizeof(hashmap_node_t *));
+    hashmap_node_t **new_buckets = (hashmap_node_t **)tmp_alloc;
     if (!new_buckets) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
     }
-    memset(new_buckets, 0, new_count * sizeof(hashmap_node_t *));
+    for (size_t _i = 0; _i < new_count; _i++) {
+        new_buckets[_i] = NULL;
+    }
     if (impl->buckets) {
         for (size_t i = 0; i < impl->bucket_count; i++) {
             hashmap_node_t *node = impl->buckets[i];
@@ -293,7 +301,7 @@ static int hashmap_ensure_buckets(hashmap_impl_t *impl, size_t min_buckets)
                 node                    = next;
             }
         }
-        impl->alloc->free(impl->alloc, impl->buckets);
+        impl->alloc->free(impl->alloc, (void *)impl->buckets);
     }
     impl->buckets      = new_buckets;
     impl->bucket_count = new_count;
@@ -314,7 +322,8 @@ cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets)
     map->base            = hashmap_map_vtable;
     hashmap_impl_t *impl = &map->impl;
     if (initial_buckets > 0) {
-        impl->buckets = calloc(initial_buckets, sizeof(hashmap_node_t *));
+        void *tmp_calloc = calloc(initial_buckets, sizeof(hashmap_node_t *));
+        impl->buckets    = (hashmap_node_t **)tmp_calloc;
         if (!impl->buckets) {
             free(map);
             cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
@@ -353,7 +362,7 @@ int cobalt_hashmap_put(cobalt_hashmap_t *map, const char *key, void *value)
     }
     hashmap_impl_t *impl = &map->impl;
     if (impl->bucket_count == 0) {
-        if (hashmap_ensure_buckets(impl, 16) != 0) {
+        if (hashmap_ensure_buckets(impl, COBALT_HASHMAP_DEFAULT_BUCKETS) != 0) {
             return -1;
         }
     }
@@ -464,7 +473,7 @@ void cobalt_hashmap_destroy(cobalt_hashmap_t *map)
                 node = next;
             }
         }
-        impl->alloc->free(impl->alloc, impl->buckets);
+        impl->alloc->free(impl->alloc, (void *)impl->buckets);
     }
     free(map);
 }
@@ -494,7 +503,7 @@ int cobalt_hashmap_put_ext(cobalt_hashmap_t *map, const void *key, size_t key_le
     }
     hashmap_impl_t *impl = &map->impl;
     if (impl->bucket_count == 0) {
-        if (hashmap_ensure_buckets(impl, 16) != 0) {
+        if (hashmap_ensure_buckets(impl, COBALT_HASHMAP_DEFAULT_BUCKETS) != 0) {
             return -1;
         }
     }

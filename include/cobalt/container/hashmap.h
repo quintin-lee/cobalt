@@ -44,7 +44,7 @@ typedef unsigned int (*cobalt_hash_func_t)(const void *key, size_t key_len);
  * @param key_len Length of each key in bytes
  * @return Non-zero if keys are equal, zero otherwise
  */
-typedef int (*cobalt_equal_func_t)(const void *a, const void *b, size_t key_len);
+typedef int (*cobalt_equal_func_t)(const void *key_a, const void *key_b, size_t key_len);
 
 /**
  * @brief Create a new hash map (string keys)
