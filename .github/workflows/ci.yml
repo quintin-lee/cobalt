@@ -17,7 +17,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get install -y clang-tidy clang-format valgrind lcov
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy clang-format valgrind lcov
 
       - name: Configure
         run: |
@@ -46,7 +48,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get install -y clang-tidy clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy clang-format
 
       - name: Configure with ASan
         run: |
@@ -71,7 +75,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get install -y clang-tidy clang-format valgrind
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-tidy clang-format valgrind
 
       - name: Configure
         run: |
@@ -94,7 +100,9 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: sudo apt-get install -y lcov
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lcov
 
       - name: Configure with coverage
         run: |
