@@ -116,3 +116,10 @@ add_test(NAME bench_set COMMAND benchmark_set
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 add_test(NAME bench_deque COMMAND benchmark_deque
          PASS_REGULAR_EXPRESSION "Benchmark completed")
+
+# Unified benchmark runner
+add_executable(bench_runner benchmark/bench_runner.c)
+target_link_libraries(bench_runner cobalt m)
+
+add_test(NAME bench_runner COMMAND bench_runner
+         PASS_REGULAR_EXPRESSION "Benchmark suite complete")
