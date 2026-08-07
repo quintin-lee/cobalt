@@ -20,6 +20,7 @@ void test_hashmap(void);
 void test_treemap(void);
 void test_sort(void);
 void test_functional(void);
+void test_stream(void);
 void test_json(void);
 void test_eventloop(void);
 void test_stack(void);
@@ -57,6 +58,7 @@ static const TestEntry test_registry[] = {
     {"treemap", test_treemap},
     {"sort", test_sort},
     {"functional", test_functional},
+    {"stream", test_stream},
     {"json", test_json},
     {"eventloop", test_eventloop},
     {"stack", test_stack},

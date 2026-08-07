@@ -20,6 +20,7 @@ add_executable(cobalt_test
     unit/test_treemap.c
     unit/test_sort.c
     unit/test_functional.c
+    unit/test_stream.c
     unit/test_json.c
     unit/test_eventloop.c
     unit/test_stack.c
@@ -65,6 +66,7 @@ add_test(NAME test_hashmap COMMAND cobalt_test --filter hashmap)
 add_test(NAME test_treemap COMMAND cobalt_test --filter treemap)
 add_test(NAME test_sort COMMAND cobalt_test --filter sort)
 add_test(NAME test_functional COMMAND cobalt_test --filter functional)
+add_test(NAME test_stream COMMAND cobalt_test --filter stream)
 add_test(NAME test_json COMMAND cobalt_test --filter json)
 add_test(NAME test_eventloop COMMAND cobalt_test --filter eventloop)
 add_test(NAME test_stack COMMAND cobalt_test --filter stack)
