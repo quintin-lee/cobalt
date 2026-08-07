@@ -65,6 +65,7 @@ set(SOURCES
     src/container/deque.c
     src/algorithm/sort.c
     src/algorithm/functional.c
+    src/algorithm/stream.c
     src/module/json.c
     src/module/json_parse.c
     src/module/json_serialize.c
@@ -167,6 +168,12 @@ add_executable(examples_refcount_demo examples/refcount_demo.c)
 target_link_libraries(examples_refcount_demo cobalt pthread)
 
 add_executable(examples_simple_server examples/simple_server.c)
+
+add_executable(examples_error_stack_demo examples/error_stack_demo.c)
+target_link_libraries(examples_error_stack_demo cobalt)
+
+add_executable(examples_concurrent_demo examples/concurrent_demo.c)
+target_link_libraries(examples_concurrent_demo cobalt pthread)
 target_link_libraries(examples_simple_server cobalt)
 
 # ============================================================
