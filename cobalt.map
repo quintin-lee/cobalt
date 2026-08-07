@@ -1,0 +1,4 @@
+{
+  global: cobalt_*;
+  local: *;
+};

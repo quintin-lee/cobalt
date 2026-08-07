@@ -74,10 +74,14 @@ set(SOURCES
     src/interface/map.c
     src/interface/sequence.c
     src/utils/string.c
+    src/utils/benchmark.c
 )
 
 # Main library
 add_library(cobalt ${SOURCES})
+set_target_properties(cobalt PROPERTIES
+    LINK_FLAGS "-Wl,--version-script=${CMAKE_SOURCE_DIR}/cobalt.map"
+)
 
 target_include_directories(cobalt PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>

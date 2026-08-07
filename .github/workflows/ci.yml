@@ -238,3 +238,45 @@ jobs:
         with:
           name: coverage-report
           path: build-cov/coverage_report/
+
+  abi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format ccache
+
+      - name: Cache build artifacts
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-abi-${{ hashFiles('**/*.c', '**/*.h') }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-abi-
+
+      - name: Configure
+        run: |
+          mkdir -p build
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang \
+            -DCOBALT_RUN_TIDY=OFF \
+            -DCOBALT_RUN_FORMAT=OFF
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Dump ABI symbols
+        run: |
+          nm build/libcobalt.a | grep " T cobalt_" | sort > .abi-snapshot.txt
+          echo "Total exported cobalt_* symbols: $(wc -l < .abi-snapshot.txt)"
+          cat .abi-snapshot.txt
+
+      - name: Upload ABI snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: abi-snapshot
+          path: .abi-snapshot.txt
