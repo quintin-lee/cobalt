@@ -219,7 +219,7 @@ add_custom_target(coverage
     COMMAND cmake --build . --parallel
     COMMAND ctest --output-on-failure
     COMMAND lcov --capture --directory . --output-file coverage.info --rc branch_coverage=1 --ignore-errors negative
-    COMMAND genhtml coverage.info --output-directory coverage_report --rc genhtml_branch_coverage=1
+    COMMAND genhtml coverage.info --output-directory coverage_report --rc branch_coverage=1 --ignore-errors deprecated
     DEPENDS cobalt cobalt_test
     COMMENT "Building, running tests, and generating coverage report..."
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
@@ -229,7 +229,7 @@ add_custom_target(coverage-summary
     COMMAND cmake --build . --parallel
     COMMAND ctest --output-on-failure
     COMMAND lcov --capture --directory . --rc branch_coverage=1 -o coverage.info --ignore-errors negative
-    COMMAND genhtml coverage.info --output-directory coverage_report --rc genhtml_branch_coverage=1
+    COMMAND genhtml coverage.info --output-directory coverage_report --rc branch_coverage=1 --ignore-errors deprecated
     COMMAND tail -5 coverage_report/index.html | grep -oE '[0-9]+\.[0-9]+%' || true
     DEPENDS cobalt cobalt_test
     COMMENT "Running coverage and printing summary..."

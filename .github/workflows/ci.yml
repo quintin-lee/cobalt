@@ -87,3 +87,33 @@ jobs:
 
       - name: Run Valgrind
         run: valgrind --leak-check=full --error-exitcode=1 build/tests/cobalt_test
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y lcov
+
+      - name: Configure with coverage
+        run: |
+          mkdir -p build-cov
+          cmake -B build-cov \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCOBALT_BUILD_COVERAGE=ON \
+            -DCOBALT_RUN_TIDY=OFF \
+            -DCOBALT_RUN_FORMAT=OFF
+
+      - name: Build and run tests
+        run: cmake --build build-cov --parallel
+
+      - name: Generate coverage report
+        run: cmake --build build-cov --target coverage-summary
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build-cov/coverage_report/
