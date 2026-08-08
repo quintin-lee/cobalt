@@ -73,6 +73,52 @@ void test_string_contains(void)
     printf("  contains: OK\n");
 }
 
+void test_string_snprintf(void)
+{
+    printf("Testing cobalt_snprintf...\n");
+
+    char *buf = NULL;
+    int   ret;
+
+    ret = cobalt_snprintf(&buf, "hello %s", "world");
+    TEST_ASSERT(ret == 11);
+    TEST_ASSERT(buf != NULL);
+    TEST_ASSERT(strcmp(buf, "hello world") == 0);
+    free(buf);
+    buf = NULL;
+
+    ret = cobalt_snprintf(&buf, "int=%d float=%.1f", 42, 3.14);
+    TEST_ASSERT(ret > 0);
+    TEST_ASSERT(buf != NULL);
+    TEST_ASSERT(strstr(buf, "42") != NULL);
+    free(buf);
+    buf = NULL;
+
+    /* NULL inputs */
+    TEST_ASSERT(cobalt_snprintf(NULL, "hello") == -1);
+    TEST_ASSERT(cobalt_snprintf(&buf, NULL) == -1);
+
+    printf("  snprintf: OK\n");
+}
+
+void test_string_vformat(void)
+{
+    printf("Testing cobalt_vformat...\n");
+
+    /* vformat is a low-level va_list API; verify via snprintf delegation */
+    char  *buf = NULL;
+    int    ret;
+
+    ret = cobalt_snprintf(&buf, "%d + %d = %d", 1, 2, 3);
+    TEST_ASSERT(ret == 9);
+    TEST_ASSERT(buf != NULL);
+    TEST_ASSERT(strcmp(buf, "1 + 2 = 3") == 0);
+    free(buf);
+    buf = NULL;
+
+    printf("  vformat: OK\n");
+}
+
 void test_string(void)
 {
     printf("Testing string utilities...\n");
@@ -80,5 +126,7 @@ void test_string(void)
     test_string_starts_with();
     test_string_ends_with();
     test_string_contains();
+    test_string_snprintf();
+    test_string_vformat();
     printf("  String utility tests completed\n");
 }

@@ -8,6 +8,7 @@
  * Provides cross-platform, C11 standard-compatible string operation helper functions.
  */
 
+#include <stdarg.h>
 #include <stddef.h>
 
 /**
@@ -53,6 +54,25 @@ int cobalt_ends_with(const char *str, const char *suffix);
  * @note NULL inputs return 0
  */
 int cobalt_contains(const char *str, const char *sub);
+
+/**
+ * @brief Format a string into a dynamically allocated buffer
+ * @param out Pointer to receive the allocated buffer (caller must free)
+ * @param fmt printf-style format string
+ * @return Number of characters written (excluding null terminator), or -1 on error
+ * @note Equivalent to snprintf but with automatic memory allocation.
+ *       NULL inputs or OOM return -1 and set *out to NULL.
+ */
+int cobalt_snprintf(char **out, const char *fmt, ...);
+
+/**
+ * @brief Format a string into a dynamically allocated buffer (va_list variant)
+ * @param out Pointer to receive the allocated buffer (caller must free)
+ * @param fmt printf-style format string
+ * @param ap argument list
+ * @return Number of characters written (excluding null terminator), or -1 on error
+ */
+int cobalt_vformat(char **out, const char *fmt, va_list ap);
 
 /** @} */
 

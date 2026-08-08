@@ -4,6 +4,8 @@
  */
 
 #include "cobalt/utils/string.h"
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -63,4 +65,52 @@ int cobalt_contains(const char *str, const char *sub)
         return 0;
     }
     return strstr(str, sub) != NULL;
+}
+
+int cobalt_vformat(char **out, const char *fmt, va_list ap)
+{
+    if (!out || !fmt) {
+        return -1;
+    }
+    *out = NULL;
+
+    /* First pass: determine required buffer size */
+    va_list ap_copy;
+    va_copy(ap_copy, ap);
+    int n = vsnprintf(NULL, 0, fmt, ap_copy);
+    va_end(ap_copy);
+    if (n < 0) {
+        return -1;
+    }
+
+    /* Allocate buffer (n chars + null terminator) */
+    char *buf = (char *)malloc((size_t)n + 1U);
+    if (!buf) {
+        return -1;
+    }
+
+    /* Second pass: write into buffer */
+    va_list ap_copy2;
+    va_copy(ap_copy2, ap);
+    int written = vsnprintf(buf, (size_t)n + 1U, fmt, ap_copy2);
+    va_end(ap_copy2);
+    if (written < 0) {
+        free(buf);
+        return -1;
+    }
+
+    *out = buf;
+    return written;
+}
+
+int cobalt_snprintf(char **out, const char *fmt, ...)
+{
+    if (!out || !fmt) {
+        return -1;
+    }
+    va_list ap;
+    va_start(ap, fmt);
+    int result = cobalt_vformat(out, fmt, ap);
+    va_end(ap);
+    return result;
 }
