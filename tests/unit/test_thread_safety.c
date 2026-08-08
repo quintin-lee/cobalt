@@ -65,6 +65,15 @@ void test_thread_safety_hashmap_single(void)
     TEST_ASSERT(cobalt_hashmap_size(map) == 100);
     int *got = (int *)cobalt_hashmap_get(map, "key50");
     TEST_ASSERT(got != NULL && *got == 500);
+    /* Free all allocated values */
+    for (int i = 0; i < 100; i++) {
+        char key[16];
+        snprintf(key, sizeof(key), "key%d", i);
+        int *v = (int *)cobalt_hashmap_get(map, key);
+        if (v) {
+            free(v);
+        }
+    }
     cobalt_hashmap_destroy(map);
     printf("  HashMap single-thread: OK\n");
 }

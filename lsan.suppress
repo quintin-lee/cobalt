@@ -1,0 +1,5 @@
+# Known leaks from test_allocator_inject:
+# These allocations use system malloc/calloc internally (hashmap struct,
+# buckets array, strdup for keys) and are unavoidable with current design.
+leak:cobalt_hashmap_create
+leak:cobalt_strdup

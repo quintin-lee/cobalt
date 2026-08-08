@@ -25,6 +25,9 @@ static size_t mock_offset      = 0;
 static int    mock_alloc_count = 0;
 static int    mock_free_count  = 0;
 static int    mock_fail_next   = 0;
+#define MOCK_MAX_TRACKED 256
+static void *mock_tracked[MOCK_MAX_TRACKED];
+static int   mock_tracked_count = 0;
 
 static void *mock_alloc(cobalt_allocator_t *self, size_t size)
 {
@@ -39,14 +42,32 @@ static void *mock_alloc(cobalt_allocator_t *self, size_t size)
     }
     void *ptr = &mock_buf[mock_offset];
     mock_offset += size;
+    if (mock_tracked_count < MOCK_MAX_TRACKED) {
+        mock_tracked[mock_tracked_count++] = ptr;
+    }
     return ptr;
 }
 
 static void mock_free(cobalt_allocator_t *self, void *ptr)
 {
     (void)self;
-    (void)ptr;
     mock_free_count++;
+    for (int i = 0; i < mock_tracked_count; i++) {
+        if (mock_tracked[i] == ptr) {
+            mock_tracked[i] = NULL;
+            break;
+        }
+    }
+}
+
+static void mock_free_all(void)
+{
+    for (int i = 0; i < mock_tracked_count; i++) {
+        if (mock_tracked[i]) {
+            mock_free_count++;
+            mock_tracked[i] = NULL;
+        }
+    }
 }
 
 static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
@@ -108,6 +129,7 @@ void test_allocator_inject_hashmap(void)
     int *got = (int *)cobalt_hashmap_get(map, "key");
     TEST_ASSERT(got != NULL && *got == 42);
     cobalt_hashmap_destroy(map);
+    mock_free_all();
     printf("  HashMap with injected allocator: OK\n");
 }
 void test_allocator_inject_list(void)

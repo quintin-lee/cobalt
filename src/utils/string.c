@@ -132,7 +132,7 @@ char **cobalt_split(const char *str, char delim, int *count)
         }
     }
 
-    char **parts = (char **)malloc(sizeof(char *) * (size_t)cnt + 1U);
+    char **parts = (char **)malloc(sizeof(char *) * ((size_t)cnt + 1U));
     if (!parts) {
         if (count) {
             *count = 0;
