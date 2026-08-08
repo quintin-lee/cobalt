@@ -4,6 +4,7 @@
  */
 
 #include "cobalt/module/json.h"
+#include "test_framework.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,7 +119,9 @@ void test_json_parse_string(void)
         if (val && strcmp(val, "C:\\Users\\test") == 0) {
             printf("  Parse escaped backslash: OK\n");
         } else {
-            fprintf(stderr, "ERROR: Expected \"C:\\\\Users\\\\test\", got \"%s\"\n", val ? val : "NULL");
+            fprintf(stderr,
+                    "ERROR: Expected \"C:\\\\Users\\\\test\", got \"%s\"\n",
+                    val ? val : "NULL");
         }
         json_destroy(bs);
     }
@@ -130,7 +133,9 @@ void test_json_parse_string(void)
         if (val && strcmp(val, "say \"hello\"") == 0) {
             printf("  Parse escaped quote: OK\n");
         } else {
-            fprintf(stderr, "ERROR: Expected \"say \\\\\"hello\\\\\"\", got \"%s\"\n", val ? val : "NULL");
+            fprintf(stderr,
+                    "ERROR: Expected \"say \\\\\"hello\\\\\"\", got \"%s\"\n",
+                    val ? val : "NULL");
         }
         json_destroy(qt);
     }
@@ -328,4 +333,72 @@ void test_json(void)
     test_json_accessors();
     test_json_destroy();
     printf("  JSON tests completed\n");
+}
+
+void test_json_fuzz(void)
+{
+    printf("Testing JSON fuzzing (malformed inputs)...\n");
+
+    json_node_t *node;
+
+    node = json_parse("{");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("[");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("}");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("]");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("{{");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("{}{}");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("{\"a\":}");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("{\"a\": 1,}");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse(": 1");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("\"unclosed");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("null\0null");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("{\0}");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("[\0]");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("1\02");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("true\0false");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("   ");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("\t\n\r");
+    TEST_ASSERT(node == NULL);
+
+    node = json_parse("42");
+    TEST_ASSERT(node != NULL);
+    json_destroy(node);
+
+    node = json_parse("{\"a\": [1, 2, 3]}");
+    TEST_ASSERT(node != NULL);
+    json_destroy(node);
+
+    printf("  Fuzzing: OK\n");
 }
