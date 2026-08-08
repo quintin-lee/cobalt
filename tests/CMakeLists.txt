@@ -18,6 +18,7 @@ add_executable(cobalt_test
     unit/test_list.c
     unit/test_hashmap.c
     unit/test_treemap.c
+    unit/test_string.c
     unit/test_sort.c
     unit/test_functional.c
     unit/test_stream.c
@@ -67,7 +68,7 @@ add_test(NAME test_vector COMMAND cobalt_test --filter vector)
 add_test(NAME test_list COMMAND cobalt_test --filter list)
 add_test(NAME test_hashmap COMMAND cobalt_test --filter hashmap)
 add_test(NAME test_treemap COMMAND cobalt_test --filter treemap)
-add_test(NAME test_sort COMMAND cobalt_test --filter sort)
+add_test(NAME test_string COMMAND cobalt_test --filter string)
 add_test(NAME test_functional COMMAND cobalt_test --filter functional)
 add_test(NAME test_stream COMMAND cobalt_test --filter stream)
 add_test(NAME test_json COMMAND cobalt_test --filter json)

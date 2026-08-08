@@ -31,3 +31,36 @@ char *cobalt_strdup(const char *s)
 
     return dup;
 }
+
+int cobalt_starts_with(const char *str, const char *prefix)
+{
+    if (!str || !prefix) {
+        return 0;
+    }
+    size_t prefix_len = strlen(prefix);
+    if (prefix_len > strlen(str)) {
+        return 0;
+    }
+    return strncmp(str, prefix, prefix_len) == 0;
+}
+
+int cobalt_ends_with(const char *str, const char *suffix)
+{
+    if (!str || !suffix) {
+        return 0;
+    }
+    size_t str_len    = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    if (suffix_len > str_len) {
+        return 0;
+    }
+    return strcmp(str + (str_len - suffix_len), suffix) == 0;
+}
+
+int cobalt_contains(const char *str, const char *sub)
+{
+    if (!str || !sub) {
+        return 0;
+    }
+    return strstr(str, sub) != NULL;
+}
