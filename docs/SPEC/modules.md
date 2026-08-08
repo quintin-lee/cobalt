@@ -78,6 +78,43 @@ Event types include readable/writable/POLLERR/POLLHUP semantics mapped to platfo
 
 Timer IDs are monotonically increasing integers returned by add_timer; used for cancellation.
 
+## 3.1 UNIX Domain Socket Support
+
+**Header:** `module/eventloop.h`  
+**Source:** `src/module/eventloop.c`
+
+Unix domain sockets provide efficient local IPC (inter-process communication) on POSIX systems. They avoid network stack overhead and support passing file descriptors between processes.
+
+```c
+// Create a UNIX domain socket server
+// Binds to path, listens, and registers for POLLIN
+// Automatically removes stale socket file
+int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out);
+
+// Accept a connection on a UNIX domain socket server
+// Returns a new fd ready for read/write, or -1 on error
+cobalt_fd_t cobalt_eventloop_accept(cobalt_eventloop_t *loop, cobalt_fd_t server_fd);
+```
+
+**`cobalt_eventloop_create_unix_server`**: Creates a UNIX domain socket server. Binds to the given `path`, calls `listen()`, and registers the socket for `POLLIN` events on the event loop. Automatically removes any stale socket file at the path. Returns 0 on success.
+
+**`cobalt_eventloop_accept`**: Accepts a pending connection on the server socket. Returns a new file descriptor ready for I/O operations, or -1 if no connection is pending or an error occurred.
+
+Usage pattern:
+```c
+cobalt_fd_t server_fd;
+cobalt_eventloop_create_unix_server("/tmp/cobalt.sock", &server_fd);
+
+// Register accept callback on the event loop
+eventloop_add_fd(loop, server_fd, POLLIN, accept_handler, ctx);
+
+// In accept_handler:
+cobalt_fd_t client_fd = cobalt_eventloop_accept(loop, server_fd);
+eventloop_add_fd(loop, client_fd, POLLIN, client_handler, ctx);
+```
+
+Note: UNIX domain sockets are only available on POSIX systems (Linux, macOS, BSD). On Windows, use TCP localhost sockets instead.
+
 ## 4. Module Interaction Patterns
 
 JSON parsers construct tree nodes using the allocator from the calling context (often an arena from a request-scoped allocation). Event loops integrate with the platform layer's IO abstraction, and callbacks may enqueue work into queues (containers) processed elsewhere.

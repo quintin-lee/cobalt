@@ -78,6 +78,81 @@ cobalt_vector_t *vec = vector_create_with_allocator(arena_alloc, 16);
 
 All internal allocations go through the provided allocator, enabling whole-heap-free operation when combined with an arena/pool allocator.
 
+## 6. HashMap Runtime API
+
+**Header:** `container/hashmap.h`  
+**Source:** `src/container/hashmap.c`
+
+These APIs allow runtime modification of hashmap behavior and allocator-compatible creation.
+
+```c
+// Create with explicit initial bucket count (prevents first-rehash overhead)
+cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t initial_buckets, cobalt_allocator_t *alloc);
+
+// Replace hash and equality callbacks on an existing hashmap
+// Changes only affect future operations - existing entries are not rehashed
+int cobalt_hashmap_set_funcs(cobalt_hashmap_t *map,
+                              cobalt_hash_func_t  hash_func,
+                              cobalt_equal_func_t equal_func);
+```
+
+**`cobalt_hashmap_create_ext`**: Creates a HashMap with a user-specified initial bucket count. Use this when you know the expected size range to avoid rehashing overhead.
+
+**`cobalt_hashmap_set_funcs`**: Replaces the hash and equality callbacks on an existing hashmap. Changes only affect future operations — existing entries are not rehashed. Useful for swapping between string and integer key modes, or for testing with mock functions.
+
+## 7. TreeMap Custom Comparator
+
+**Header:** `container/treemap.h`  
+**Source:** `src/container/treemap.c`
+
+```c
+// Create a TreeMap with a custom comparison function
+cobalt_treemap_t *cobalt_treemap_create_ext(cobalt_compare_func_t compare_func);
+```
+
+**`cobalt_treemap_create_ext`**: Creates a TreeMap with a custom comparison function. Use `NULL` for default `strcmp` behavior (same as `cobalt_treemap_create()`). The comparator receives `(const void *a, const void *b)` and must return `< 0`, `0`, or `> 0`.
+
+Typical use: ordering non-string keys (integers, structs, pointers) or custom string comparison (case-insensitive, locale-aware).
+
+## 8. String Utilities
+
+**Header:** `utils/string.h`  
+**Source:** `src/utils/string.c`
+
+```c
+// Split a string by delimiter, returns array of strings (caller must free each element and the array)
+char **cobalt_split(const char *str, char delim, int *count);
+
+// Join an array of strings with a delimiter
+char *cobalt_join(const char **parts, char delim);
+
+// Strip leading/trailing whitespace
+char *cobalt_strip(const char *str);
+```
+
+| Function | Description |
+|----------|-------------|
+| `cobalt_split` | Split str by delim, store result in **parts (caller must free each element and the array). count receives the number of parts. |
+| `cobalt_join` | Join an array of strings with the given delimiter. Returns a newly allocated string (caller must free). |
+| `cobalt_strip` | Strip leading and trailing whitespace from str. Returns a newly allocated string (caller must free). |
+
+**Example:**
+```c
+int count;
+char **parts = cobalt_split("a,b,c", ',', &count);
+// parts[0]="a", parts[1]="b", parts[2]="c", count=3
+for (int i = 0; i < count; i++) free(parts[i]);
+free(parts);
+
+char *joined = cobalt_join(parts, ',');  // "a,b,c"
+free(joined);
+
+char *trimmed = cobalt_strip("  hello  ");  // "hello"
+free(trimmed);
+```
+
+> **Security note**: `cobalt_split` had a heap-buffer-overflow fix in v2.3.0 (CWE-122). The allocation size was corrected from `sizeof(char*)*cnt + 1` to `sizeof(char*)*(cnt+1)` to account for the NULL terminator.
+
 ## 7. Future Collections (Planned)
 
 - Stack (LIFO queue) — based on vector or list

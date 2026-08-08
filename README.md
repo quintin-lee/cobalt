@@ -96,7 +96,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 41 tests passing
+ctest --output-on-failure  # 41/41 tests passing
 # or with verbose output
 ctest --verbose
 ```
@@ -145,20 +145,38 @@ cd build
 
 | Category | Count |
 |----------|-------|
-| 28 | 25 |
-| Header files (.h) | 27 |
-| Test files (.c) | 29 |
-| Benchmark files (.c) | 5 |
-| Example files (.c) | 14 |
-| Documentation (.md) | 31 |
+| Source files (.c) | 33 |
+| Header files (.h) | 35 |
+| Test files (.c) | 34 |
+| Benchmark files (.c) | 8 |
+| Example files (.c) | 17 |
+| Documentation (.md) | 41 |
 
 | Metric | Value |
 |--------|-------|
-| Total lines of code | 10,130 |
+| Total lines of code | 10,982 |
 | Git commits | 226 |
 | 27/27 | 27/27 |
 
+
+## CI/CD
+
+Continuous integration runs on every push to `master`:
+
+| Job | Description |
+|-----|-------------|
+| **build** | Build with GCC/Clang × Debug/Release (4 variants) with format + tidy gates |
+| **asan** | AddressSanitizer build with LSan suppressions for allocator-inject tests |
+| **ubsan** | UndefinedBehaviorSanitizer build |
+| **valgrind** | Memory leak and error checking with Valgrind |
+| **bench** | Performance benchmark regression detection |
+| **coverage** | Code coverage reporting with lcov |
+| **abi** | ABI snapshot comparison for breakage detection |
+
+All jobs require passing format and clang-tidy checks before tests run.
+
 ## License
+
 
 MIT License - See [LICENSE](LICENSE) for details.
 

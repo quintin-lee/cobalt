@@ -1,4 +1,4 @@
-# Cobalt C Framework v2.0.0 - Implementation Summary
+# Cobalt C Framework v2.3.0 - Implementation Summary
 
 ## Project Overview
 
@@ -66,13 +66,13 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
 
 ## Code Statistics
 
-- **Header files**: 26
-- **Source files**: 25
-- **Test files**: 22
-- **Documentation files**: 27
-- **Total lines of code**: 6,627
-- **Git commits**: 192
-- **Test modules passing**: 22/22
+- **Header files**: 35
+- **Source files**: 33
+- **Test files**: 34
+- **Documentation files**: 41
+- **Total lines of code**: 10,982
+- **Git commits**: 226
+- **Test modules passing**: 41/41
 
 ## Key Features
 
@@ -84,6 +84,11 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
 6. **Event Loop**: Real async I/O with timer support
 7. **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque
 8. **Algorithms**: QuickSort, InsertionSort, binary search, find_if, for_each, predicates
+9. **String Utilities**: split, join, strip via cobalt_split(), cobalt_join(), cobalt_strip()
+10. **HashMap Runtime APIs**: cobalt_hashmap_set_funcs() for runtime hash/equal replacement, cobalt_hashmap_create_ext()
+11. **TreeMap Custom Comparator**: cobalt_treemap_create_ext() with cobalt_compare_func_t
+12. **UNIX Domain Sockets**: cobalt_eventloop_create_unix_server() and cobalt_eventloop_accept() for local IPC
+13. **CI/CD**: GitHub Actions with format gate, clang-tidy, ASan, UBsan, Valgrind, and benchmark regression checks
 
 ## Testing
 
@@ -98,7 +103,9 @@ All 41 test modules pass:
 - ✅ error, logger, object, class, interface
 - ✅ vector, list, hashmap, treemap, set, deque
 - ✅ sort, functional, json, eventloop
-- ✅ stack, queue, iterator
+- ✅ stack, queue, iterator, map, sequence
+- ✅ thread, thread_safety, allocator_inject
+- ✅ string, platform_utils, abi
 
 ## Documentation
 
@@ -129,7 +136,7 @@ Supports:
 
 ## Version
 
-Tagged as **v2.1.0** - Feature Expansion Release
+Tagged as **v2.3.0** - Security Fixes & Advanced APIs Release
 
 ## Phase 3 Updates
 
@@ -148,7 +155,30 @@ Tagged as **v2.1.0** - Feature Expansion Release
 ### Test Coverage
 - Added tests for Set and Deque containers
 - Added tests for new algorithms (bsearch, find_if, for_each)
+- Added thread safety and allocator injection tests
 - Total: 41 tests, all passing
+
+## Phase 4 Updates (v2.3.0)
+
+### Security Fixes
+- Fixed heap-buffer-overflow in cobalt_split() (CWE-122)
+- Fixed memory leak and double-free in test_thread_safety
+- Added lsan.suppress for known allocator-inject test infrastructure leaks
+
+### Advanced APIs
+- **HashMap**: cobalt_hashmap_set_funcs() for runtime hash/equal replacement; cobalt_hashmap_create_ext() for allocator-compatible creation
+- **TreeMap**: cobalt_treemap_create_ext() with custom cobalt_compare_func_t
+- **String Utilities**: cobalt_split(), cobalt_join(), cobalt_strip() in utils/string.h
+- **Event Loop**: UNIX domain socket support via cobalt_eventloop_create_unix_server() and cobalt_eventloop_accept()
+
+### CI/CD Hardening
+- Format gate enforced via clang-format POST_BUILD check
+- clang-tidy checks integrated into CI
+- ASan (AddressSanitizer) job with LSan suppressions for allocator-inject tests
+- UBsan (UndefinedBehaviorSanitizer) job
+- Valgrind memory-check job
+- Benchmark regression detection against baseline
+- Automated ABI snapshot comparison
 
 ## Next Steps
 
