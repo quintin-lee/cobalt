@@ -36,6 +36,13 @@ typedef struct cobalt_list cobalt_list_t;
  * fails.
  */
 cobalt_list_t *cobalt_list_create(void);
+/**
+ * @brief Create a list with a custom allocator
+ *
+ * Same as cobalt_list_create() but uses the provided allocator.
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the newly created list, or NULL on failure
+ */
 cobalt_list_t *cobalt_list_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
@@ -168,7 +175,7 @@ void cobalt_list_set_head(cobalt_list_t *list, cobalt_list_node_t *head, cobalt_
  * @param count Pointer to element count (optional)
  * @param compar Comparison function
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

@@ -29,6 +29,13 @@ typedef struct cobalt_queue cobalt_queue_t;
  * allocation fails.
  */
 cobalt_queue_t *cobalt_queue_create(void);
+/**
+ * @brief Create a queue with a custom allocator
+ *
+ * Same as cobalt_queue_create() but uses the provided allocator.
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the newly created queue, or NULL on failure
+ */
 cobalt_queue_t *cobalt_queue_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
@@ -83,7 +90,7 @@ size_t cobalt_queue_size(const cobalt_queue_t *queue);
  * @return Returns 1 if the queue is not NULL and the number of elements is 0; otherwise returns 0.
  * If queue is NULL, returns 0.
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

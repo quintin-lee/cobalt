@@ -31,6 +31,13 @@ typedef struct cobalt_deque cobalt_deque_t;
  * memory allocation fails.
  */
 cobalt_deque_t *cobalt_deque_create(void);
+/**
+ * @brief Create a deque with a custom allocator
+ *
+ * Same as cobalt_deque_create() but uses the provided allocator.
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the newly created deque, or NULL on failure
+ */
 cobalt_deque_t *cobalt_deque_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
@@ -111,7 +118,7 @@ size_t cobalt_deque_size(const cobalt_deque_t *deque);
  * @param deque Pointer to the target double-ended queue
  * @return Returns 1 if the queue is empty; otherwise returns 0. If deque is NULL, also returns 1.
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

@@ -23,7 +23,9 @@ cmake-build-*/
 _build/
 out/
 target/
+build_*/
 
+docs/doxygen
 # --- IDE / Editor ---
 .vscode/
 .idea/

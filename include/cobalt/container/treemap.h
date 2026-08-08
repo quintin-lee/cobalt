@@ -90,7 +90,7 @@ size_t cobalt_treemap_size(const cobalt_treemap_t *map);
  * @note Returns a cobalt_map_iterator_t compatible with the Map interface.
  *       Destroy with cobalt_map_iterator_destroy().
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

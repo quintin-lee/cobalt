@@ -27,6 +27,13 @@ typedef struct cobalt_stack cobalt_stack_t;
  * @return Returns the stack pointer on success, or NULL if memory allocation fails.
  */
 cobalt_stack_t *cobalt_stack_create(void);
+/**
+ * @brief Create a stack with a custom allocator
+ *
+ * Same as cobalt_stack_create() but uses the provided allocator.
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the newly created stack, or NULL on failure
+ */
 cobalt_stack_t *cobalt_stack_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
@@ -73,7 +80,7 @@ size_t cobalt_stack_size(const cobalt_stack_t *stack);
  * @param stack Pointer to the stack
  * @return Returns 1 if the stack's size is 0, returns 0 if it is not empty or stack is NULL.
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

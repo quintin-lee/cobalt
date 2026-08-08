@@ -57,7 +57,7 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop);
 /**
  * @brief Register a file descriptor event listener
  * @param loop Event loop object
- * @param file_descriptor File descriptor to listen to
+ * @param fd File descriptor to listen to
  * @param events Event type to listen for
  * @param callback Callback function called when the event occurs
  * @param user_data User data to pass to the callback function

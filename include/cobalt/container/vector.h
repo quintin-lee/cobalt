@@ -33,6 +33,15 @@ typedef struct cobalt_vector cobalt_vector_t;
  * allocation fails.
  */
 cobalt_vector_t *cobalt_vector_create(size_t initial_capacity);
+/**
+ * @brief Create a dynamic array with a custom allocator
+ *
+ * Same as cobalt_vector_create() but uses the provided allocator
+ * for all internal memory operations.
+ * @param initial_capacity Initially allocated capacity. If 0, no initial array memory is allocated.
+ * @param alloc            Custom allocator (must not be NULL)
+ * @return Pointer to the newly created dynamic array, or NULL on failure
+ */
 cobalt_vector_t *cobalt_vector_create_with_allocator(size_t              initial_capacity,
                                                      cobalt_allocator_t *alloc);
 
@@ -92,7 +101,7 @@ size_t cobalt_vector_size(const cobalt_vector_t *vec);
  * @return If the dynamic array is empty (i.e., size is 0), returns a non-zero value (1); otherwise
  * returns 0. If vec is NULL, also returns 0.
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.
