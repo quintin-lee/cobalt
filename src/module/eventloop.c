@@ -25,7 +25,6 @@
 
 #define COBALT_EVENTLOOP_DEFAULT_CAPACITY 16
 #define COBALT_EVENTLOOP_TIMEOUT_MS 10
-#define COBALT_EVENTLOOP_TIMEOUT_MAX 100
 #define COBALT_EVENTLOOP_TIMER_HEAP_INITIAL 16
 #define COBALT_SIGNAL_RING_SIZE 64
 #define COBALT_MILLIS_PER_SEC 1000ULL
@@ -266,9 +265,6 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
         if (timeout_ms < 0) {
             timeout_ms = 0;
         }
-        if (timeout_ms > COBALT_EVENTLOOP_TIMEOUT_MAX) {
-            timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MAX;
-        }
     }
     return timeout_ms;
 }
@@ -355,7 +351,8 @@ platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out
         epoll_wait(loop->epoll_fd, loop->epoll_events, loop->epoll_capacity, timeout_ms);
     *entries_out = loop->epoll_events;
 #elif __APPLE__
-    struct timespec ts = {0, COBALT_NANOS_PER_MILLI};
+    int             timeout_ms = calculate_timeout_ms(loop, NULL);
+    struct timespec ts         = {timeout_ms / 1000, (timeout_ms % 1000) * COBALT_NANOS_PER_MILLI};
     struct kevent   events[COBALT_EVENTLOOP_DEFAULT_CAPACITY];
     *event_count_out = kevent(loop->kq, NULL, 0, events, COBALT_EVENTLOOP_DEFAULT_CAPACITY, &ts);
     *entries_out     = events;
