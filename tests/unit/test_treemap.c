@@ -153,6 +153,10 @@ void test_treemap_remove_stress(void)
     printf("  TreeMap remove stress test passed\n");
 }
 
+void test_treemap_empty_operations(void);
+void test_treemap_null_operations(void);
+void test_treemap_single_element_cycle(void);
+
 void test_treemap(void)
 {
     printf("Testing treemap...\n");
@@ -163,6 +167,9 @@ void test_treemap(void)
     test_treemap_edge_cases();
     test_treemap_duplicate_keys();
     test_treemap_large_scale();
+    test_treemap_empty_operations();
+    test_treemap_null_operations();
+    test_treemap_single_element_cycle();
 }
 
 void test_treemap_iterator(void)
@@ -354,4 +361,65 @@ void test_treemap_large_scale(void)
         free(cobalt_treemap_get(map, key));
     }
     cobalt_treemap_destroy(map);
+}
+
+void test_treemap_empty_operations(void)
+{
+    printf("Testing treemap empty map operations...\n");
+
+    cobalt_treemap_t *map = cobalt_treemap_create();
+    TEST_ASSERT(map != NULL);
+    TEST_ASSERT(cobalt_treemap_size(map) == 0);
+    TEST_ASSERT(cobalt_treemap_get(map, "nonexistent") == NULL);
+    TEST_ASSERT(cobalt_treemap_remove(map, "nonexistent") == -1);
+    cobalt_map_iterator_t *it = cobalt_treemap_iterator_create(map);
+    TEST_ASSERT(it != NULL);
+    cobalt_map_pair_t pair = cobalt_map_iterator_next(it);
+    TEST_ASSERT(pair.key == NULL && pair.value == NULL);
+    cobalt_map_iterator_destroy(it);
+    cobalt_treemap_destroy(map);
+    printf("  Empty treemap operations: OK\n");
+}
+
+void test_treemap_null_operations(void)
+{
+    printf("Testing treemap null key handling...\n");
+
+    cobalt_treemap_t *map = cobalt_treemap_create();
+    TEST_ASSERT(map != NULL);
+
+    int val = 1;
+    TEST_ASSERT(cobalt_treemap_put(map, NULL, &val) == -1);
+    TEST_ASSERT(cobalt_treemap_get(map, NULL) == NULL);
+    TEST_ASSERT(cobalt_treemap_remove(map, NULL) == -1);
+    cobalt_treemap_destroy(map);
+    printf("  Null key handling: OK\n");
+}
+
+void test_treemap_single_element_cycle(void)
+{
+    printf("Testing treemap single element insert/get/remove...\n");
+
+    cobalt_treemap_t *map = cobalt_treemap_create();
+    TEST_ASSERT(map != NULL);
+
+    static int v1 = 1, v2 = 2;
+    TEST_ASSERT(cobalt_treemap_put(map, "only", &v1) == 0);
+    TEST_ASSERT(cobalt_treemap_size(map) == 1);
+    TEST_ASSERT(cobalt_treemap_get(map, "only") == &v1);
+    TEST_ASSERT(cobalt_treemap_min_key(map) != NULL);
+    TEST_ASSERT(strcmp(cobalt_treemap_min_key(map), "only") == 0);
+    TEST_ASSERT(cobalt_treemap_max_key(map) != NULL);
+    TEST_ASSERT(strcmp(cobalt_treemap_max_key(map), "only") == 0);
+    TEST_ASSERT(cobalt_treemap_remove(map, "only") == 0);
+    TEST_ASSERT(cobalt_treemap_size(map) == 0);
+    TEST_ASSERT(cobalt_treemap_get(map, "only") == NULL);
+    TEST_ASSERT(cobalt_treemap_min_key(map) == NULL);
+    TEST_ASSERT(cobalt_treemap_max_key(map) == NULL);
+    /* Re-insert to verify recovery */
+    TEST_ASSERT(cobalt_treemap_put(map, "only", &v2) == 0);
+    TEST_ASSERT(cobalt_treemap_size(map) == 1);
+    TEST_ASSERT(*(int *)cobalt_treemap_get(map, "only") == 2);
+    cobalt_treemap_destroy(map);
+    printf("  Single element cycle: OK\n");
 }

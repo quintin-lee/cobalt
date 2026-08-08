@@ -128,6 +128,11 @@ void test_hashmap_resize_stress(void)
     printf("  Resize stress test passed\n");
 }
 
+void test_hashmap_empty_operations(void);
+void test_hashmap_single_element(void);
+void test_hashmap_null_key(void);
+void test_hashmap_overwrite_then_remove(void);
+
 void test_hashmap(void)
 {
     printf("Testing hashmap...\n");
@@ -135,6 +140,10 @@ void test_hashmap(void)
     test_hashmap_resize();
     test_hashmap_zero_initial_capacity();
     test_hashmap_resize_stress();
+    test_hashmap_empty_operations();
+    test_hashmap_single_element();
+    test_hashmap_null_key();
+    test_hashmap_overwrite_then_remove();
     printf("  Hashmap tests completed\n");
 }
 
@@ -146,7 +155,7 @@ void test_hashmap(void)
 static unsigned int hash_int(const void *key, size_t key_len)
 {
     (void)key_len;
-    const int *k = (const int *)key;
+    const int   *k = (const int *)key;
     unsigned int h = 5381;
     for (size_t i = 0; i < sizeof(int); i++) {
         h = h * 33 + ((const unsigned char *)k)[i];
@@ -166,7 +175,7 @@ void test_hashmap_ext_int_keys(void)
     cobalt_hashmap_t *map = cobalt_hashmap_create_ext(8, hash_int, equal_int);
     TEST_ASSERT(map != NULL);
 
-    int key1 = 42, key2 = 99;
+    int        key1 = 42, key2 = 99;
     static int val_a = 100, val_b = 200;
 
     TEST_ASSERT(cobalt_hashmap_put_ext(map, &key1, sizeof(int), &val_a) == 0);
@@ -213,3 +222,77 @@ void test_hashmap_ext_null_callbacks(void)
     printf("  hashmap ext NULL callbacks: OK\n");
 }
 
+/* -------------------------------------------------------------------------- */
+/* Boundary condition tests                                                    */
+/* -------------------------------------------------------------------------- */
+
+void test_hashmap_empty_operations(void)
+{
+    printf("Testing hashmap empty map operations...\n");
+
+    cobalt_hashmap_t *map = cobalt_hashmap_create(4);
+    TEST_ASSERT(map != NULL);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 0);
+    TEST_ASSERT(cobalt_hashmap_get(map, "nonexistent") == NULL);
+    TEST_ASSERT(cobalt_hashmap_remove(map, "nonexistent") == -1);
+    cobalt_map_iterator_t *it = cobalt_hashmap_iterator_create(map);
+    TEST_ASSERT(it != NULL);
+    cobalt_map_pair_t pair = cobalt_map_iterator_next(it);
+    TEST_ASSERT(pair.key == NULL && pair.value == NULL);
+    cobalt_map_iterator_destroy(it);
+    cobalt_hashmap_destroy(map);
+    printf("  Empty map operations: OK\n");
+}
+
+void test_hashmap_single_element(void)
+{
+    printf("Testing hashmap single element...\n");
+
+    cobalt_hashmap_t *map = cobalt_hashmap_create(4);
+    TEST_ASSERT(map != NULL);
+
+    static int val = 42;
+    TEST_ASSERT(cobalt_hashmap_put(map, "solo", &val) == 0);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 1);
+    TEST_ASSERT(cobalt_hashmap_get(map, "solo") == &val);
+    TEST_ASSERT(cobalt_hashmap_get(map, "other") == NULL);
+    TEST_ASSERT(cobalt_hashmap_remove(map, "solo") == 0);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 0);
+    TEST_ASSERT(cobalt_hashmap_get(map, "solo") == NULL);
+    cobalt_hashmap_destroy(map);
+    printf("  Single element: OK\n");
+}
+
+void test_hashmap_null_key(void)
+{
+    printf("Testing hashmap null key handling...\n");
+
+    cobalt_hashmap_t *map = cobalt_hashmap_create(4);
+    TEST_ASSERT(map != NULL);
+
+    int val = 1;
+    TEST_ASSERT(cobalt_hashmap_put(map, NULL, &val) == -1);
+    TEST_ASSERT(cobalt_hashmap_get(map, NULL) == NULL);
+    TEST_ASSERT(cobalt_hashmap_remove(map, NULL) == -1);
+    cobalt_hashmap_destroy(map);
+    printf("  Null key handling: OK\n");
+}
+
+void test_hashmap_overwrite_then_remove(void)
+{
+    printf("Testing hashmap overwrite and remove cycle...\n");
+
+    cobalt_hashmap_t *map = cobalt_hashmap_create(4);
+    TEST_ASSERT(map != NULL);
+
+    static int v1 = 1, v2 = 2, v3 = 3;
+    TEST_ASSERT(cobalt_hashmap_put(map, "k", &v1) == 0);
+    TEST_ASSERT(cobalt_hashmap_put(map, "k", &v2) == 0);
+    TEST_ASSERT(cobalt_hashmap_put(map, "k", &v3) == 0);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 1);
+    TEST_ASSERT(*(int *)cobalt_hashmap_get(map, "k") == 3);
+    TEST_ASSERT(cobalt_hashmap_remove(map, "k") == 0);
+    TEST_ASSERT(cobalt_hashmap_size(map) == 0);
+    cobalt_hashmap_destroy(map);
+    printf("  Overwrite and remove cycle: OK\n");
+}
