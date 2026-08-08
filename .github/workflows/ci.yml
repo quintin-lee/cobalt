@@ -33,7 +33,7 @@ jobs:
       - name: Configure
         run: |
           mkdir -p build
-          cmake -B build \\
+          cmake -B build \
             -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
             -DCMAKE_C_COMPILER=${{matrix.compiler}} \
             -DCOBALT_RUN_TIDY=ON \
@@ -74,7 +74,7 @@ jobs:
           mkdir -p build-asan
           cmake -B build-asan \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_C_COMPILER=clang \\
+            -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_FLAGS="-fsanitize=address -g" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address" \
             -DCOBALT_RUN_TIDY=ON \
@@ -85,6 +85,8 @@ jobs:
 
       - name: Test with ASan
         run: ctest --test-dir build-asan --output-on-failure
+        env:
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/lsan.suppress
 
   ubsan:
     runs-on: ubuntu-latest
@@ -109,10 +111,10 @@ jobs:
           mkdir -p build-ubsan
           cmake -B build-ubsan \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DCMAKE_C_COMPILER=clang \\
+            -DCMAKE_C_COMPILER=clang \
             -DCMAKE_C_FLAGS="-fsanitize=undefined -g" \
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=undefined" \
-            -DCOBALT_RUN_TIDY=OFF \\
+            -DCOBALT_RUN_TIDY=OFF \
             -DCOBALT_RUN_FORMAT=OFF
 
       - name: Build
@@ -142,7 +144,7 @@ jobs:
       - name: Configure
         run: |
           mkdir -p build
-          cmake -B build \\
+          cmake -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_C_COMPILER=gcc \
             -DCOBALT_RUN_TIDY=ON \
@@ -248,7 +250,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=Debug \
             -DCMAKE_C_COMPILER=gcc \
             -DCOBALT_BUILD_COVERAGE=ON \
-            -DCOBALT_RUN_TIDY=OFF \\
+            -DCOBALT_RUN_TIDY=OFF \
             -DCOBALT_RUN_FORMAT=OFF
 
       - name: Build and run tests
@@ -284,10 +286,10 @@ jobs:
       - name: Configure
         run: |
           mkdir -p build
-          cmake -B build \\
-            -DCMAKE_BUILD_TYPE=Release \\
-            -DCMAKE_C_COMPILER=clang \\
-            -DCOBALT_RUN_TIDY=OFF \\
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_C_COMPILER=clang \
+            -DCOBALT_RUN_TIDY=OFF \
             -DCOBALT_RUN_FORMAT=OFF
 
       - name: Build
