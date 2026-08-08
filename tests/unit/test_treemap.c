@@ -156,6 +156,7 @@ void test_treemap_remove_stress(void)
 void test_treemap_empty_operations(void);
 void test_treemap_null_operations(void);
 void test_treemap_single_element_cycle(void);
+void test_treemap_rebalance(void);
 
 void test_treemap(void)
 {
@@ -170,6 +171,7 @@ void test_treemap(void)
     test_treemap_empty_operations();
     test_treemap_null_operations();
     test_treemap_single_element_cycle();
+    test_treemap_rebalance();
 }
 
 void test_treemap_iterator(void)
@@ -422,4 +424,54 @@ void test_treemap_single_element_cycle(void)
     TEST_ASSERT(*(int *)cobalt_treemap_get(map, "only") == 2);
     cobalt_treemap_destroy(map);
     printf("  Single element cycle: OK\n");
+}
+
+void test_treemap_rebalance(void)
+{
+    printf("Testing treemap rebalance...\n");
+
+    cobalt_treemap_t *map = cobalt_treemap_create();
+    TEST_ASSERT(map != NULL);
+
+    char keys[500][32];
+    int  values[500];
+
+    /* Insert in sorted order — worst case for unbalanced tree */
+    for (int i = 0; i < 500; i++) {
+        snprintf(keys[i], 32, "key_%04d", i);
+        values[i] = i;
+        int ret   = cobalt_treemap_put(map, keys[i], &values[i]);
+        TEST_ASSERT(ret == 0);
+    }
+    TEST_ASSERT(cobalt_treemap_size(map) == 500);
+
+    /* All keys should be retrievable */
+    for (int i = 0; i < 500; i++) {
+        int *got = (int *)cobalt_treemap_get(map, keys[i]);
+        TEST_ASSERT(got != NULL);
+        TEST_ASSERT(*got == i);
+    }
+
+    /* Delete in sorted order */
+    for (int i = 0; i < 500; i++) {
+        int ret = cobalt_treemap_remove(map, keys[i]);
+        TEST_ASSERT(ret == 0);
+    }
+    TEST_ASSERT(cobalt_treemap_size(map) == 0);
+
+    /* Insert in reverse order */
+    for (int i = 499; i >= 0; i--) {
+        int ret = cobalt_treemap_put(map, keys[i], &values[i]);
+        TEST_ASSERT(ret == 0);
+    }
+    TEST_ASSERT(cobalt_treemap_size(map) == 500);
+
+    for (int i = 0; i < 500; i++) {
+        int *got = (int *)cobalt_treemap_get(map, keys[i]);
+        TEST_ASSERT(got != NULL);
+        TEST_ASSERT(*got == i);
+    }
+
+    cobalt_treemap_destroy(map);
+    printf("  Treemap rebalance test passed\n");
 }

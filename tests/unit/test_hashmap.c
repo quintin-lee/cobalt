@@ -133,6 +133,8 @@ void test_hashmap_single_element(void);
 void test_hashmap_null_key(void);
 void test_hashmap_overwrite_then_remove(void);
 
+void test_hashmap_collision_stress(void);
+
 void test_hashmap(void)
 {
     printf("Testing hashmap...\n");
@@ -144,6 +146,7 @@ void test_hashmap(void)
     test_hashmap_single_element();
     test_hashmap_null_key();
     test_hashmap_overwrite_then_remove();
+    test_hashmap_collision_stress();
     printf("  Hashmap tests completed\n");
 }
 
@@ -295,4 +298,65 @@ void test_hashmap_overwrite_then_remove(void)
     TEST_ASSERT(cobalt_hashmap_size(map) == 0);
     cobalt_hashmap_destroy(map);
     printf("  Overwrite and remove cycle: OK\n");
+}
+
+void test_hashmap_collision_stress(void)
+{
+    printf("Testing hashmap collision stress...\n");
+
+    /* Custom hash function that maps all keys to the same bucket (hash = 0) */
+    unsigned int same_hash(const void *key, size_t key_len)
+    {
+        (void)key;
+        (void)key_len;
+        return 0u;
+    }
+
+    int same_equal(const void *a, const void *b, size_t len)
+    {
+        (void)len;
+        return strcmp((const char *)a, (const char *)b) == 0;
+    }
+
+    cobalt_hashmap_t *map = cobalt_hashmap_create_ext(4, same_hash, same_equal);
+    TEST_ASSERT(map != NULL);
+
+    /* Insert many keys that all hash to 0 — tests separate chaining under pressure */
+    int  values[256];
+    char keys[256][32];
+    for (int i = 0; i < 256; i++) {
+        snprintf(keys[i], 32, "collision_key_%d", i);
+        values[i] = i * 100;
+        int ret   = cobalt_hashmap_put(map, keys[i], &values[i]);
+        TEST_ASSERT(ret == 0);
+    }
+
+    TEST_ASSERT(cobalt_hashmap_size(map) == 256);
+
+    /* Verify all values are retrievable */
+    for (int i = 0; i < 256; i++) {
+        int *got = (int *)cobalt_hashmap_get(map, keys[i]);
+        TEST_ASSERT(got != NULL);
+        TEST_ASSERT(*got == values[i]);
+    }
+
+    /* Delete half and verify */
+    for (int i = 0; i < 256; i += 2) {
+        int ret = cobalt_hashmap_remove(map, keys[i]);
+        TEST_ASSERT(ret == 0);
+    }
+    TEST_ASSERT(cobalt_hashmap_size(map) == 128);
+
+    for (int i = 0; i < 256; i++) {
+        int *got = (int *)cobalt_hashmap_get(map, keys[i]);
+        if (i % 2 == 0) {
+            TEST_ASSERT(got == NULL);
+        } else {
+            TEST_ASSERT(got != NULL);
+            TEST_ASSERT(*got == values[i]);
+        }
+    }
+
+    cobalt_hashmap_destroy(map);
+    printf("  Collision stress test passed\n");
 }
