@@ -157,6 +157,7 @@ void test_treemap_empty_operations(void);
 void test_treemap_null_operations(void);
 void test_treemap_single_element_cycle(void);
 void test_treemap_rebalance(void);
+void test_treemap_generic_keys(void);
 
 void test_treemap(void)
 {
@@ -172,6 +173,7 @@ void test_treemap(void)
     test_treemap_null_operations();
     test_treemap_single_element_cycle();
     test_treemap_rebalance();
+    test_treemap_generic_keys();
 }
 
 void test_treemap_iterator(void)
@@ -474,4 +476,52 @@ void test_treemap_rebalance(void)
 
     cobalt_treemap_destroy(map);
     printf("  Treemap rebalance test passed\n");
+}
+
+static int cmp_numeric_string(const void *a, const void *b)
+{
+    long x = strtol((const char *)a, NULL, 10);
+    long y = strtol((const char *)b, NULL, 10);
+    return (x < y) ? -1 : (x > y) ? 1 : 0;
+}
+
+void test_treemap_generic_keys(void)
+{
+    printf("Testing treemap with custom comparator...\n");
+
+    cobalt_treemap_t *map = cobalt_treemap_create_ext(cmp_numeric_string);
+    TEST_ASSERT(map != NULL);
+
+    const char *keys[]   = {"5", "3", "7", "1", "4", "9", "2"};
+    int         values[] = {50, 30, 70, 10, 40, 90, 20};
+    int         n        = sizeof(keys) / sizeof(keys[0]);
+
+    for (int i = 0; i < n; i++) {
+        int ret = cobalt_treemap_put(map, keys[i], &values[i]);
+        TEST_ASSERT(ret == 0);
+    }
+    TEST_ASSERT(cobalt_treemap_size(map) == n);
+
+    /* Verify all values are retrievable */
+    for (int i = 0; i < n; i++) {
+        int *got = (int *)cobalt_treemap_get(map, keys[i]);
+        TEST_ASSERT(got != NULL);
+        TEST_ASSERT(*got == values[i]);
+    }
+
+    /* Verify min/max keys via numeric comparison */
+    const char *min_key = cobalt_treemap_min_key(map);
+    const char *max_key = cobalt_treemap_max_key(map);
+    TEST_ASSERT(min_key != NULL && strcmp(min_key, "1") == 0);
+    TEST_ASSERT(max_key != NULL && strcmp(max_key, "9") == 0);
+
+    /* Remove and verify */
+    for (int i = 0; i < n; i++) {
+        int ret = cobalt_treemap_remove(map, keys[i]);
+        TEST_ASSERT(ret == 0);
+    }
+    TEST_ASSERT(cobalt_treemap_size(map) == 0);
+
+    cobalt_treemap_destroy(map);
+    printf("  Custom comparator test passed\n");
 }

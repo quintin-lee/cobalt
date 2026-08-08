@@ -16,18 +16,20 @@
 #define RB_BLACK 1
 
 typedef struct treemap_node {
-    char                *key;
+    void                *key;
     void                *value;
     struct treemap_node *left;
     struct treemap_node *right;
     struct treemap_node *parent;
     int                  color;
+    int                  key_owned;
 } treemap_node_t;
 
 typedef struct {
-    treemap_node_t     *root;
-    size_t              size;
-    cobalt_allocator_t *alloc;
+    treemap_node_t       *root;
+    size_t                size;
+    cobalt_allocator_t   *alloc;
+    cobalt_compare_func_t compare_func;
 } treemap_impl_t;
 
 struct cobalt_treemap {
@@ -36,10 +38,24 @@ struct cobalt_treemap {
 };
 
 /* ========================================================================= */
+/* Forward declarations                                                       */
+/* ========================================================================= */
+static int             rb_compare(const treemap_impl_t *impl, const void *a, const void *b);
+static treemap_node_t *rb_find(treemap_node_t *node, const void *key, const treemap_impl_t *impl);
+static treemap_node_t *
+rb_node_create_ext(treemap_impl_t *impl, const void *key, void *value, int owned);
+
+/* ========================================================================= */
 /* Node helpers                                                               */
 /* ========================================================================= */
 
 static treemap_node_t *rb_node_create(treemap_impl_t *impl, const char *key, void *value)
+{
+    return rb_node_create_ext(impl, key, value, 1);
+}
+
+static treemap_node_t *
+rb_node_create_ext(treemap_impl_t *impl, const void *key, void *value, int owned)
 {
     if (!impl) {
         return NULL;
@@ -50,13 +66,18 @@ static treemap_node_t *rb_node_create(treemap_impl_t *impl, const char *key, voi
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
-    node->key = cobalt_strdup(key);
-    if (!node->key) {
-        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
-        impl->alloc->free(impl->alloc, node);
-        return NULL;
+    if (owned) {
+        node->key = cobalt_strdup((const char *)key);
+        if (!node->key) {
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            impl->alloc->free(impl->alloc, node);
+            return NULL;
+        }
+    } else {
+        node->key = (void *)key;
     }
-    node->value = value;
+    node->value     = value;
+    node->key_owned = owned;
     node->left = node->right = node->parent = NULL;
     node->color                             = RB_RED;
     return node;
@@ -67,7 +88,7 @@ static void rb_node_free(treemap_impl_t *impl, treemap_node_t *node)
     if (!node || !impl) {
         return;
     }
-    if (node->key) {
+    if (node->key && node->key_owned) {
         impl->alloc->free(impl->alloc, node->key);
     }
     impl->alloc->free(impl->alloc, node);
@@ -176,7 +197,7 @@ static void rb_insert(treemap_impl_t *tree, treemap_node_t *z)
 
     while (x) {
         y       = x;
-        int cmp = strcmp(z->key, x->key);
+        int cmp = rb_compare(tree, z->key, x->key);
         if (cmp < 0) {
             x = x->left;
         } else if (cmp > 0) {
@@ -191,10 +212,13 @@ static void rb_insert(treemap_impl_t *tree, treemap_node_t *z)
     z->parent = y;
     if (!y) {
         tree->root = z;
-    } else if (strcmp(z->key, y->key) < 0) {
-        y->left = z;
     } else {
-        y->right = z;
+        int cmp = rb_compare(tree, z->key, y->key);
+        if (cmp < 0) {
+            y->left = z;
+        } else {
+            y->right = z;
+        }
     }
     rb_insert_fixup(tree, z);
     tree->size++;
@@ -333,10 +357,18 @@ static void rb_delete(treemap_impl_t *tree, treemap_node_t *z)
 /* Find helpers                                                               */
 /* ========================================================================= */
 
-static treemap_node_t *rb_find(treemap_node_t *node, const char *key)
+static int rb_compare(const treemap_impl_t *impl, const void *a, const void *b)
+{
+    if (impl->compare_func) {
+        return impl->compare_func(a, b);
+    }
+    return strcmp((const char *)a, (const char *)b);
+}
+
+static treemap_node_t *rb_find(treemap_node_t *node, const void *key, const treemap_impl_t *impl)
 {
     while (node) {
-        int cmp = strcmp(key, node->key);
+        int cmp = rb_compare(impl, key, node->key);
         if (cmp < 0) {
             node = node->left;
         } else if (cmp > 0) {
@@ -523,7 +555,7 @@ static int treemap_map_contains(cobalt_map_t *self, const void *key, size_t key_
 {
     (void)key_len;
     cobalt_treemap_t *map = (cobalt_treemap_t *)self;
-    return rb_find(map->impl.root, (const char *)key) != NULL;
+    return rb_find(map->impl.root, key, &map->impl) != NULL;
 }
 
 static void treemap_map_clear(cobalt_map_t *self)
@@ -575,6 +607,16 @@ cobalt_treemap_t *cobalt_treemap_create(void)
     return cobalt_treemap_create_with_allocator(cobalt_allocator_get_system());
 }
 
+cobalt_treemap_t *cobalt_treemap_create_ext(cobalt_compare_func_t compare_func)
+{
+    cobalt_treemap_t *map = cobalt_treemap_create();
+    if (!map) {
+        return NULL;
+    }
+    map->impl.compare_func = compare_func;
+    return map;
+}
+
 cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc)
 {
     if (!alloc) {
@@ -585,10 +627,11 @@ cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
-    map->base       = treemap_map_vtable;
-    map->impl.root  = NULL;
-    map->impl.size  = 0;
-    map->impl.alloc = alloc;
+    map->base              = treemap_map_vtable;
+    map->impl.root         = NULL;
+    map->impl.size         = 0;
+    map->impl.alloc        = alloc;
+    map->impl.compare_func = NULL;
     return map;
 }
 
@@ -608,7 +651,7 @@ int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value)
     if (!map || !key) {
         return -1;
     }
-    treemap_node_t *existing = rb_find(map->impl.root, key);
+    treemap_node_t *existing = rb_find(map->impl.root, key, &map->impl);
     if (existing) {
         existing->value = value;
         return 0;
@@ -626,7 +669,7 @@ void *cobalt_treemap_get(const cobalt_treemap_t *map, const char *key)
     if (!map || !key) {
         return NULL;
     }
-    treemap_node_t *node = rb_find(map->impl.root, key);
+    treemap_node_t *node = rb_find(map->impl.root, key, &map->impl);
     return node ? node->value : NULL;
 }
 
@@ -635,7 +678,7 @@ int cobalt_treemap_remove(cobalt_treemap_t *map, const char *key)
     if (!map || !key) {
         return -1;
     }
-    treemap_node_t *node = rb_find(map->impl.root, key);
+    treemap_node_t *node = rb_find(map->impl.root, key, &map->impl);
     if (!node) {
         return -1;
     }

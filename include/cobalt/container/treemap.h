@@ -24,10 +24,28 @@
 typedef struct cobalt_treemap cobalt_treemap_t;
 
 /**
- * @brief Create a new TreeMap
+ * @brief Generic comparison function type for TreeMap
+ * @param a  Pointer to first key
+ * @param b  Pointer to second key
+ * @return Negative if a < b, zero if a == b, positive if a > b
+ */
+typedef int (*cobalt_compare_func_t)(const void *a, const void *b);
+
+/**
+ * @brief Create a new TreeMap (string keys, lexicographic order)
  * @return Returns the newly created map pointer on success, NULL on failure
  */
 cobalt_treemap_t *cobalt_treemap_create(void);
+
+/**
+ * @brief Create a new TreeMap with a custom comparison function
+ * @param compare_func Custom comparison function (may be NULL for default strcmp)
+ * @return Returns the newly created map pointer on success, NULL on failure
+ * @note When a custom comparator is provided, keys are NOT copied — the caller must
+ *       ensure key lifetime exceeds the map's lifetime. With NULL, string keys are
+ *       deep-copied as with cobalt_treemap_create().
+ */
+cobalt_treemap_t *cobalt_treemap_create_ext(cobalt_compare_func_t compare_func);
 
 /**
  * @brief Destroy the TreeMap and free memory
