@@ -71,6 +71,18 @@ cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t              initial_buckets,
                                             cobalt_equal_func_t equal_func);
 
 /**
+ * @brief Set or replace the hash and equality functions on an existing hash map
+ * @param map Pointer to the hash map created with cobalt_hashmap_create_ext()
+ * @param hash_func Custom hash function (may be NULL for default)
+ * @param equal_func Custom equality function (may be NULL for default)
+ * @return Returns 0 on success, -1 if map is NULL
+ * @note Changes affect future operations only; existing entries are not rehashed.
+ */
+int cobalt_hashmap_set_funcs(cobalt_hashmap_t   *map,
+                             cobalt_hash_func_t  hash_func,
+                             cobalt_equal_func_t equal_func);
+
+/**
  * @brief Create a hash map with a custom allocator
  *
  * Same as cobalt_hashmap_create() but uses the provided allocator.

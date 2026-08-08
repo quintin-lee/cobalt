@@ -133,7 +133,74 @@ void test_hashmap_single_element(void);
 void test_hashmap_null_key(void);
 void test_hashmap_overwrite_then_remove(void);
 
+static unsigned int hash_always_zero(const void *key, size_t key_len)
+{
+    (void)key;
+    (void)key_len;
+    return 0u;
+}
+
+static int equal_strcmp2(const void *a, const void *b, size_t len)
+{
+    (void)len;
+    return strcmp((const char *)a, (const char *)b) == 0;
+}
+
 void test_hashmap_collision_stress(void);
+void test_hashmap_set_funcs(void);
+
+static unsigned int hash_fnv1a(const void *key, size_t key_len)
+{
+    (void)key_len;
+    unsigned int h = 2166136261u;
+    const char  *k = (const char *)key;
+    while (*k) {
+        h = h * 31 + (unsigned char)*k++;
+    }
+    return h;
+}
+
+static int equal_strcmp(const void *a, const void *b, size_t len)
+{
+    (void)len;
+    return strcmp((const char *)a, (const char *)b) == 0;
+}
+
+void test_hashmap_set_funcs(void)
+{
+    printf("Testing hashmap set_funcs...\n");
+
+    /* Create with default functions */
+    cobalt_hashmap_t *map = cobalt_hashmap_create(4);
+    TEST_ASSERT(map != NULL);
+
+    int ret = cobalt_hashmap_put(map, "name", "Alice");
+    TEST_ASSERT(ret == 0);
+
+    const char *val = (const char *)cobalt_hashmap_get(map, "name");
+    TEST_ASSERT(val != NULL);
+    TEST_ASSERT(strcmp(val, "Alice") == 0);
+
+    /* Change hash function to a custom one */
+    ret = cobalt_hashmap_set_funcs(map, hash_fnv1a, equal_strcmp);
+    TEST_ASSERT(ret == 0);
+
+    /* Re-insert with new hash function — existing entries may not be
+     * findable since they were hashed with the previous function */
+    ret = cobalt_hashmap_put(map, "age", "30");
+    TEST_ASSERT(ret == 0);
+
+    val = (const char *)cobalt_hashmap_get(map, "age");
+    TEST_ASSERT(val != NULL && strcmp(val, "30") == 0);
+
+    /* Verify old key is gone (different hash) */
+    val = (const char *)cobalt_hashmap_get(map, "name");
+    TEST_ASSERT(val == NULL);
+
+    cobalt_hashmap_destroy(map);
+    printf("  set_funcs: OK\n");
+}
+
 
 void test_hashmap(void)
 {
@@ -147,6 +214,7 @@ void test_hashmap(void)
     test_hashmap_null_key();
     test_hashmap_overwrite_then_remove();
     test_hashmap_collision_stress();
+    test_hashmap_set_funcs();
     printf("  Hashmap tests completed\n");
 }
 
@@ -305,20 +373,7 @@ void test_hashmap_collision_stress(void)
     printf("Testing hashmap collision stress...\n");
 
     /* Custom hash function that maps all keys to the same bucket (hash = 0) */
-    unsigned int same_hash(const void *key, size_t key_len)
-    {
-        (void)key;
-        (void)key_len;
-        return 0u;
-    }
-
-    int same_equal(const void *a, const void *b, size_t len)
-    {
-        (void)len;
-        return strcmp((const char *)a, (const char *)b) == 0;
-    }
-
-    cobalt_hashmap_t *map = cobalt_hashmap_create_ext(4, same_hash, same_equal);
+    cobalt_hashmap_t *map = cobalt_hashmap_create_ext(4, hash_always_zero, equal_strcmp2);
     TEST_ASSERT(map != NULL);
 
     /* Insert many keys that all hash to 0 — tests separate chaining under pressure */

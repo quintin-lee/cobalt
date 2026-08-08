@@ -497,6 +497,18 @@ cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t              initial_buckets,
     return map;
 }
 
+int cobalt_hashmap_set_funcs(cobalt_hashmap_t   *map,
+                             cobalt_hash_func_t  hash_func,
+                             cobalt_equal_func_t equal_func)
+{
+    if (!map) {
+        return -1;
+    }
+    map->impl.hash_func  = hash_func;
+    map->impl.equal_func = equal_func;
+    return 0;
+}
+
 int cobalt_hashmap_put_ext(cobalt_hashmap_t *map, const void *key, size_t key_len, void *value)
 {
     if (!map || !key) {
