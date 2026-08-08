@@ -13,6 +13,7 @@ option(COBALT_BUILD_EXAMPLES "Build examples" ON)
 option(COBALT_RUN_TIDY "Run clang-tidy checks" ON)
 option(COBALT_RUN_FORMAT "Run clang-format checks" ON)
 option(COBALT_BUILD_COVERAGE "Build with coverage instrumentation" OFF)
+option(COBALT_COVERAGE_THRESHOLD "Minimum coverage percentage to pass (0 = no check)" 80)
 option(COBALT_RUN_ASAN "Build with AddressSanitizer" OFF)
 
 # ASAN build flags
@@ -244,6 +245,16 @@ add_custom_target(coverage-summary
     COMMAND tail -5 coverage_report/index.html | grep -oE '[0-9]+\.[0-9]+%' || true
     DEPENDS cobalt cobalt_test
     COMMENT "Running coverage and printing summary..."
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+# Check coverage against threshold
+add_custom_target(coverage-check
+    COMMAND cmake --build . --parallel
+    COMMAND ctest --output-on-failure
+    COMMAND lcov --capture --directory . --rc branch_coverage=1 -o coverage.info --ignore-errors negative
+    COMMAND ${CMAKE_SOURCE_DIR}/cmake/check_coverage.sh ${COBALT_COVERAGE_THRESHOLD}
+    DEPENDS cobalt cobalt_test
+    COMMENT "Running coverage and checking against threshold..."
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 
