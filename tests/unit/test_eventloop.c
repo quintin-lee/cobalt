@@ -5,12 +5,15 @@
 
 #include "cobalt/module/eventloop.h"
 #include "test_framework.h"
+#include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <time.h>
-#include <signal.h>
 #include <unistd.h>
 
 static int  timer_called  = 0;
@@ -55,6 +58,7 @@ static void on_fd(int fd, short events, void *user_data)
 /* Forward declarations for new tests */
 void test_eventloop_timer_edge_cases(void);
 void test_eventloop_fd_edge_cases(void);
+void test_eventloop_unix_socket(void);
 
 void test_eventloop_create_destroy(void)
 {
@@ -366,8 +370,6 @@ void test_eventloop_fd_edge_cases(void)
     printf("  FD edge cases passed\n");
 }
 
-
-
 static void test_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
 {
     (void)fd;
@@ -398,20 +400,17 @@ void test_eventloop_signal(void)
     int signal_fired = 0;
 
     /* Register SIGUSR1 handler */
-    int ret = cobalt_eventloop_add_signal(loop, SIGUSR1,
-        test_signal_handler, &signal_fired);
+    int ret = cobalt_eventloop_add_signal(loop, SIGUSR1, test_signal_handler, &signal_fired);
     TEST_ASSERT(ret == 0);
     printf("  Signal handler registered: OK\n");
 
     /* Duplicate registration should fail */
-    ret = cobalt_eventloop_add_signal(loop, SIGUSR1,
-        test_signal_handler, &signal_fired);
+    ret = cobalt_eventloop_add_signal(loop, SIGUSR1, test_signal_handler, &signal_fired);
     TEST_ASSERT(ret == -1);
     printf("  Duplicate signal reject: OK\n");
 
     /* NULL loop should fail */
-    ret = cobalt_eventloop_add_signal(NULL, SIGUSR1,
-        test_signal_handler, &signal_fired);
+    ret = cobalt_eventloop_add_signal(NULL, SIGUSR1, test_signal_handler, &signal_fired);
     TEST_ASSERT(ret == -1);
     printf("  NULL loop signal reject: OK\n");
 
@@ -433,8 +432,7 @@ void test_eventloop_close_callback(void)
 
     int close_fired = 0;
 
-    int ret = cobalt_eventloop_add_close_callback(loop,
-        test_close_handler, &close_fired);
+    int ret = cobalt_eventloop_add_close_callback(loop, test_close_handler, &close_fired);
     TEST_ASSERT(ret == 0);
     printf("  Close callback registered: OK\n");
 
@@ -459,6 +457,7 @@ void test_eventloop(void)
     test_eventloop_fd_edge_cases();
     test_eventloop_signal();
     test_eventloop_close_callback();
+    test_eventloop_unix_socket();
     printf("  Eventloop tests completed\n");
 }
 
@@ -487,4 +486,70 @@ void test_eventloop_timer_periodic(void)
 
     cobalt_eventloop_destroy(loop);
     printf("  Periodic timer test passed\n");
+}
+
+/* Server callback for UNIX socket test — file-scope to avoid nested functions */
+typedef struct {
+    int accept_count;
+} unix_test_ctx_t;
+
+static void unix_server_cb(cobalt_fd_t fd, cobalt_events_t events, void *ud)
+{
+    (void)events;
+    unix_test_ctx_t   *ctx     = (unix_test_ctx_t *)ud;
+    struct sockaddr_un addr    = {};
+    socklen_t          addrlen = sizeof(addr);
+    cobalt_fd_t        cfd     = accept(fd, (struct sockaddr *)&addr, &addrlen);
+    if (cfd >= 0) {
+        ctx->accept_count++;
+        close(cfd);
+    }
+}
+
+void test_eventloop_unix_socket(void)
+{
+    printf("Testing eventloop UNIX domain socket...\n");
+
+    const char *sock_path = "/tmp/cobalt_unix_test.sock";
+    unlink(sock_path);
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    /* Create server socket */
+    cobalt_fd_t server_fd;
+    int         ret = cobalt_eventloop_create_unix_server(sock_path, &server_fd);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(server_fd >= 0);
+
+    /* Register server for incoming connections */
+    unix_test_ctx_t ctx = {0};
+    ret                 = cobalt_eventloop_add_fd(loop, server_fd, POLLIN, unix_server_cb, &ctx);
+    TEST_ASSERT(ret == 0);
+
+    /* Create client and connect */
+    cobalt_fd_t client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    TEST_ASSERT(client_fd >= 0);
+
+    struct sockaddr_un cli_addr = {};
+    cli_addr.sun_family         = AF_UNIX;
+    strncpy(cli_addr.sun_path, sock_path, sizeof(cli_addr.sun_path) - 1);
+
+    ret = connect(client_fd, (struct sockaddr *)&cli_addr, sizeof(cli_addr));
+    TEST_ASSERT(ret == 0);
+
+    /* Run one iteration to trigger accept */
+    ret = cobalt_eventloop_iteration(loop);
+    TEST_ASSERT(ret == 0);
+
+    /* Server should have accepted the connection */
+    TEST_ASSERT(ctx.accept_count > 0);
+
+    /* Clean up */
+    close(client_fd);
+    cobalt_eventloop_del_fd(loop, server_fd);
+    cobalt_eventloop_destroy(loop);
+    unlink(sock_path);
+
+    printf("  UNIX socket test passed\n");
 }

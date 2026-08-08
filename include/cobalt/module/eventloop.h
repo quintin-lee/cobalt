@@ -166,6 +166,34 @@ int cobalt_eventloop_add_close_callback(cobalt_eventloop_t *loop,
                                         fd_handler_t        callback,
                                         void               *user_data);
 
+/**
+ * @brief Create a UNIX domain socket server
+ * @param path   Unix socket path (e.g. "/tmp/cobalt_test.sock")
+ * @param sock_out Pointer to receive the new socket FD
+ * @return Returns 0 on success, -1 on failure
+ * @note The socket is automatically set to listen mode. The caller must
+ *       register it with cobalt_eventloop_add_fd() to handle incoming
+ *       connections. The socket path is unlinked on bind; stale sockets
+ *       are removed automatically.
+ */
+int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out);
+
+/**
+ * @brief Accept a connection on a UNIX domain socket and register it with the event loop
+ * @param loop     Event loop to register the connection on
+ * @param listen_fd Listening socket FD (must already be registered with the loop)
+ * @param events   Event mask to watch on the accepted connection (e.g. POLLIN)
+ * @param callback Callback invoked when events occur on the new connection
+ * @param user_data User data passed to the callback
+ * @return Returns 0 on success, -1 on failure (e.g. EAGAIN / EWOULDBLOCK)
+ * @note Returns -1 immediately if no connection is pending (non-blocking accept).
+ */
+int cobalt_eventloop_accept(cobalt_eventloop_t *loop,
+                            cobalt_fd_t         listen_fd,
+                            cobalt_events_t     events,
+                            fd_handler_t        callback,
+                            void               *user_data);
+
 /** @} */
 
 #endif /* EVENTLOOP_H */

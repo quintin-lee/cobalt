@@ -17,10 +17,16 @@
 
 #ifdef __linux__
 #include <sys/epoll.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #elif __APPLE__
 #include <sys/event.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #else
 #include <poll.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #endif
 
 #define COBALT_EVENTLOOP_DEFAULT_CAPACITY 16
@@ -277,7 +283,7 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
 #ifdef __linux__
     struct epoll_event ev = {0};
     ev.events             = events;
-    ev.data.fd            = fd;
+    ev.data.ptr           = NULL;
     return epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, fd, &ev);
 #elif __APPLE__
     struct kevent kev;
@@ -309,7 +315,7 @@ static int platform_mod_fd(cobalt_eventloop_t *loop, int fd, short events)
 #ifdef __linux__
     struct epoll_event ev = {0};
     ev.events             = events;
-    ev.data.fd            = fd;
+    ev.data.ptr           = NULL;
     return epoll_ctl(loop->epoll_fd, EPOLL_CTL_MOD, fd, &ev);
 #elif __APPLE__
     struct kevent kev;
@@ -362,6 +368,67 @@ platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out
     *entries_out     = loop->pollfds;
     (void)max_events;
 #endif
+}
+
+/* -------------------------------------------------------------------------- */
+/* UNIX domain socket helpers                                                 */
+/* -------------------------------------------------------------------------- */
+
+int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out)
+{
+    if (!path || !sock_out) {
+        return -1;
+    }
+
+    int sock = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sock < 0) {
+        return -1;
+    }
+
+    struct sockaddr_un addr = {};
+    addr.sun_family         = AF_UNIX;
+    strncpy(addr.sun_path, path, sizeof(addr.sun_path) - 1);
+
+    /* Remove stale socket file */
+    unlink(path);
+
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        close(sock);
+        return -1;
+    }
+
+    if (listen(sock, 128) < 0) {
+        close(sock);
+        unlink(path);
+        return -1;
+    }
+
+    *sock_out = (cobalt_fd_t)sock;
+    return 0;
+}
+
+int cobalt_eventloop_accept(cobalt_eventloop_t *loop,
+                            cobalt_fd_t         listen_fd,
+                            cobalt_events_t     events,
+                            fd_handler_t        callback,
+                            void               *user_data)
+{
+    if (!loop || listen_fd < 0 || !callback) {
+        return -1;
+    }
+
+    struct sockaddr_un client_addr = {};
+    socklen_t          addrlen     = sizeof(client_addr);
+    cobalt_fd_t        conn_fd = accept((int)listen_fd, (struct sockaddr *)&client_addr, &addrlen);
+    if (conn_fd < 0) {
+        return -1;
+    }
+
+    int ret = cobalt_eventloop_add_fd(loop, conn_fd, events, callback, user_data);
+    if (ret < 0) {
+        close(conn_fd);
+    }
+    return ret;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -524,6 +591,15 @@ int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
     entry->events    = (short)events;
     entry->callback  = callback;
     entry->user_data = user_data;
+
+#ifdef __linux__
+    {
+        struct epoll_event ev = {0};
+        ev.events             = events;
+        ev.data.ptr           = entry;
+        epoll_ctl(loop->epoll_fd, EPOLL_CTL_MOD, (int)fd, &ev);
+    }
+#endif
 
     if (!loop->fd_head) {
         loop->fd_head = loop->fd_tail = entry;
