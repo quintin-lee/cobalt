@@ -69,3 +69,42 @@ void cobalt_list_sort(void **head, size_t *count, compare_func_t compar);
 /** @} */
 
 #endif /* SORT_H */
+
+/* -----------------------------------------------------------------------------
+ *  Additional sorting and sequence utilities
+ * -------------------------------------------------------------------------- */
+
+/**
+ * @brief Stable sort (uses insertion sort internally)
+ * @param base Pointer to the first element of the array to be sorted
+ * @param nmemb Number of elements in the array
+ * @param size Size of each element in bytes
+ * @param compar Comparison function
+ * @note This is a stable sorting algorithm — equal elements preserve their relative order.
+ */
+void cobalt_stable_sort(void *base, size_t nmemb, size_t size, compare_func_t compar);
+
+/**
+ * @brief Partition array around a pivot value
+ * @param base Pointer to the first element
+ * @param nmemb Number of elements
+ * @param size Element size in bytes
+ * @param pivot Value to partition around
+ * @return Index of the first element in the "greater-or-equal" partition
+ * @note After partitioning, all elements < pivot are before the returned index,
+ *       and all elements >= pivot are at or after it. Order within partitions is undefined.
+ */
+size_t
+cobalt_partition(void *base, size_t nmemb, size_t size, const void *pivot, compare_func_t compar);
+
+/**
+ * @brief Remove consecutive duplicate elements from a sorted range
+ * @param base Pointer to the first element
+ * @param nmemb Input number of elements (updated to output count)
+ * @param size Element size in bytes
+ * @param compar Comparison function
+ * @return New logical size after deduplication
+ * @note The array must be sorted according to compar before calling.
+ *       Elements after the returned count are unspecified.
+ */
+size_t cobalt_unique(void *base, size_t *nmemb, size_t size, compare_func_t compar);

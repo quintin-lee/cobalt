@@ -25,6 +25,13 @@ static int cmp_double(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
+static int cmp_item_val(const void *a, const void *b)
+{
+    const int *x = (const int *)a;
+    const int *y = (const int *)b;
+    return *x - *y;
+}
+
 static int pred_gt5(const void *item)
 {
     return *(const int *)item > 5;
@@ -153,8 +160,8 @@ void test_insertion_sort_single(void)
 void test_bsearch_found(void)
 {
     printf("Testing bsearch found...\n");
-    int arr[] = {1, 3, 5, 7, 9, 11};
-    int key = 7;
+    int   arr[]  = {1, 3, 5, 7, 9, 11};
+    int   key    = 7;
     void *result = cobalt_bsearch(&key, arr, 6, sizeof(int), cmp_int);
     TEST_ASSERT(result != NULL);
     TEST_EQUAL(*(int *)result, 7);
@@ -164,8 +171,8 @@ void test_bsearch_found(void)
 void test_bsearch_not_found(void)
 {
     printf("Testing bsearch not found...\n");
-    int arr[] = {1, 3, 5, 7, 9};
-    int key = 4;
+    int   arr[]  = {1, 3, 5, 7, 9};
+    int   key    = 4;
     void *result = cobalt_bsearch(&key, arr, 5, sizeof(int), cmp_int);
     TEST_ASSERT(result == NULL);
     printf("  bsearch not found: OK\n");
@@ -174,7 +181,7 @@ void test_bsearch_not_found(void)
 void test_bsearch_empty(void)
 {
     printf("Testing bsearch empty array...\n");
-    int key = 1;
+    int   key    = 1;
     void *result = cobalt_bsearch(&key, NULL, 0, sizeof(int), cmp_int);
     TEST_ASSERT(result == NULL);
     printf("  bsearch empty: OK\n");
@@ -183,8 +190,8 @@ void test_bsearch_empty(void)
 void test_bsearch_first(void)
 {
     printf("Testing bsearch first element...\n");
-    int arr[] = {1, 3, 5};
-    int key = 1;
+    int   arr[]  = {1, 3, 5};
+    int   key    = 1;
     void *result = cobalt_bsearch(&key, arr, 3, sizeof(int), cmp_int);
     TEST_ASSERT(result != NULL);
     TEST_EQUAL(*(int *)result, 1);
@@ -194,8 +201,8 @@ void test_bsearch_first(void)
 void test_bsearch_last(void)
 {
     printf("Testing bsearch last element...\n");
-    int arr[] = {1, 3, 5};
-    int key = 5;
+    int   arr[]  = {1, 3, 5};
+    int   key    = 5;
     void *result = cobalt_bsearch(&key, arr, 3, sizeof(int), cmp_int);
     TEST_ASSERT(result != NULL);
     TEST_EQUAL(*(int *)result, 5);
@@ -209,7 +216,7 @@ void test_bsearch_last(void)
 void test_find_if(void)
 {
     printf("Testing find_if...\n");
-    int arr[] = {1, 4, 3, 8, 5};
+    int   arr[]  = {1, 4, 3, 8, 5};
     void *result = cobalt_find_if(arr, 5, sizeof(int), pred_gt5);
     TEST_ASSERT(result != NULL);
     TEST_EQUAL(*(int *)result, 8);
@@ -219,7 +226,7 @@ void test_find_if(void)
 void test_find_if_not_found(void)
 {
     printf("Testing find_if not found...\n");
-    int arr[] = {1, 2, 3};
+    int   arr[]  = {1, 2, 3};
     void *result = cobalt_find_if(arr, 3, sizeof(int), pred_gt10);
     TEST_ASSERT(result == NULL);
     printf("  find_if not found: OK\n");
@@ -235,7 +242,7 @@ static void op_count(void *item)
 void test_for_each(void)
 {
     printf("Testing for_each...\n");
-    int arr[] = {1, 2, 3, 4, 5};
+    int arr[]      = {1, 2, 3, 4, 5};
     int call_count = 0;
     /* for_each signature: for_each(base, nmemb, size, op) */
     /* We can't easily capture call_count, so use a global trick */
@@ -251,7 +258,7 @@ void test_for_each(void)
 void test_map(void)
 {
     printf("Testing map...\n");
-    int input[]  = {1, 2, 3, 4, 5};
+    int input[] = {1, 2, 3, 4, 5};
     int output[5];
     int ret = cobalt_map(input, output, 5, sizeof(int), map_double, NULL);
     TEST_EQUAL(ret, 0);
@@ -264,10 +271,10 @@ void test_map(void)
 void test_filter(void)
 {
     printf("Testing filter...\n");
-    int input[]  = {1, 2, 3, 4, 5, 6, 7, 8};
-    int output[8];
+    int    input[] = {1, 2, 3, 4, 5, 6, 7, 8};
+    int    output[8];
     size_t count = 8;
-    int ret = cobalt_filter(input, output, &count, sizeof(int), pred_even);
+    int    ret   = cobalt_filter(input, output, &count, sizeof(int), pred_even);
     TEST_EQUAL(ret, 0);
     TEST_EQUAL(count, 4u);
     TEST_EQUAL(output[0], 2);
@@ -280,13 +287,17 @@ void test_filter(void)
 void test_fold(void)
 {
     printf("Testing fold (sum)...\n");
-    int arr[] = {1, 2, 3, 4, 5};
-    int sum = 0;
+    int   arr[]  = {1, 2, 3, 4, 5};
+    int   sum    = 0;
     void *result = cobalt_fold(arr, 5, sizeof(int), &sum, fold_sum, NULL);
     TEST_ASSERT(result == &sum);
     TEST_EQUAL(sum, 15);
     printf("  fold sum: OK\n");
 }
+
+void test_sort_stable(void);
+void test_sort_partition(void);
+void test_sort_unique(void);
 
 void test_predicate_helpers(void)
 {
@@ -313,6 +324,9 @@ void test_sort(void)
     test_insertion_sort_int();
     test_insertion_sort_already_sorted();
     test_insertion_sort_single();
+    test_sort_stable();
+    test_sort_partition();
+    test_sort_unique();
     test_bsearch_found();
     test_bsearch_not_found();
     test_bsearch_empty();
@@ -326,4 +340,58 @@ void test_sort(void)
     test_fold();
     test_predicate_helpers();
     printf("  Sort/functional tests completed\n");
+}
+
+void test_sort_stable(void)
+{
+    printf("Testing cobalt_stable_sort...\n");
+
+    int    arr[] = {5, 3, 8, 1, 3, 2};
+    size_t n     = sizeof(arr) / sizeof(arr[0]);
+    cobalt_stable_sort(arr, n, sizeof(int), cmp_int);
+
+    TEST_ASSERT(arr[0] == 1);
+    TEST_ASSERT(arr[1] == 2);
+    TEST_ASSERT(arr[2] == 3);
+    TEST_ASSERT(arr[3] == 3);
+    TEST_ASSERT(arr[4] == 5);
+    TEST_ASSERT(arr[5] == 8);
+    printf("  stable_sort: OK\n");
+}
+
+void test_sort_partition(void)
+{
+    printf("Testing cobalt_partition...\n");
+
+    int    arr[] = {9, 3, 7, 1, 5, 4, 8, 2};
+    size_t n     = sizeof(arr) / sizeof(arr[0]);
+    int    pivot = 5;
+
+    size_t idx = cobalt_partition(arr, n, sizeof(int), &pivot, cmp_int);
+
+    TEST_ASSERT(idx > 0 && idx <= n);
+    for (size_t i = 0; i < idx; i++) {
+        TEST_ASSERT(arr[i] < pivot);
+    }
+    for (size_t i = idx; i < n; i++) {
+        TEST_ASSERT(arr[i] >= pivot);
+    }
+    printf("  partition: OK\n");
+}
+
+void test_sort_unique(void)
+{
+    printf("Testing cobalt_unique...\n");
+
+    int    arr[]  = {1, 1, 2, 3, 3, 3, 4, 5, 5};
+    size_t n      = sizeof(arr) / sizeof(arr[0]);
+    size_t result = cobalt_unique(arr, &n, sizeof(int), cmp_int);
+
+    TEST_ASSERT(result == 5);
+    TEST_ASSERT(arr[0] == 1);
+    TEST_ASSERT(arr[1] == 2);
+    TEST_ASSERT(arr[2] == 3);
+    TEST_ASSERT(arr[3] == 4);
+    TEST_ASSERT(arr[4] == 5);
+    printf("  unique: OK\n");
 }

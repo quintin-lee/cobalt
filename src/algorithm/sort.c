@@ -73,3 +73,61 @@ void cobalt_list_sort(void **head, size_t *count, compare_func_t compar)
     cobalt_list_node_t **list_head = (cobalt_list_node_t **)head;
     cobalt_list_merge_sort(list_head, count, compar);
 }
+
+void cobalt_stable_sort(void *base, size_t nmemb, size_t size, compare_func_t compar)
+{
+    if (!base || nmemb <= 1) {
+        return;
+    }
+    cobalt_insertion_sort(base, nmemb, size, compar);
+}
+
+size_t
+cobalt_partition(void *base, size_t nmemb, size_t size, const void *pivot, compare_func_t compar)
+{
+    if (!base || nmemb == 0 || !compar || !pivot) {
+        return 0;
+    }
+    char  *arr   = (char *)base;
+    size_t left  = 0;
+    size_t right = nmemb;
+    char  *tmp   = (char *)malloc(size);
+    if (!tmp) {
+        return 0;
+    }
+
+    while (left < right) {
+        if (compar(arr + left * size, pivot) < 0) {
+            left++;
+        } else {
+            right--;
+            if (left != right) {
+                memcpy(tmp, arr + left * size, size);
+                memcpy(arr + left * size, arr + right * size, size);
+                memcpy(arr + right * size, tmp, size);
+            }
+        }
+    }
+    free(tmp);
+    return left;
+}
+
+size_t cobalt_unique(void *base, size_t *nmemb, size_t size, compare_func_t compar)
+{
+    if (!base || !nmemb || nmemb == NULL || *nmemb <= 1 || !compar) {
+        return nmemb ? *nmemb : 0;
+    }
+    size_t count = *nmemb;
+    size_t write = 1;
+    char  *arr   = (char *)base;
+    for (size_t i = 1; i < count; i++) {
+        if (compar(arr + i * size, arr + (i - 1) * size) != 0) {
+            if (write != i) {
+                memcpy(arr + write * size, arr + i * size, size);
+            }
+            write++;
+        }
+    }
+    *nmemb = write;
+    return write;
+}
