@@ -39,8 +39,8 @@ typedef unsigned int (*cobalt_hash_func_t)(const void *key, size_t key_len);
 
 /**
  * @brief Generic equality function type
- * @param a First key pointer
- * @param b Second key pointer
+ * @param key_a  First key pointer
+ * @param key_b  Second key pointer
  * @param key_len Length of each key in bytes
  * @return Non-zero if keys are equal, zero otherwise
  */
@@ -69,6 +69,16 @@ cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets);
 cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t              initial_buckets,
                                             cobalt_hash_func_t  hash_func,
                                             cobalt_equal_func_t equal_func);
+
+/**
+ * @brief Create a hash map with a custom allocator
+ *
+ * Same as cobalt_hashmap_create() but uses the provided allocator.
+ * @param initial_buckets Initial number of buckets. If 0, a default size will be allocated
+ *                        upon lazy loading.
+ * @param alloc           Custom allocator (must not be NULL)
+ * @return Pointer to the created hash map. Returns NULL if memory allocation fails.
+ */
 cobalt_hashmap_t *cobalt_hashmap_create_with_allocator(size_t              initial_buckets,
                                                        cobalt_allocator_t *alloc);
 
@@ -162,7 +172,7 @@ size_t cobalt_hashmap_capacity(const cobalt_hashmap_t *map);
  * @note Returns a cobalt_map_iterator_t compatible with the Map interface.
  *       Destroy with cobalt_map_iterator_destroy().
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

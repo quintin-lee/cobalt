@@ -32,8 +32,10 @@ enum { COBALT_ERROR_STACK_MAX_DEPTH = 32 };
  * @brief Error stack type — stack-allocatable
  */
 typedef struct cobalt_error_stack {
+    /** Error entries stored in the stack */
     cobalt_error_t entries[COBALT_ERROR_STACK_MAX_DEPTH];
-    size_t         depth;
+    /** Current number of entries in the stack */
+    size_t depth;
 } cobalt_error_stack_t;
 
 /**

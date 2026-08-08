@@ -48,19 +48,72 @@ typedef void *(*fold_func_t)(void *accumulator, const void *item, void *user_dat
  *  Common predicate functions
  * -------------------------------------------------------------------------- */
 
+/**
+ * @brief Predicate: two items are equal
+ * @param a     First item
+ * @param b     Second item
+ * @param comp  Comparison function
+ * @return Non-zero if equal, zero otherwise
+ */
 int predicate_equal(const void *a, const void *b, compare_func_t comp);
+
+/**
+ * @brief Predicate: two items are not equal
+ * @param a     First item
+ * @param b     Second item
+ * @param comp  Comparison function
+ * @return Non-zero if not equal, zero otherwise
+ */
 int predicate_not_equal(const void *a, const void *b, compare_func_t comp);
+
+/**
+ * @brief Predicate: item is NULL
+ * @param item Item to test
+ * @return Non-zero if NULL, zero otherwise
+ */
 int predicate_null(const void *item);
+
+/**
+ * @brief Predicate: item is non-NULL
+ * @param item Item to test
+ * @return Non-zero if non-NULL, zero otherwise
+ */
 int predicate_nonnull(const void *item);
 
 /* -----------------------------------------------------------------------------
  *  Generic search and traversal algorithms
  * -------------------------------------------------------------------------- */
 
+/**
+ * @brief Binary search on a sorted array
+ * @param key      Key to search for
+ * @param base     Pointer to the array
+ * @param nmemb    Number of elements
+ * @param size     Size of each element in bytes
+ * @param compar   Comparison function (returns <0, 0, >0)
+ * @return Pointer to matching element, or NULL if not found
+ */
 void *
 cobalt_bsearch(const void *key, const void *base, size_t nmemb, size_t size, compare_func_t compar);
+
+/**
+ * @brief Find the first element matching a predicate
+ * @param base   Pointer to the array
+ * @param nmemb  Number of elements
+ * @param size   Size of each element in bytes
+ * @param pred   Predicate function
+ * @return Pointer to matching element, or NULL if not found
+ */
 void *cobalt_find_if(const void *base, size_t nmemb, size_t size, predicate_func_t pred);
-void  cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func_t op);
+
+/**
+ * @brief Apply an operation to each element
+ * @param base   Pointer to the array
+ * @param nmemb  Number of elements
+ * @param size   Size of each element in bytes
+ * @param op     Operation function
+ */
+void cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func_t op);
 
 /* -----------------------------------------------------------------------------
  *  Stream operators (map, filter, fold)

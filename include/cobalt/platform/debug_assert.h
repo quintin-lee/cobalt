@@ -9,6 +9,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+/**
+ * @brief Assert macro that aborts on failure in debug builds
+ * @param expr Expression to evaluate
+ */
 #ifdef COBALT_DEBUG
 #define COBALT_ASSERT(expr)                                                                        \
     do {                                                                                           \

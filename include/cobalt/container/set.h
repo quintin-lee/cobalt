@@ -43,18 +43,41 @@ typedef int (*cobalt_set_equal_func_t)(const void *a, const void *b, size_t item
 cobalt_set_t *cobalt_set_create(size_t initial_capacity);
 
 /**
- * @brief Create a new set with custom hash and equality functions
- * @param initial_capacity Initial capacity, uses default capacity if 0
- * @param hash_func Custom hash function (may be NULL for default string hash)
- * @param equal_func Custom equality function (may be NULL for default strcmp)
- * @return Returns set pointer on success, NULL on failure
- * @note Elements are NOT copied — caller must ensure element lifetime exceeds the set's lifetime.
+ * @brief Create a set with a custom allocator
+ *
+ * Same as cobalt_set_create() but uses the provided allocator.
+ * @param initial_capacity Initial number of buckets.
+ * @param alloc            Custom allocator (must not be NULL)
+ * @return Pointer to the newly created set, or NULL on failure
  */
 cobalt_set_t *cobalt_set_create_with_allocator(size_t initial_capacity, cobalt_allocator_t *alloc);
+
+/**
+ * @brief Create an extended set with a custom allocator
+ *
+ * Same as cobalt_set_create_ext() but uses the provided allocator.
+ * @param initial_capacity Initial number of buckets.
+ * @param hash_func        Custom hash function (may be NULL for default).
+ * @param equal_func       Custom equality function (may be NULL for default).
+ * @param alloc            Custom allocator (must not be NULL)
+ * @return Pointer to the newly created set, or NULL on failure
+ */
 cobalt_set_t *cobalt_set_create_ext_with_allocator(size_t                  initial_capacity,
                                                    cobalt_set_hash_func_t  hash_func,
                                                    cobalt_set_equal_func_t equal_func,
                                                    cobalt_allocator_t     *alloc);
+
+/**
+ * @brief Create an extended set with custom hash and equality functions
+ *
+ * Creates a set that stores arbitrary (non-string) elements using
+ * user-provided hash and equality callbacks.
+ * @param initial_capacity Initial number of buckets.
+ * @param hash_func        Custom hash function (may be NULL for default).
+ * @param equal_func       Custom equality function (may be NULL for default).
+ * @return Pointer to the newly created set, or NULL on failure
+ * @note Elements are NOT copied — caller must ensure element lifetime exceeds the set's lifetime.
+ */
 
 cobalt_set_t *cobalt_set_create_ext(size_t                  initial_capacity,
                                     cobalt_set_hash_func_t  hash_func,
@@ -153,7 +176,7 @@ cobalt_map_iterator_t *cobalt_set_iterator_create(cobalt_set_t *set);
  * @note This function exists for API symmetry with HashMap/TreeMap.
  *       Use cobalt_set_contains() to check existence without the sentinel.
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

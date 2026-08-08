@@ -8,8 +8,13 @@
  * deallocation, and reallocation to enable custom memory management strategies (such as using the
  * default system allocator, memory pools, etc.).
  *
+ * @defgroup Memory_Module Memory module
+ * @{
+ */
+
+/**
  * @defgroup Allocator Memory allocator module
- * @ingroup Memory
+ * @ingroup Memory_Module
  * @{
  */
 
@@ -76,6 +81,8 @@ void cobalt_allocator_free(cobalt_allocator_t *self, void *ptr);
  * @return void* Pointer to the reallocated memory block
  */
 void *cobalt_allocator_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size);
+
+/** @} */
 
 /** @} */
 

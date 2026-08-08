@@ -9,7 +9,7 @@
  *          small allocations of a known fixed size.
  *
  * @defgroup Pool Pool allocator module
- * @ingroup Memory
+ * @ingroup Memory_Module
  * @{
  */
 
@@ -71,7 +71,7 @@ int cobalt_pool_is_full(const cobalt_pool_t *pool);
  * @param pool Pool to query
  * @return Number of available blocks
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

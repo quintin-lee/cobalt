@@ -21,7 +21,7 @@
  * copy, the user is responsible for freeing the returned string using free(). This solves the
  * problem of strdup being non-standard on some platforms.
  *
- * @param s The source string to duplicate
+ * @param str_src The source string to duplicate
  * @return A pointer to the newly allocated string copy; returns NULL if the source string is NULL
  * or memory allocation fails
  */

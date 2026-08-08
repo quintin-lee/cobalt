@@ -9,7 +9,7 @@
  *          cycles of a known set of object sizes.
  *
  * @defgroup Slab Slab allocator module
- * @ingroup Memory
+ * @ingroup Memory_Module
  * @{
  */
 
@@ -62,7 +62,7 @@ void *cobalt_slab_alloc(cobalt_slab_t *slab, size_t size);
  * @param slab  Slab the object was allocated from
  * @param ptr   Object to free
 
- * @thread_safety The container is **not thread-safe**. Concurrent access from
+ * @note The container is **not thread-safe**. Concurrent access from
  *                multiple threads without external synchronization leads to
  *                data races and undefined behavior. Use a mutex or other
  *                synchronization primitive to protect shared containers.

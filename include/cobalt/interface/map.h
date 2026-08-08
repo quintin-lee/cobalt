@@ -30,8 +30,10 @@ typedef struct cobalt_map_iterator cobalt_map_iterator_t;
  * @brief A key-value pair yielded by map iteration
  */
 typedef struct cobalt_map_pair {
+    /** Key of the pair */
     const void *key;
-    void       *value;
+    /** Value of the pair */
+    void *value;
 } cobalt_map_pair_t;
 
 /**
@@ -40,14 +42,23 @@ typedef struct cobalt_map_pair {
  *          Do not instantiate directly.
  */
 struct cobalt_map {
+    /** Get a value by key */
     void *(*get)(cobalt_map_t *self, const void *key, size_t key_len);
+    /** Insert or update a key-value pair */
     int (*put)(cobalt_map_t *self, const void *key, size_t key_len, void *value);
+    /** Remove a key */
     int (*remove)(cobalt_map_t *self, const void *key, size_t key_len);
+    /** Check if a key exists */
     int (*contains)(cobalt_map_t *self, const void *key, size_t key_len);
+    /** Remove all elements */
     void (*clear)(cobalt_map_t *self);
+    /** Get the number of elements */
     size_t (*size)(cobalt_map_t *self);
+    /** Check if the map is empty */
     int (*is_empty)(cobalt_map_t *self);
+    /** Create an iterator over the map */
     cobalt_map_iterator_t *(*iterator)(cobalt_map_t *self);
+    /** Destroy the map */
     void (*destroy)(cobalt_map_t *self);
 };
 
@@ -59,8 +70,11 @@ struct cobalt_map {
  * @brief Map iterator virtual function table
  */
 typedef struct cobalt_map_iterator_vtable {
+    /** Check if there is a next element */
     int (*has_next)(void *ctx);
+    /** Get the next key-value pair */
     cobalt_map_pair_t (*next)(void *ctx);
+    /** Destroy the iterator */
     void (*destroy)(void *ctx);
 } cobalt_map_iterator_vtable_t;
 
@@ -68,8 +82,10 @@ typedef struct cobalt_map_iterator_vtable {
  * @brief Map iterator structure
  */
 struct cobalt_map_iterator {
+    /** Virtual function table for iterator operations */
     const cobalt_map_iterator_vtable_t *vtable;
-    void                               *data;
+    /** Iterator implementation-specific data */
+    void *data;
 };
 
 /* -------------------------------------------------------------------------- */

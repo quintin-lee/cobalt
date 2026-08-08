@@ -67,11 +67,17 @@ void cobalt_logger_log(log_level_t level, const char *file, int line, const char
  * @brief Logging shortcuts that automatically capture the current filename and line number
  * @{
  */
+/** Log a trace message */
 #define cobalt_trace(...) cobalt_logger_log(LOG_LEVEL_TRACE, __FILE__, __LINE__, __VA_ARGS__)
+/** Log a debug message */
 #define cobalt_debug(...) cobalt_logger_log(LOG_LEVEL_DEBUG, __FILE__, __LINE__, __VA_ARGS__)
+/** Log an info message */
 #define cobalt_info(...) cobalt_logger_log(LOG_LEVEL_INFO, __FILE__, __LINE__, __VA_ARGS__)
+/** Log a warning message */
 #define cobalt_warning(...) cobalt_logger_log(LOG_LEVEL_WARNING, __FILE__, __LINE__, __VA_ARGS__)
+/** Log an error message */
 #define cobalt_error(...) cobalt_logger_log(LOG_LEVEL_ERROR, __FILE__, __LINE__, __VA_ARGS__)
+/** Log a fatal message */
 #define cobalt_fatal(...) cobalt_logger_log(LOG_LEVEL_FATAL, __FILE__, __LINE__, __VA_ARGS__)
 /** @} */
 

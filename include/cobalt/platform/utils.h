@@ -59,10 +59,17 @@
 #define COBALT_HOST_IS_BIG_ENDIAN 0
 #else
 /* Fallback: detect at runtime via helper */
+/** Host is little-endian */
 #define COBALT_HOST_IS_LITTLE_ENDIAN 0
+/** Host is big-endian */
 #define COBALT_HOST_IS_BIG_ENDIAN 0
 #endif
 
+/**
+ * @name Byte-swap macros
+ * @brief Platform-independent byte-swap operations
+ * @{
+ */
 /* ========================================================================= */
 /* Byte-swap builtins (GCC/Clang)                                             */
 /* ========================================================================= */
@@ -86,10 +93,14 @@ static inline uint64_t cobalt_bswap64_generic(uint64_t x)
     return ((uint64_t)cobalt_bswap32_generic((uint32_t)x) << 32) |
            cobalt_bswap32_generic((uint32_t)(x >> 32));
 }
+/** Byte-swap 16-bit integer */
 #define COBALT_BSWAP16 cobalt_bswap16_generic
+/** Byte-swap 32-bit integer */
 #define COBALT_BSWAP32 cobalt_bswap32_generic
+/** Byte-swap 64-bit integer */
 #define COBALT_BSWAP64 cobalt_bswap64_generic
 #endif
+/** @} */
 
 /* ========================================================================= */
 /* Host <-> Network byte order conversion                                     */
