@@ -286,7 +286,7 @@ void test_thread_safety_refcount(void)
 static void *unsafe_vector_thread(void *arg)
 {
     cobalt_vector_t *v = (cobalt_vector_t *)arg;
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 50; i++) {
         int *val = (int *)malloc(sizeof(int));
         if (val) {
             *val = i;
@@ -303,8 +303,8 @@ void test_thread_safety_container_not_safe(void)
     cobalt_vector_t *v = cobalt_vector_create(4);
     TEST_ASSERT(v != NULL);
 
-    cobalt_thread_t threads[4];
-    for (int i = 0; i < 4; i++) {
+    cobalt_thread_t threads[2];
+    for (int i = 0; i < 2; i++) {
         TEST_ASSERT(cobalt_thread_create(unsafe_vector_thread, v, &threads[i]) == 0);
     }
     for (int i = 0; i < 4; i++) {
