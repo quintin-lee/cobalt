@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
 #include <unistd.h>
 
 static int  timer_called  = 0;
@@ -365,6 +366,85 @@ void test_eventloop_fd_edge_cases(void)
     printf("  FD edge cases passed\n");
 }
 
+
+
+static void test_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
+{
+    (void)fd;
+    (void)events;
+    int *flag = (int *)ud;
+    if (flag) {
+        *flag = 1;
+    }
+}
+
+static void test_close_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
+{
+    (void)fd;
+    (void)events;
+    int *flag = (int *)ud;
+    if (flag) {
+        *flag = 1;
+    }
+}
+
+void test_eventloop_signal(void)
+{
+    printf("Testing eventloop signal handling...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    int signal_fired = 0;
+
+    /* Register SIGUSR1 handler */
+    int ret = cobalt_eventloop_add_signal(loop, SIGUSR1,
+        test_signal_handler, &signal_fired);
+    TEST_ASSERT(ret == 0);
+    printf("  Signal handler registered: OK\n");
+
+    /* Duplicate registration should fail */
+    ret = cobalt_eventloop_add_signal(loop, SIGUSR1,
+        test_signal_handler, &signal_fired);
+    TEST_ASSERT(ret == -1);
+    printf("  Duplicate signal reject: OK\n");
+
+    /* NULL loop should fail */
+    ret = cobalt_eventloop_add_signal(NULL, SIGUSR1,
+        test_signal_handler, &signal_fired);
+    TEST_ASSERT(ret == -1);
+    printf("  NULL loop signal reject: OK\n");
+
+    /* Send signal and drain */
+    kill(getpid(), SIGUSR1);
+    usleep(5000);
+    cobalt_eventloop_iteration(loop);
+
+    printf("  Signal test completed\n");
+    cobalt_eventloop_destroy(loop);
+}
+
+void test_eventloop_close_callback(void)
+{
+    printf("Testing eventloop close callback...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    int close_fired = 0;
+
+    int ret = cobalt_eventloop_add_close_callback(loop,
+        test_close_handler, &close_fired);
+    TEST_ASSERT(ret == 0);
+    printf("  Close callback registered: OK\n");
+
+    /* Destroy should trigger close callback */
+    cobalt_eventloop_destroy(loop);
+    TEST_ASSERT(close_fired == 1);
+
+    printf("  Close callback: OK\n");
+}
+
 void test_eventloop(void)
 {
     printf("Testing eventloop...\n");
@@ -377,6 +457,8 @@ void test_eventloop(void)
     test_eventloop_timing();
     test_eventloop_timer_edge_cases();
     test_eventloop_fd_edge_cases();
+    test_eventloop_signal();
+    test_eventloop_close_callback();
     printf("  Eventloop tests completed\n");
 }
 

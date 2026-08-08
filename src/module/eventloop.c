@@ -8,6 +8,7 @@
 #endif
 #include "cobalt/module/eventloop.h"
 #include <errno.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,10 +27,14 @@
 #define COBALT_EVENTLOOP_TIMEOUT_MS 10
 #define COBALT_EVENTLOOP_TIMEOUT_MAX 100
 #define COBALT_EVENTLOOP_TIMER_HEAP_INITIAL 16
+#define COBALT_SIGNAL_RING_SIZE 64
 #define COBALT_MILLIS_PER_SEC 1000ULL
 #define COBALT_NANOS_PER_MILLI 1000000ULL
 #define COBALT_NANOS_PER_SEC 1000000000LL
 
+/* -------------------------------------------------------------------------- */
+/* Internal types                                                             */
+/* -------------------------------------------------------------------------- */
 typedef struct timer_entry {
     uint64_t        timer_id;
     uint64_t        timeout_ms;
@@ -47,6 +52,23 @@ typedef struct fd_entry {
     void            *user_data;
     struct fd_entry *next;
 } fd_entry_t;
+
+/* Signal ring buffer — async-signal-safe, fixed size */
+static int                   g_signal_ring[COBALT_SIGNAL_RING_SIZE];
+static volatile sig_atomic_t g_signal_head  = 0;
+static volatile sig_atomic_t g_signal_tail  = 0;
+static int                   g_signal_count = 0;
+
+/* Signal handler table (signum -> callback + user_data) */
+typedef struct {
+    fd_handler_t callback;
+    void        *user_data;
+    int          signum;
+    int          active;
+} signal_handler_entry_t;
+
+#define COBALT_MAX_SIGNAL_HANDLERS 32
+static signal_handler_entry_t g_signal_table[COBALT_MAX_SIGNAL_HANDLERS];
 
 struct cobalt_eventloop {
 #ifdef __linux__
@@ -67,8 +89,45 @@ struct cobalt_eventloop {
     uint64_t        next_timer_id;
     int             running;
     int             stop_flag;
+    /* Close callback */
+    fd_handler_t close_callback;
+    void        *close_user_data;
 };
 
+/* -------------------------------------------------------------------------- */
+/* Signal handling                                                            */
+/* -------------------------------------------------------------------------- */
+static void cobalt_signal_handler(int signum)
+{
+    /* Ring-buffer write is async-signal-safe (no malloc, no stdio) */
+    int next = (g_signal_tail + 1) % COBALT_SIGNAL_RING_SIZE;
+    if (next != (int)g_signal_head) {
+        g_signal_ring[(int)g_signal_tail] = signum;
+        g_signal_tail                     = (sig_atomic_t)next;
+        g_signal_count++;
+    }
+}
+
+static void cobalt_drain_signals(cobalt_eventloop_t *loop)
+{
+    (void)loop;
+    while (g_signal_count > 0) {
+        int signum    = g_signal_ring[(int)g_signal_head];
+        g_signal_head = (sig_atomic_t)((g_signal_head + 1) % COBALT_SIGNAL_RING_SIZE);
+        g_signal_count--;
+
+        for (int i = 0; i < COBALT_MAX_SIGNAL_HANDLERS; i++) {
+            if (g_signal_table[i].active && g_signal_table[i].signum == signum) {
+                g_signal_table[i].callback((cobalt_fd_t)signum, 0, g_signal_table[i].user_data);
+                break;
+            }
+        }
+    }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Heap operations                                                            */
+/* -------------------------------------------------------------------------- */
 static int timer_compare(const timer_entry_t *a, const timer_entry_t *b)
 {
     if (a->next_fire.tv_sec < b->next_fire.tv_sec) {
@@ -217,7 +276,6 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
 /* -------------------------------------------------------------------------- */
 /* Platform-specific FD management                                            */
 /* -------------------------------------------------------------------------- */
-
 static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
 {
 #ifdef __linux__
@@ -230,7 +288,6 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
     EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
 #else
-    /* poll fallback: grow the pollfd array */
     int idx = fd;
     if (idx >= loop->pollfds_capacity) {
         int            new_cap  = loop->pollfds_capacity == 0 ? COBALT_EVENTLOOP_DEFAULT_CAPACITY
@@ -239,7 +296,6 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
         if (!new_pfds) {
             return -1;
         }
-        /* Zero-initialize any new slots */
         memset(new_pfds + loop->pollfds_capacity,
                0,
                sizeof(struct pollfd) * (new_cap - loop->pollfds_capacity));
@@ -304,7 +360,6 @@ platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out
     *event_count_out = kevent(loop->kq, NULL, 0, events, COBALT_EVENTLOOP_DEFAULT_CAPACITY, &ts);
     *entries_out     = events;
 #else
-    /* poll fallback: build the timeout from the timer heap */
     int timeout_ms   = calculate_timeout_ms(loop, NULL);
     *event_count_out = poll(loop->pollfds, (nfds_t)loop->pollfds_capacity, timeout_ms);
     *entries_out     = loop->pollfds;
@@ -315,7 +370,6 @@ platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out
 /* -------------------------------------------------------------------------- */
 /* Public API                                                                 */
 /* -------------------------------------------------------------------------- */
-
 cobalt_eventloop_t *cobalt_eventloop_create(void)
 {
     cobalt_eventloop_t *loop = calloc(1, sizeof(cobalt_eventloop_t));
@@ -351,8 +405,6 @@ cobalt_eventloop_t *cobalt_eventloop_create(void)
         close(loop->epoll_fd);
 #elif __APPLE__
         close(loop->kq);
-#else
-        /* pollfds starts at 0 capacity — fine */
 #endif
         free(loop);
         return NULL;
@@ -391,7 +443,67 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
         free(loop->timer_heap[i]);
     }
     free(loop->timer_heap);
+
+    /* Invoke close callback */
+    if (loop->close_callback) {
+        loop->close_callback(-1, 0, loop->close_user_data);
+    }
+
     free(loop);
+}
+
+int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop,
+                                int                 signum,
+                                fd_handler_t        callback,
+                                void               *user_data)
+{
+    (void)loop;
+    if (signum <= 0 || !callback) {
+        return -1;
+    }
+    /* Check for duplicate */
+    for (int i = 0; i < COBALT_MAX_SIGNAL_HANDLERS; i++) {
+        if (g_signal_table[i].active && g_signal_table[i].signum == signum) {
+            return -1;
+        }
+    }
+    /* Find free slot */
+    int slot = -1;
+    for (int i = 0; i < COBALT_MAX_SIGNAL_HANDLERS; i++) {
+        if (!g_signal_table[i].active) {
+            slot = i;
+            break;
+        }
+    }
+    if (slot < 0) {
+        return -1;
+    }
+    g_signal_table[slot].signum    = signum;
+    g_signal_table[slot].callback  = callback;
+    g_signal_table[slot].user_data = user_data;
+    g_signal_table[slot].active    = 1;
+
+    struct sigaction sa = {};
+    sa.sa_handler       = cobalt_signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    if (sigaction(signum, &sa, NULL) != 0) {
+        g_signal_table[slot].active = 0;
+        return -1;
+    }
+    return 0;
+}
+
+int cobalt_eventloop_add_close_callback(cobalt_eventloop_t *loop,
+                                        fd_handler_t        callback,
+                                        void               *user_data)
+{
+    if (!loop) {
+        return -1;
+    }
+    loop->close_callback  = callback;
+    loop->close_user_data = user_data;
+    return 0;
 }
 
 int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
@@ -545,6 +657,7 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
     struct timespec now;
     get_time_now(&now);
     process_expired_timers(loop, &now);
+    cobalt_drain_signals(loop);
 
     int   event_count = 0;
     void *entries     = NULL;
@@ -572,7 +685,6 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
         }
     }
 #else
-    /* poll fallback */
     struct pollfd *pfds = (struct pollfd *)entries;
     for (int i = 0; i < event_count; i++) {
         if (pfds[i].revents == 0) {

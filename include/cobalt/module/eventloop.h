@@ -138,6 +138,34 @@ void cobalt_eventloop_stop(cobalt_eventloop_t *loop);
  */
 int cobalt_eventloop_iteration(cobalt_eventloop_t *loop);
 
+/**
+ * @brief Register a signal handler that delivers events through the event loop
+ * @details Installs a signal handler using a ring buffer. The callback is invoked
+ *          from cobalt_eventloop_iteration with fd set to the signum.
+ * @param loop Event loop object (used for API consistency; signal handlers are global)
+ * @param signum Signal number to catch (e.g., SIGINT=2, SIGTERM=15)
+ * @param callback Callback invoked when the signal is received
+ * @param user_data User data passed to the callback
+ * @return Returns 0 on success, -1 on failure
+ * @note Registering the same signal twice returns -1.
+ * @note Maximum COBALT_MAX_SIGNAL_HANDLERS (32) concurrent signal handlers.
+ */
+int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop,
+                                int                 signum,
+                                fd_handler_t        callback,
+                                void               *user_data);
+
+/**
+ * @brief Register a close/cleanup callback invoked on cobalt_eventloop_destroy
+ * @param loop Event loop object
+ * @param callback Callback invoked with fd=-1, events=0 during destroy
+ * @param user_data User data passed to the callback
+ * @return Returns 0 on success, -1 on failure
+ */
+int cobalt_eventloop_add_close_callback(cobalt_eventloop_t *loop,
+                                        fd_handler_t        callback,
+                                        void               *user_data);
+
 /** @} */
 
 #endif /* EVENTLOOP_H */
