@@ -1,41 +1,10 @@
 # Test executable
+# Auto-discover unit tests
+file(GLOB UNIT_TESTS "unit/test_*.c")
+
 add_executable(cobalt_test
     test_runner.c
-    
-    unit/test_platform.c
-    unit/test_atomic.c
-    unit/test_allocator.c
-    unit/test_arena.c
-    unit/test_pool.c
-    unit/test_slab.c
-    unit/test_error.c
-    unit/test_error_stack.c
-    unit/test_logger.c
-    unit/test_object.c
-    unit/test_class.c
-    unit/test_interface.c
-    unit/test_vector.c
-    unit/test_list.c
-    unit/test_hashmap.c
-    unit/test_treemap.c
-    unit/test_string.c
-    unit/test_sort.c
-    unit/test_functional.c
-    unit/test_stream.c
-    unit/test_json.c
-    unit/test_eventloop.c
-    unit/test_stack.c
-    unit/test_queue.c
-    unit/test_set.c
-    unit/test_deque.c
-    unit/test_sequence.c
-    unit/test_iterator.c
-    unit/test_map.c
-    unit/test_thread.c
-    unit/test_platform_utils.c
-    unit/test_abi.c
-    unit/test_allocator_inject.c
-    unit/test_thread_safety.c
+    ${UNIT_TESTS}
 )
 
 target_include_directories(cobalt_test PRIVATE
