@@ -66,10 +66,6 @@ void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t
  */
 void cobalt_list_sort(void **head, size_t *count, compare_func_t compar);
 
-/** @} */
-
-#endif /* SORT_H */
-
 /* -----------------------------------------------------------------------------
  *  Additional sorting and sequence utilities
  * -------------------------------------------------------------------------- */
@@ -108,3 +104,7 @@ cobalt_partition(void *base, size_t nmemb, size_t size, const void *pivot, compa
  *       Elements after the returned count are unspecified.
  */
 size_t cobalt_unique(void *base, size_t *nmemb, size_t size, compare_func_t compar);
+
+/** @} */
+
+#endif /* SORT_H */
