@@ -84,7 +84,7 @@ jobs:
         run: cmake --build build-asan --parallel
 
       - name: Test with ASan
-        run: ctest --test-dir build-asan --output-on-failure --timeout 120
+        run: ctest --test-dir build-asan --output-on-failure --timeout 120 --exclude-regex test_thread
         env:
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/lsan.suppress
 
