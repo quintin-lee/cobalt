@@ -201,8 +201,9 @@ char *cobalt_join(const char **parts, char delim)
         if (i > 0) {
             *p++ = delim;
         }
-        strcpy(p, parts[i]);
-        p += strlen(parts[i]);
+        size_t slen = strlen(parts[i]);
+        memcpy(p, parts[i], slen);
+        p += slen;
     }
     *p = '\0';
     return result;
@@ -223,7 +224,10 @@ char *cobalt_strip(const char *str)
     while (*end) {
         end++;
     }
-    while (end > start && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) {
+    /* end now points to '\0' */
+    /* Move end back past trailing whitespace */
+    while (end > start &&
+           (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\n' || end[-1] == '\r')) {
         end--;
     }
 
