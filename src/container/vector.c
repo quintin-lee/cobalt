@@ -253,3 +253,67 @@ int cobalt_vector_is_empty(const cobalt_vector_t *vec)
 {
     return vec && ((cobalt_vector_impl_t *)vec)->size == 0;
 }
+/**
+ * @brief Get the current capacity of the dynamic array
+ */
+size_t cobalt_vector_capacity(const cobalt_vector_t *vec)
+{
+    return vec ? ((cobalt_vector_impl_t *)vec)->capacity : 0;
+}
+
+/**
+ * @brief Reserve capacity for at least n elements
+ */
+int cobalt_vector_reserve(cobalt_vector_t *vec, size_t n)
+{
+    if (!vec) {
+        return -1;
+    }
+    cobalt_vector_impl_t *impl = (cobalt_vector_impl_t *)vec;
+    if (impl->capacity >= n) {
+        return 0;
+    }
+    void *new_items = impl->alloc->alloc(impl->alloc, n * sizeof(void *));
+    if (!new_items) {
+        return -1;
+    }
+    if (impl->items && impl->size > 0) {
+        memcpy(new_items, impl->items, impl->size * sizeof(void *));
+    }
+    impl->alloc->free(impl->alloc, impl->items);
+    impl->items    = new_items;
+    impl->capacity = n;
+    return 0;
+}
+
+/**
+ * @brief Shrink capacity to match current size
+ */
+int cobalt_vector_shrink_to_fit(cobalt_vector_t *vec)
+{
+    if (!vec) {
+        return -1;
+    }
+    cobalt_vector_impl_t *impl = (cobalt_vector_impl_t *)vec;
+    if (impl->capacity <= impl->size) {
+        return 0;
+    }
+    size_t new_cap = impl->size;
+    if (new_cap == 0) {
+        impl->alloc->free(impl->alloc, impl->items);
+        impl->items    = NULL;
+        impl->capacity = 0;
+        return 0;
+    }
+    void *new_items = impl->alloc->alloc(impl->alloc, new_cap * sizeof(void *));
+    if (!new_items) {
+        return -1;
+    }
+    if (impl->items && impl->size > 0) {
+        memcpy(new_items, impl->items, impl->size * sizeof(void *));
+    }
+    impl->alloc->free(impl->alloc, impl->items);
+    impl->items    = new_items;
+    impl->capacity = new_cap;
+    return 0;
+}

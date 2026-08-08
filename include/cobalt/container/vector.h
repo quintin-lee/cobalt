@@ -110,6 +110,33 @@ size_t cobalt_vector_size(const cobalt_vector_t *vec);
  */
 int cobalt_vector_is_empty(const cobalt_vector_t *vec);
 
+/**
+ * @brief Get the current capacity of the dynamic array
+ * @param vec Pointer to the dynamic array
+ * @return The allocated capacity (number of elements that can be held without reallocation).
+ *         If vec is NULL, returns 0.
+ */
+size_t cobalt_vector_capacity(const cobalt_vector_t *vec);
+
+/**
+ * @brief Reserve capacity for at least n elements
+ * @details If the current capacity is already >= n, this is a no-op.
+ *          Otherwise, reallocates the internal array to hold at least n elements.
+ * @param vec Pointer to the dynamic array
+ * @param n   Minimum desired capacity
+ * @return Returns 0 on success, -1 on failure (e.g., allocation failure)
+ */
+int cobalt_vector_reserve(cobalt_vector_t *vec, size_t n);
+
+/**
+ * @brief Shrink capacity to match current size
+ * @details Reduces the internal allocation to hold exactly the current number of elements,
+ *          freeing any unused capacity. If size is 0, frees the internal array entirely.
+ * @param vec Pointer to the dynamic array
+ * @return Returns 0 on success, -1 on failure
+ */
+int cobalt_vector_shrink_to_fit(cobalt_vector_t *vec);
+
 /** @} */
 
 #endif /* VECTOR_H */

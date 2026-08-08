@@ -338,6 +338,59 @@ void test_vector_alternating_push_set(void)
     printf("  Alternating push/set test passed\n");
 }
 
+
+void test_vector_reserve(void)
+{
+    printf("Testing vector reserve and capacity...\n");
+
+    cobalt_vector_t *vec = cobalt_vector_create(4);
+    TEST_ASSERT(vec != NULL);
+
+    TEST_ASSERT(cobalt_vector_capacity(vec) == 4);
+    TEST_ASSERT(cobalt_vector_size(vec) == 0);
+
+    /* Reserve more capacity */
+    int ret = cobalt_vector_reserve(vec, 16);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cobalt_vector_capacity(vec) == 16);
+    TEST_ASSERT(cobalt_vector_size(vec) == 0);
+
+    /* Reserve less than current capacity — no-op */
+    ret = cobalt_vector_reserve(vec, 8);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cobalt_vector_capacity(vec) == 16);
+
+    /* Add elements */
+    int vals[] = {1, 2, 3, 4, 5};
+    for (int i = 0; i < 5; i++) {
+        ret = cobalt_vector_push(vec, &vals[i]);
+        TEST_ASSERT(ret == 0);
+    }
+    TEST_ASSERT(cobalt_vector_size(vec) == 5);
+    TEST_ASSERT(cobalt_vector_capacity(vec) == 16);
+
+    /* Shrink to fit */
+    ret = cobalt_vector_shrink_to_fit(vec);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cobalt_vector_capacity(vec) == 5);
+
+    /* Shrink again — no-op */
+    ret = cobalt_vector_shrink_to_fit(vec);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cobalt_vector_capacity(vec) == 5);
+
+    /* Shrink empty vector */
+    cobalt_vector_t *empty = cobalt_vector_create(10);
+    TEST_ASSERT(empty != NULL);
+    ret = cobalt_vector_shrink_to_fit(empty);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cobalt_vector_capacity(empty) == 0);
+    cobalt_vector_destroy(empty);
+
+    cobalt_vector_destroy(vec);
+    printf("  Reserve/capacity/shrink: OK\n");
+}
+
 void test_vector(void)
 {
     printf("Testing vector...\n");

@@ -25,8 +25,7 @@ cobalt_platform_id_t cobalt_platform_get_id(void)
 
 /*
  * @brief Get the main platform handle
- * @details Currently implemented as a placeholder, not yet bound to a specific underlying window or
- * application handle.
+ * @details Returns NULL as no platform-specific handle is bound in this framework.
  */
 cobalt_platform_handle_t cobalt_platform_get_handle(void)
 {

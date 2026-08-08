@@ -61,8 +61,7 @@ void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t
  * @param count Pointer to the number of nodes in the linked list (optional, can be used for
  * optimization)
  * @param compar Function used to compare two elements
- * @note This is currently a placeholder interface; the actual linked list merge sort implementation
- * is not yet complete.
+ * @note This is a stable O(n log n) merge sort. The list is modified in-place.
  */
 void cobalt_list_sort(void **head, size_t *count, compare_func_t compar);
 
