@@ -22,6 +22,15 @@ if(COBALT_RUN_ASAN)
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
 endif()
 
+# Copy lsan.suppress to build dir for ASan tests
+if(EXISTS ${CMAKE_SOURCE_DIR}/lsan.suppress)
+    configure_file(
+        ${CMAKE_SOURCE_DIR}/lsan.suppress
+        ${CMAKE_BINARY_DIR}/lsan.suppress
+        COPYONLY
+    )
+endif()
+
 # Coverage build flags
 if(COBALT_BUILD_COVERAGE)
     if(CMAKE_C_COMPILER_ID STREQUAL "GNU")

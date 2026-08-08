@@ -53,6 +53,12 @@ add_test(NAME test_thread COMMAND cobalt_test --filter thread)
 add_test(NAME test_platform_utils COMMAND cobalt_test --filter platform_utils)
 add_test(NAME test_abi COMMAND cobalt_test --filter abi)
 add_test(NAME test_allocator_inject COMMAND cobalt_test --filter allocator_inject)
+# Set LSAN suppressions for ASan builds
+if(EXISTS ${CMAKE_BINARY_DIR}/lsan.suppress)
+    set_tests_properties(test_allocator_inject PROPERTIES
+        ENVIRONMENT "LSAN_OPTIONS=suppressions=${CMAKE_BINARY_DIR}/lsan.suppress"
+    )
+endif()
 add_test(NAME test_thread_safety COMMAND cobalt_test --filter thread_safety)
 
 # Benchmarks
