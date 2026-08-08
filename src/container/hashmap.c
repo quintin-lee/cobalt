@@ -408,12 +408,13 @@ void *cobalt_hashmap_get(const cobalt_hashmap_t *map, const char *key)
         cobalt_error_set(NULL, COBALT_ERROR_NOT_FOUND);
         return NULL;
     }
-    const hashmap_impl_t *impl = &map->impl;
-    unsigned int          idx  = hash_string(key) % impl->bucket_count;
+    const hashmap_impl_t *impl    = &map->impl;
+    size_t                key_len = strlen(key);
+    unsigned int          idx     = node_hash(impl, key, key_len) % impl->bucket_count;
 
     hashmap_node_t *node = impl->buckets[idx];
     while (node) {
-        if (strcmp(node->key, key) == 0) {
+        if (node_equal(impl, node, key, key_len)) {
             return node->value;
         }
         node = node->next;
@@ -428,14 +429,15 @@ int cobalt_hashmap_remove(cobalt_hashmap_t *map, const char *key)
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
         return -1;
     }
-    hashmap_impl_t *impl = &map->impl;
-    unsigned int    idx  = hash_string(key) % impl->bucket_count;
+    hashmap_impl_t *impl    = &map->impl;
+    size_t          key_len = strlen(key);
+    unsigned int    idx     = node_hash(impl, key, key_len) % impl->bucket_count;
 
     hashmap_node_t **prev = &impl->buckets[idx];
     hashmap_node_t  *node = *prev;
 
     while (node) {
-        if (strcmp(node->key, key) == 0) {
+        if (node_equal(impl, node, key, key_len)) {
             *prev = node->next;
             hashmap_free_node(impl, node);
             impl->size--;
