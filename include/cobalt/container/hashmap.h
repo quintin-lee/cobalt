@@ -161,6 +161,13 @@ size_t cobalt_hashmap_capacity(const cobalt_hashmap_t *map);
  * @return Iterator pointer, or NULL on failure
  * @note Returns a cobalt_map_iterator_t compatible with the Map interface.
  *       Destroy with cobalt_map_iterator_destroy().
+
+ * @thread_safety The container is **not thread-safe**. Concurrent access from
+ *                multiple threads without external synchronization leads to
+ *                data races and undefined behavior. Use a mutex or other
+ *                synchronization primitive to protect shared containers.
+ *                Reference-counted objects (@ref cobalt_object_t) use atomic
+ *                operations and are thread-safe for ref-count operations.
  */
 cobalt_map_iterator_t *cobalt_hashmap_iterator_create(cobalt_hashmap_t *map);
 

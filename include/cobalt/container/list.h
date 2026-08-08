@@ -167,6 +167,13 @@ void cobalt_list_set_head(cobalt_list_t *list, cobalt_list_node_t *head, cobalt_
  * @param head_ref Pointer to the head node pointer of the list
  * @param count Pointer to element count (optional)
  * @param compar Comparison function
+
+ * @thread_safety The container is **not thread-safe**. Concurrent access from
+ *                multiple threads without external synchronization leads to
+ *                data races and undefined behavior. Use a mutex or other
+ *                synchronization primitive to protect shared containers.
+ *                Reference-counted objects (@ref cobalt_object_t) use atomic
+ *                operations and are thread-safe for ref-count operations.
  */
 void cobalt_list_merge_sort(cobalt_list_node_t **head_ref, size_t *count, compare_func_t compar);
 

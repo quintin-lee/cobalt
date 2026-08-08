@@ -61,6 +61,13 @@ void *cobalt_slab_alloc(cobalt_slab_t *slab, size_t size);
  * @brief Free an object back to its size class
  * @param slab  Slab the object was allocated from
  * @param ptr   Object to free
+
+ * @thread_safety The container is **not thread-safe**. Concurrent access from
+ *                multiple threads without external synchronization leads to
+ *                data races and undefined behavior. Use a mutex or other
+ *                synchronization primitive to protect shared containers.
+ *                Reference-counted objects (@ref cobalt_object_t) use atomic
+ *                operations and are thread-safe for ref-count operations.
  */
 void cobalt_slab_free(cobalt_slab_t *slab, void *ptr);
 

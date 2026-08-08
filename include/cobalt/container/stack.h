@@ -72,6 +72,13 @@ size_t cobalt_stack_size(const cobalt_stack_t *stack);
  * @brief Check if the stack is empty
  * @param stack Pointer to the stack
  * @return Returns 1 if the stack's size is 0, returns 0 if it is not empty or stack is NULL.
+
+ * @thread_safety The container is **not thread-safe**. Concurrent access from
+ *                multiple threads without external synchronization leads to
+ *                data races and undefined behavior. Use a mutex or other
+ *                synchronization primitive to protect shared containers.
+ *                Reference-counted objects (@ref cobalt_object_t) use atomic
+ *                operations and are thread-safe for ref-count operations.
  */
 int cobalt_stack_is_empty(const cobalt_stack_t *stack);
 

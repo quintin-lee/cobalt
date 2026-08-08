@@ -5,6 +5,7 @@
 void test_platform(void);
 void test_abi(void);
 void test_allocator_inject(void);
+void test_thread_safety(void);
 void test_atomic(void);
 void test_allocator(void);
 void test_arena(void);
@@ -74,6 +75,7 @@ static const TestEntry test_registry[] = {
     {"platform_utils", test_platform_utils},
     {"abi", test_abi},
     {"allocator_inject", test_allocator_inject},
+    {"thread_safety", test_thread_safety},
 };
 
 static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);

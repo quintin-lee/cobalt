@@ -152,6 +152,13 @@ cobalt_map_iterator_t *cobalt_set_iterator_create(cobalt_set_t *set);
  * @return Non-NULL pointer if element exists (returns internal sentinel), NULL if not found
  * @note This function exists for API symmetry with HashMap/TreeMap.
  *       Use cobalt_set_contains() to check existence without the sentinel.
+
+ * @thread_safety The container is **not thread-safe**. Concurrent access from
+ *                multiple threads without external synchronization leads to
+ *                data races and undefined behavior. Use a mutex or other
+ *                synchronization primitive to protect shared containers.
+ *                Reference-counted objects (@ref cobalt_object_t) use atomic
+ *                operations and are thread-safe for ref-count operations.
  */
 void *cobalt_set_get(const cobalt_set_t *set, void *item);
 

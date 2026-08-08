@@ -91,6 +91,13 @@ size_t cobalt_vector_size(const cobalt_vector_t *vec);
  * @param vec Pointer to the target dynamic array
  * @return If the dynamic array is empty (i.e., size is 0), returns a non-zero value (1); otherwise
  * returns 0. If vec is NULL, also returns 0.
+
+ * @thread_safety The container is **not thread-safe**. Concurrent access from
+ *                multiple threads without external synchronization leads to
+ *                data races and undefined behavior. Use a mutex or other
+ *                synchronization primitive to protect shared containers.
+ *                Reference-counted objects (@ref cobalt_object_t) use atomic
+ *                operations and are thread-safe for ref-count operations.
  */
 int cobalt_vector_is_empty(const cobalt_vector_t *vec);
 

@@ -70,6 +70,13 @@ int cobalt_pool_is_full(const cobalt_pool_t *pool);
  * @brief Get the number of free blocks remaining
  * @param pool Pool to query
  * @return Number of available blocks
+
+ * @thread_safety The container is **not thread-safe**. Concurrent access from
+ *                multiple threads without external synchronization leads to
+ *                data races and undefined behavior. Use a mutex or other
+ *                synchronization primitive to protect shared containers.
+ *                Reference-counted objects (@ref cobalt_object_t) use atomic
+ *                operations and are thread-safe for ref-count operations.
  */
 size_t cobalt_pool_free_count(const cobalt_pool_t *pool);
 

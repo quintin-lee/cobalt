@@ -51,6 +51,13 @@ void *cobalt_arena_alloc(cobalt_arena_t *arena, size_t size);
  * @param arena Pointer to the arena
  * @details "Frees" all memory allocated from it at once. In reality, it zeroes out the used offset,
  * but the underlying memory is not returned to the OS, allowing for reuse.
+
+ * @thread_safety The container is **not thread-safe**. Concurrent access from
+ *                multiple threads without external synchronization leads to
+ *                data races and undefined behavior. Use a mutex or other
+ *                synchronization primitive to protect shared containers.
+ *                Reference-counted objects (@ref cobalt_object_t) use atomic
+ *                operations and are thread-safe for ref-count operations.
  */
 void cobalt_arena_reset(cobalt_arena_t *arena);
 
