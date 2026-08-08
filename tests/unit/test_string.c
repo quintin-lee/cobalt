@@ -119,6 +119,102 @@ void test_string_vformat(void)
     printf("  vformat: OK\n");
 }
 
+
+void test_string_split(void)
+{
+    printf("Testing cobalt_split...\n");
+
+    int count = 0;
+    char **parts = cobalt_split("a,b,c", ',', &count);
+    TEST_ASSERT(parts != NULL);
+    TEST_ASSERT(count == 3);
+    TEST_ASSERT(strcmp(parts[0], "a") == 0);
+    TEST_ASSERT(strcmp(parts[1], "b") == 0);
+    TEST_ASSERT(strcmp(parts[2], "c") == 0);
+    TEST_ASSERT(parts[3] == NULL);
+    for (int i = 0; i < count; i++) {
+        free(parts[i]);
+    }
+    free(parts);
+
+    /* Empty string */
+    parts = cobalt_split("", ',', &count);
+    TEST_ASSERT(parts != NULL);
+    TEST_ASSERT(count == 1);
+    TEST_ASSERT(strcmp(parts[0], "") == 0);
+    free(parts[0]);
+    free(parts);
+
+    /* Consecutive delimiters */
+    parts = cobalt_split("a,,b", ',', &count);
+    TEST_ASSERT(parts != NULL);
+    TEST_ASSERT(count == 3);
+    TEST_ASSERT(strcmp(parts[0], "a") == 0);
+    TEST_ASSERT(strcmp(parts[1], "") == 0);
+    TEST_ASSERT(strcmp(parts[2], "b") == 0);
+    for (int i = 0; i < count; i++) {
+        free(parts[i]);
+    }
+    free(parts);
+
+    /* NULL input */
+    TEST_ASSERT(cobalt_split(NULL, ',', &count) == NULL);
+
+    printf("  split: OK\n");
+}
+
+void test_string_join(void)
+{
+    printf("Testing cobalt_join...\n");
+
+    const char *parts[] = {"hello", "world", "foo", NULL};
+    char *result = cobalt_join(parts, '-');
+    TEST_ASSERT(result != NULL);
+    TEST_ASSERT(strcmp(result, "hello-world-foo") == 0);
+    free(result);
+
+    /* Single element */
+    const char *single[] = {"only", NULL};
+    result = cobalt_join(single, '-');
+    TEST_ASSERT(result != NULL);
+    TEST_ASSERT(strcmp(result, "only") == 0);
+    free(result);
+
+    /* NULL input */
+    TEST_ASSERT(cobalt_join(NULL, '-') == NULL);
+
+    printf("  join: OK\n");
+}
+
+void test_string_strip(void)
+{
+    printf("Testing cobalt_strip...\n");
+
+    char *result = cobalt_strip("  hello world  ");
+    TEST_ASSERT(result != NULL);
+    TEST_ASSERT(strcmp(result, "hello world") == 0);
+    free(result);
+
+    result = cobalt_strip("\t\n spaces \r\n");
+    TEST_ASSERT(result != NULL);
+    TEST_ASSERT(strcmp(result, "spaces") == 0);
+    free(result);
+
+    result = cobalt_strip("no_whitespace");
+    TEST_ASSERT(result != NULL);
+    TEST_ASSERT(strcmp(result, "no_whitespace") == 0);
+    free(result);
+
+    result = cobalt_strip("");
+    TEST_ASSERT(result != NULL);
+    TEST_ASSERT(strcmp(result, "") == 0);
+    free(result);
+
+    TEST_ASSERT(cobalt_strip(NULL) == NULL);
+
+    printf("  strip: OK\n");
+}
+
 void test_string(void)
 {
     printf("Testing string utilities...\n");
@@ -128,5 +224,8 @@ void test_string(void)
     test_string_contains();
     test_string_snprintf();
     test_string_vformat();
+    test_string_split();
+    test_string_join();
+    test_string_strip();
     printf("  String utility tests completed\n");
 }

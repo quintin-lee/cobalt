@@ -74,6 +74,39 @@ int cobalt_snprintf(char **out, const char *fmt, ...);
  */
 int cobalt_vformat(char **out, const char *fmt, va_list ap);
 
+/**
+ * @brief Split a string by delimiter into dynamically allocated substrings
+ * @details Splits @p str at each occurrence of @p delim. The resulting substrings are
+ *          dynamically allocated — caller must free each element and the array itself.
+ *          Consecutive delimiters produce empty strings. Trailing delimiter produces
+ *          an extra empty string.
+ * @param str    The string to split (must not be NULL)
+ * @param delim  The delimiter character
+ * @param count  Pointer to receive the number of substrings (can be NULL)
+ * @return A dynamically allocated array of substrings, or NULL on error/empty input.
+ *         Caller must free each element and the array. Returns NULL if str is NULL.
+ */
+char **cobalt_split(const char *str, char delim, int *count);
+
+/**
+ * @brief Join an array of strings with a delimiter
+ * @details Concatenates all strings in @p parts with @p delim between each pair.
+ *          The result is dynamically allocated — caller must free it.
+ * @param parts  Array of string pointers (must be non-NULL, terminated by NULL)
+ * @param delim  Delimiter character
+ * @return Dynamically allocated joined string, or NULL on error
+ */
+char *cobalt_join(const char **parts, char delim);
+
+/**
+ * @brief Remove leading and trailing whitespace from a string
+ * @details Allocates a new string with leading/trailing whitespace (space, tab, newline,
+ *          carriage return) stripped. Caller must free the returned string.
+ * @param str The input string (must not be NULL)
+ * @return A newly allocated stripped string, or NULL on error
+ */
+char *cobalt_strip(const char *str);
+
 /** @} */
 
 #endif /* COBALT_STRING_UTIL_H */

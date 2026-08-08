@@ -114,3 +114,125 @@ int cobalt_snprintf(char **out, const char *fmt, ...)
     va_end(ap);
     return result;
 }
+
+char **cobalt_split(const char *str, char delim, int *count)
+{
+    if (!str) {
+        if (count) {
+            *count = 0;
+        }
+        return NULL;
+    }
+
+    /* Count delimiters to determine number of parts */
+    int cnt = 1;
+    for (const char *p = str; *p; p++) {
+        if (*p == delim) {
+            cnt++;
+        }
+    }
+
+    char **parts = (char **)malloc(sizeof(char *) * (size_t)cnt + 1U);
+    if (!parts) {
+        if (count) {
+            *count = 0;
+        }
+        return NULL;
+    }
+
+    int         idx   = 0;
+    const char *start = str;
+    for (const char *p = str;; p++) {
+        if (*p == delim || *p == '\0') {
+            size_t len = (size_t)(p - start);
+            parts[idx] = (char *)malloc(len + 1U);
+            if (!parts[idx]) {
+                /* Free already allocated parts on error */
+                for (int i = 0; i < idx; i++) {
+                    free(parts[i]);
+                }
+                free(parts);
+                if (count) {
+                    *count = 0;
+                }
+                return NULL;
+            }
+            memcpy(parts[idx], start, len);
+            parts[idx][len] = '\0';
+            idx++;
+            if (*p == '\0') {
+                break;
+            }
+            start = p + 1;
+        }
+    }
+    parts[idx] = NULL; /* NULL-terminated for iteration convenience */
+
+    if (count) {
+        *count = idx;
+    }
+    return parts;
+}
+
+char *cobalt_join(const char **parts, char delim)
+{
+    if (!parts) {
+        return NULL;
+    }
+
+    /* First pass: compute total length */
+    size_t total = 0;
+    int    n     = 0;
+    while (parts[n]) {
+        total += strlen(parts[n]);
+        n++;
+    }
+    if (n > 0) {
+        total += (size_t)(n - 1) * sizeof(char); /* delimiters */
+    }
+
+    char *result = (char *)malloc(total + 1U);
+    if (!result) {
+        return NULL;
+    }
+
+    char *p = result;
+    for (int i = 0; parts[i]; i++) {
+        if (i > 0) {
+            *p++ = delim;
+        }
+        strcpy(p, parts[i]);
+        p += strlen(parts[i]);
+    }
+    *p = '\0';
+    return result;
+}
+
+char *cobalt_strip(const char *str)
+{
+    if (!str) {
+        return NULL;
+    }
+
+    const char *start = str;
+    while (*start == ' ' || *start == '\t' || *start == '\n' || *start == '\r') {
+        start++;
+    }
+
+    const char *end = start;
+    while (*end) {
+        end++;
+    }
+    while (end > start && (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r')) {
+        end--;
+    }
+
+    size_t len    = (size_t)(end - start);
+    char  *result = (char *)malloc(len + 1U);
+    if (!result) {
+        return NULL;
+    }
+    memcpy(result, start, len);
+    result[len] = '\0';
+    return result;
+}
