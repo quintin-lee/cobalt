@@ -76,6 +76,34 @@ cobalt_bench_run(const char *name, size_t iters, void (*block)(void), cobalt_ben
     return mean;
 }
 
+void cobalt_bench_output_json(const cobalt_bench_result_t *results, FILE *fp)
+{
+    if (!results || !fp) {
+        return;
+    }
+
+    fprintf(fp, "{\n");
+    fprintf(fp, "  \"benchmarks\": [\n");
+
+    size_t count = 0;
+    for (size_t i = 0; results[i].name != NULL; i++) {
+        count++;
+    }
+    for (size_t i = 0; results[i].name != NULL; i++) {
+        fprintf(fp, "    {\n");
+        fprintf(fp, "      \"name\": \"%s\",\n", results[i].name);
+        fprintf(fp, "      \"mean_ms\": %.6f,\n", results[i].mean_ms);
+        fprintf(fp, "      \"stddev_ms\": %.6f,\n", results[i].stddev_ms);
+        fprintf(fp, "      \"min_ms\": %.6f,\n", results[i].min_ms);
+        fprintf(fp, "      \"max_ms\": %.6f,\n", results[i].max_ms);
+        fprintf(fp, "      \"iterations\": %zu\n", results[i].iterations);
+        fprintf(fp, "    }%s\n", (i < count - 1) ? "," : "");
+    }
+
+    fprintf(fp, "  ]\n");
+    fprintf(fp, "}\n");
+}
+
 void cobalt_bench_print_results(const cobalt_bench_result_t *results)
 {
     if (!results) {

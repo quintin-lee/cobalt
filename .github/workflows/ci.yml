@@ -162,7 +162,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang-tidy clang-format ccache
+          sudo apt-get install -y clang-tidy clang-format ccache python3
 
       - name: Cache build artifacts
         uses: actions/cache@v4
@@ -175,29 +175,53 @@ jobs:
       - name: Configure
         run: |
           mkdir -p build
-          cmake -B build \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_C_COMPILER=clang \
-            -DCOBALT_RUN_TIDY=OFF \
-            -DCOBALT_RUN_FORMAT=OFF
+          cmake -B build             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_C_COMPILER=clang             -DCOBALT_RUN_TIDY=OFF             -DCOBALT_RUN_FORMAT=OFF
 
       - name: Build
         run: cmake --build build --parallel
 
       - name: Run benchmarks
-        run: build/tests/bench_runner
+        run: build/tests/bench_runner --json > .benchmarks/result.json
 
-      - name: Store benchmark baseline
+      - name: Download previous baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-baseline
+          path: .benchmarks/
+        continue-on-error: true
+
+      - name: Compare against baseline
         run: |
-          mkdir -p .benchmarks
-          build/tests/bench_runner > .benchmarks/baseline.txt
-          cat .benchmarks/baseline.txt
+          if [ -f .benchmarks/baseline.json ]; then
+            python3 -c "
+            import json, sys
+            with open('.benchmarks/baseline.json') as f:
+                base = {b['name']: b['mean_ms'] for b in json.load(f)['benchmarks']}
+            with open('.benchmarks/result.json') as f:
+                curr = {b['name']: b['mean_ms'] for b in json.load(f)['benchmarks']}
+            regressed = []
+            for name, cur_ms in curr.items():
+                if name in base and base[name] > 0:
+                    pct = (cur_ms - base[name]) / base[name] * 100
+                    if pct > 5:
+                        regressed.append((name, base[name], cur_ms, pct))
+            if regressed:
+                print('WARNING: Performance regression detected!')
+                for name, old_ms, new_ms, pct in regressed:
+                    print(f'  {name}: {old_ms:.3f}ms -> {new_ms:.3f}ms (+{pct:.1f}%)')
+                sys.exit(1)
+            else:
+                print('No significant regression detected.')
+            "
+          else
+            echo 'No baseline found, skipping regression check.'
+          fi
 
       - name: Upload benchmark baseline
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-baseline
-          path: .benchmarks/baseline.txt
+          path: .benchmarks/result.json
 
   coverage:
     runs-on: ubuntu-latest

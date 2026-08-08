@@ -10,6 +10,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "B" {
@@ -45,6 +46,13 @@ double cobalt_bench_run(const char *name,
  * @param results Array of results (null-terminated by name == NULL)
  */
 void cobalt_bench_print_results(const cobalt_bench_result_t *results);
+
+/**
+ * @brief Output benchmark results as JSON to a file
+ * @param results Array of results (null-terminated by name == NULL)
+ * @param fp      Output file pointer (use stdout for console)
+ */
+void cobalt_bench_output_json(const cobalt_bench_result_t *results, FILE *fp);
 
 #ifdef __cplusplus
 }
