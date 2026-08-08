@@ -23,6 +23,11 @@ Generated API reference documentation for the Cobalt C Framework.
 - **Objects**: See [core.md](core.md) for ref-count lifecycle and class system
 - **Modules**: See [modules.md](modules.md) for JSON parsing and event loop APIs
 
+- **Strings**: `cobalt_split()`, `cobalt_join()`, `cobalt_strip()` in `utils/string.h`
+- **HashMap advanced**: `cobalt_hashmap_set_funcs()`, `cobalt_hashmap_create_ext()`, `*_ext` binary-key variants
+- **TreeMap advanced**: `cobalt_treemap_create_ext()` with custom comparator
+- **Eventloop**: UNIX domain socket support via `cobalt_eventloop_create_unix_server()` and `cobalt_eventloop_accept()`
+
 ## Building
 
 ```bash

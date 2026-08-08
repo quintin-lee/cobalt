@@ -1,6 +1,33 @@
 # Cobalt Change Log
 
+## v2.3.0 (2026-08-08) — Security Fixes & Advanced APIs Release
+
+### Added
+- **HashMap runtime hash/equal replacement**: `cobalt_hashmap_set_funcs()` for swapping hash and equality callbacks on an existing instance
+- **TreeMap custom comparator**: `cobalt_treemap_create_ext()` with `cobalt_compare_func_t` for generic key comparison (not just strings)
+- **Eventloop UNIX domain sockets**: `cobalt_eventloop_create_unix_server()` and `cobalt_eventloop_accept()` for local IPC
+- **String utilities**: `cobalt_split()`, `cobalt_join()`, `cobalt_strip()` in `utils/string.h`
+- **ASan suppressions**: Added `lsan.suppress` for known allocator-inject test infrastructure leaks
+
+### Fixed
+- **Heap-buffer-overflow in `cobalt_split()`**: Fixed allocation size miscalculation (operator precedence bug in `malloc`)
+- **Memory leak in `test_thread_safety`**: Added proper cleanup of hashmap-allocated values
+- **Double-free in `test_thread_safety`**: Removed premature `free(got)` before loop cleanup
+- **CI shell line continuations**: Fixed `\\` → `\` in `.github/workflows/ci.yml` causing `command not found` errors
+- **CI benchmark job**: Added `mkdir -p .benchmarks` before running benchmarks
+
+### Changed
+- HashMap now supports `cobalt_hashmap_create_ext()` for allocator-compatible creation
+- TreeMap uses `rb_compare()` that delegates to configurable comparator
+- Eventloop epoll dispatch fixed: `data.ptr` now correctly set instead of `data.fd`
+- Updated test count: 25 → 41 (added thread safety, allocator inject, string tests)
+
+### Security
+- Fixed CWE-122 (heap buffer overflow) in `cobalt_split()` — allocation was `sizeof(char*)*cnt + 1` instead of `sizeof(char*)*(cnt+1)`
+
 This project follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH).
+
+---
 
 ## v2.2.0 (2026-08-07) — Interface & Documentation Release
 

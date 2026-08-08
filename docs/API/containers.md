@@ -38,6 +38,27 @@ int              cobalt_vector_is_empty(cobalt_vector_t *vec);
 - Vector implements `cobalt_sequence_t` — use `(cobalt_sequence_t *)vec` for polymorphic ops
 - **Memory note:** `destroy` frees internal array but NOT the data pointed to by elements
 
+## HashMap (Advanced APIs)
+
+```c
+cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t              initial_buckets,
+                                            cobalt_hash_func_t  hash_func,
+                                            cobalt_equal_func_t equal_func,
+                                            cobalt_allocator_t *alloc);
+int cobalt_hashmap_set_funcs(cobalt_hashmap_t   *map,
+                             cobalt_hash_func_t  hash_func,
+                             cobalt_equal_func_t equal_func);
+int cobalt_hashmap_put_ext(cobalt_hashmap_t *map, const void *key, size_t key_len, void *value);
+void *cobalt_hashmap_get_ext(const cobalt_hashmap_t *map, const void *key, size_t key_len);
+int cobalt_hashmap_remove_ext(cobalt_hashmap_t *map, const void *key, size_t key_len);
+```
+
+**`cobalt_hashmap_create_ext`**: Creates a hashmap with custom hash/equal functions and allocator.  
+**`cobalt_hashmap_set_funcs`**: Replaces hash and equality callbacks at runtime on an existing hashmap. Changes only affect future operations — existing entries are not rehashed.  
+**`*_ext` variants**: Accept binary keys (`void *` + `size_t`) instead of NUL-terminated strings.
+
+---
+
 ## List
 
 ```c
@@ -137,6 +158,12 @@ size_t            cobalt_hashmap_capacity(const cobalt_hashmap_t *map);
 
 ```c
 cobalt_treemap_t *cobalt_treemap_create(void);
+```c
+cobalt_treemap_t *cobalt_treemap_create_ext(cobalt_compare_func_t compare_func);
+```
+
+**`cobalt_treemap_create_ext`**: Creates a TreeMap with a custom comparison function. Use `NULL` for default `strcmp` behavior (same as `cobalt_treemap_create()`). The comparator receives `(const void *a, const void *b)` and must return `< 0`, `0`, or `> 0`.
+
 void              cobalt_treemap_destroy(cobalt_treemap_t *map);
 int               cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value);
 void             *cobalt_treemap_get(cobalt_treemap_t *map, const char *key);
@@ -258,3 +285,34 @@ All containers set errors via `cobalt_error_set()` on failure:
 ## Thread Safety
 
 Containers themselves are **not thread-safe**. Concurrent access requires external synchronization. The `cobalt_sequence_t` interface methods (`add`, `remove`, `size`, `is_empty`, `iterator`) are atomic per-call but not safe for concurrent modification patterns.
+
+---
+
+## String Utilities
+
+**Header:** `include/cobalt/utils/string.h`
+
+```c
+char **cobalt_split(const char *str, char delim, int *count);
+char  *cobalt_join(const char **parts, char delim);
+char  *cobalt_strip(const char *str);
+```
+
+| Function | Description |
+|----------|-------------|
+| `cobalt_split` | Split `str` by `delim`, store result in `**parts` (caller must free each element and the array). `count` receives the number of parts. |
+| `cobalt_join` | Join `parts` array with `delim`. Returns heap-allocated string (caller must `free`). |
+| `cobalt_strip` | Remove leading/trailing whitespace. Returns heap-allocated string (caller must `free`). Returns `NULL` on empty input. |
+
+**Example:**
+```c
+int count;
+char **parts = cobalt_split("a,b,c", ',', &count);
+// parts[0]="a", parts[1]="b", parts[2]="c", count=3
+char *joined = cobalt_join(parts, '|');  // "a|b|c"
+char *stripped = cobalt_strip("  hello  ");  // "hello"
+for (int i = 0; i < count; i++) free(parts[i]);
+free(parts);
+free(joined);
+free(stripped);
+```

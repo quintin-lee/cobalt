@@ -93,7 +93,7 @@ cd build
 ./tests/cobalt_test
 ```
 
-All 22 test modules pass:
+All 41 test modules pass:
 - ✅ platform, atomic, allocator, arena
 - ✅ error, logger, object, class, interface
 - ✅ vector, list, hashmap, treemap, set, deque
@@ -148,7 +148,7 @@ Tagged as **v2.1.0** - Feature Expansion Release
 ### Test Coverage
 - Added tests for Set and Deque containers
 - Added tests for new algorithms (bsearch, find_if, for_each)
-- Total: 22 tests, all passing
+- Total: 41 tests, all passing
 
 ## Next Steps
 

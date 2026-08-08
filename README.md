@@ -12,6 +12,11 @@ A lightweight, zero-dependency C11 framework providing object-oriented capabilit
 - **Algorithms**: Sort, binary search, find_if, for_each, predicates
 - **Modules**: JSON parser/serializer, event loop (epoll/kqueue)
 - **Cross-platform**: Linux, macOS, Windows support
+- **String utilities**: Split, join, and strip with `cobalt_split()`, `cobalt_join()`, `cobalt_strip()`
+- **HashMap runtime replacement**: Swap hash/equal functions at runtime via `cobalt_hashmap_set_funcs()`
+- **TreeMap custom comparator**: Generic key comparison with `cobalt_treemap_create_ext()`
+- **UNIX domain sockets**: Local IPC with `cobalt_eventloop_create_unix_server()` and `cobalt_eventloop_accept()`
+- **Security fix**: Heap-buffer-overflow patched in `cobalt_split()` (CWE-122)
 
 ## Architecture
 
@@ -91,7 +96,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 27 tests passing
+ctest --output-on-failure  # 41 tests passing
 # or with verbose output
 ctest --verbose
 ```
@@ -142,7 +147,7 @@ cd build
 |----------|-------|
 | 28 | 25 |
 | Header files (.h) | 27 |
-| Test files (.c) | 23 |
+| Test files (.c) | 29 |
 | Benchmark files (.c) | 5 |
 | Example files (.c) | 14 |
 | Documentation (.md) | 31 |

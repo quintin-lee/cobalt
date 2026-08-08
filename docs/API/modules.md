@@ -172,7 +172,34 @@ cobalt_eventloop_destroy(loop);
 | macOS | kqueue | `<sys/event.h>` |
 | Windows | IOCP (planned) | — |
 
-### Error Handling
+#
+### UNIX Domain Sockets
+
+```c
+int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out);
+int cobalt_eventloop_accept(cobalt_eventloop_t *loop, cobalt_fd_t sock_fd,
+                            cobalt_event_cb_t callback, void *user_data,
+                            int events);
+```
+
+| Function | Description |
+|----------|-------------|
+| `cobalt_eventloop_create_unix_server` | Create a UNIX domain socket server. Binds to `path`, listens, and registers for `POLLIN`. Automatically removes stale socket file. Returns 0 on success. |
+| `cobalt_eventloop_accept` | Accept a pending connection on `sock_fd` and register it with the eventloop. Returns the new fd on success, -1 if no connection pending (non-blocking). |
+
+**Usage pattern:**
+```c
+cobalt_fd_t server_fd;
+cobalt_eventloop_create_unix_server("/tmp/cobalt.sock", &server_fd);
+
+// In the server callback:
+cobalt_fd_t client_fd = cobalt_eventloop_accept(loop, server_fd, client_handler, NULL, POLLIN);
+if (client_fd >= 0) {
+    // client_fd is now managed by the eventloop
+}
+```
+
+## Error Handling
 
 - All API functions set `COBALT_ERROR_OUT_OF_MEMORY` on allocation failure
 - `cobalt_eventloop_add_fd` returns -1 for invalid FD or OOM
