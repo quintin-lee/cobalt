@@ -149,7 +149,11 @@ static int timer_compare(const timer_entry_t *a, const timer_entry_t *b)
     if (a->next_fire.tv_nsec > b->next_fire.tv_nsec) {
         return 1;
     }
-    return 0;
+    /* Tiebreak by timer_id for FIFO ordering of same-time timers */
+    if (a->timer_id < b->timer_id) {
+        return -1;
+    }
+    return a->timer_id > b->timer_id ? 1 : 0;
 }
 
 static void heap_sift_up(timer_entry_t **heap, int idx)
@@ -232,7 +236,7 @@ static int timer_expired(const struct timespec *a, const struct timespec *b)
 {
     long secs  = a->tv_sec - b->tv_sec;
     long nsecs = a->tv_nsec - b->tv_nsec;
-    return secs > 0 || (secs == 0 && nsecs >= 0);
+    return secs < 0 || (secs == 0 && nsecs <= 0);
 }
 
 static void process_expired_timers(cobalt_eventloop_t *loop, const struct timespec *now)

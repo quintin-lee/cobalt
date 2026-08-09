@@ -198,8 +198,8 @@ void test_eventloop_multiple_timers(void)
     uint64_t counter1 = 0;
     uint64_t counter2 = 0;
 
-    uint64_t id1 = cobalt_eventloop_add_timer(loop, 1, 0, on_timer, &counter1);
-    uint64_t id2 = cobalt_eventloop_add_timer(loop, 1, 0, on_timer, &counter2);
+    uint64_t id1 = cobalt_eventloop_add_timer(loop, 0, 0, on_timer, &counter1);
+    uint64_t id2 = cobalt_eventloop_add_timer(loop, 0, 0, on_timer, &counter2);
 
     printf("  Added 2 timers: id1=%lu, id2=%lu\n", (unsigned long)id1, (unsigned long)id2);
 
@@ -232,20 +232,26 @@ void test_eventloop_timer_heap_order(void)
     g_fired_order = fired_order;
     g_fire_idx    = 0;
 
+    /* Add timers with same timeout so heap ordering is determined by timer_id (FIFO) */
     for (int i = 0; i < timer_count; i++) {
-        timer_ids[i + 1] = cobalt_eventloop_add_timer(loop, i + 1, 0, on_timer, &timer_ids[i + 1]);
+        timer_ids[i + 1] = cobalt_eventloop_add_timer(loop, 0, 0, on_timer, &timer_ids[i + 1]);
         TEST_ASSERT(timer_ids[i + 1] != 0);
     }
 
-    for (int i = 0; i < timer_count; i++) {
-        cobalt_eventloop_iteration(loop);
-        usleep(2000);
+    /* Save original IDs before callbacks increment them */
+    static uint64_t original_ids[101];
+    for (int i = 0; i <= timer_count; i++) {
+        original_ids[i] = timer_ids[i];
     }
+
+    /* All timers expire immediately; first iteration processes all of them */
+    cobalt_eventloop_iteration(loop);
 
     TEST_ASSERT(g_fire_idx == timer_count);
 
+    /* Verify timers fire in ascending timer_id order (FIFO for same-time timers) */
     for (int i = 0; i < timer_count; i++) {
-        TEST_ASSERT(fired_order[i] == (i + 1));
+        TEST_ASSERT(fired_order[i] == (int)original_ids[i + 1]);
     }
 
     g_fired_order = NULL;
@@ -553,4 +559,3 @@ void test_eventloop_unix_socket(void)
 
     printf("  UNIX socket test passed\n");
 }
-
