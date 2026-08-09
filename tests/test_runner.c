@@ -63,6 +63,7 @@ static const TestEntry test_registry[] = {
     {"treemap",      test_treemap},
     {"string",       test_string},
     {"functional",   test_functional},
+    {"sort",         test_sort},
     {"stream",       test_stream},
     {"json",         test_json},
     {"eventloop",    test_eventloop},
