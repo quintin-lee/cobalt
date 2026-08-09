@@ -232,9 +232,11 @@ static void bench_mt_hashmap_put(void)
 {
     cobalt_tshashmap_t *map = cobalt_tshashmap_create(256);
     pthread_t           threads[BENCH_NTHREADS];
+    hashmap_thread_arg_t args[BENCH_NTHREADS];
     for (int i = 0; i < BENCH_NTHREADS; i++) {
-        hashmap_thread_arg_t arg = {.map = map, .tid = i};
-        pthread_create(&threads[i], NULL, mt_hashmap_put_thread, &arg);
+        args[i].map = map;
+        args[i].tid = i;
+        pthread_create(&threads[i], NULL, mt_hashmap_put_thread, &args[i]);
     }
     for (int i = 0; i < BENCH_NTHREADS; i++) {
         pthread_join(threads[i], NULL);
@@ -269,9 +271,11 @@ static void bench_mt_hashmap_get(void)
         }
     }
     pthread_t threads[BENCH_NTHREADS];
+    hashmap_thread_arg_t args[BENCH_NTHREADS];
     for (int i = 0; i < BENCH_NTHREADS; i++) {
-        hashmap_thread_arg_t arg = {.map = map, .tid = i};
-        pthread_create(&threads[i], NULL, mt_hashmap_get_thread, &arg);
+        args[i].map = map;
+        args[i].tid = i;
+        pthread_create(&threads[i], NULL, mt_hashmap_get_thread, &args[i]);
     }
     for (int i = 0; i < BENCH_NTHREADS; i++) {
         pthread_join(threads[i], NULL);
