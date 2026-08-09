@@ -553,3 +553,4 @@ void test_eventloop_unix_socket(void)
 
     printf("  UNIX socket test passed\n");
 }
+

@@ -142,3 +142,4 @@ void test_sequence(void)
     test_sequence_null_safety();
     printf("  Sequence tests completed\n");
 }
+

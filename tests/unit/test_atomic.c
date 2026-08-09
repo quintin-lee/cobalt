@@ -5,6 +5,7 @@
  */
 
 #include "cobalt/platform/atomic.h"
+#include "test_framework.h"
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>

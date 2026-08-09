@@ -229,3 +229,4 @@ void test_string(void)
     test_string_strip();
     printf("  String utility tests completed\n");
 }
+

@@ -7,6 +7,7 @@
 #define _DEFAULT_SOURCE
 #endif
 #include "cobalt/module/eventloop.h"
+#include "cobalt/memory/allocator.h"
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -95,8 +96,9 @@ struct cobalt_eventloop {
     int             running;
     int             stop_flag;
     /* Close callback */
-    fd_handler_t close_callback;
-    void        *close_user_data;
+    fd_handler_t        close_callback;
+    void               *close_user_data;
+    cobalt_allocator_t *alloc;
 };
 
 /* -------------------------------------------------------------------------- */
@@ -190,7 +192,8 @@ static int heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
 {
     if (loop->timer_count >= loop->timer_capacity) {
         int             new_cap  = loop->timer_capacity * 2;
-        timer_entry_t **new_heap = realloc(loop->timer_heap, sizeof(timer_entry_t *) * new_cap);
+        timer_entry_t **new_heap = (timer_entry_t **)loop->alloc->realloc(
+            loop->alloc, loop->timer_heap, sizeof(timer_entry_t *) * new_cap);
         if (!new_heap) {
             return -1;
         }
@@ -255,7 +258,7 @@ static void process_expired_timers(cobalt_eventloop_t *loop, const struct timesp
             }
             heap_push(loop, timer);
         } else {
-            free(timer);
+            loop->alloc->free(loop->alloc, timer);
         }
     }
 }
@@ -294,7 +297,8 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
     if (idx >= loop->pollfds_capacity) {
         int            new_cap  = loop->pollfds_capacity == 0 ? COBALT_EVENTLOOP_DEFAULT_CAPACITY
                                                               : loop->pollfds_capacity * 2;
-        struct pollfd *new_pfds = realloc(loop->pollfds, sizeof(struct pollfd) * new_cap);
+        struct pollfd *new_pfds = (struct pollfd *)loop->alloc->realloc(
+            loop->alloc, loop->pollfds, sizeof(struct pollfd) * new_cap);
         if (!new_pfds) {
             return -1;
         }
@@ -434,47 +438,64 @@ int cobalt_eventloop_accept(cobalt_eventloop_t *loop,
 /* -------------------------------------------------------------------------- */
 /* Public API                                                                 */
 /* -------------------------------------------------------------------------- */
-cobalt_eventloop_t *cobalt_eventloop_create(void)
+static cobalt_eventloop_t *cobalt_eventloop_create_with_alloc(cobalt_allocator_t *alloc)
 {
-    cobalt_eventloop_t *loop = calloc(1, sizeof(cobalt_eventloop_t));
+    cobalt_eventloop_t *loop =
+        (cobalt_eventloop_t *)alloc->alloc(alloc, sizeof(cobalt_eventloop_t));
     if (!loop) {
         return NULL;
     }
+    loop->alloc = alloc;
 
 #ifdef __linux__
     loop->epoll_fd = epoll_create1(0);
     if (loop->epoll_fd < 0) {
-        free(loop);
+        loop->alloc->free(loop->alloc, loop);
         return NULL;
     }
     loop->epoll_capacity = COBALT_EVENTLOOP_DEFAULT_CAPACITY;
-    loop->epoll_events   = malloc(sizeof(struct epoll_event) * loop->epoll_capacity);
+    loop->epoll_events   = (struct epoll_event *)alloc->alloc(
+        alloc, sizeof(struct epoll_event) * loop->epoll_capacity);
     if (!loop->epoll_events) {
         close(loop->epoll_fd);
-        free(loop);
+        loop->alloc->free(loop->alloc, loop);
         return NULL;
     }
 #elif __APPLE__
     loop->kq = kqueue();
     if (loop->kq < 0) {
-        free(loop);
+        loop->alloc->free(loop->alloc, loop);
         return NULL;
     }
 #endif
 
     loop->timer_capacity = COBALT_EVENTLOOP_TIMER_HEAP_INITIAL;
-    loop->timer_heap     = malloc(sizeof(timer_entry_t *) * loop->timer_capacity);
+    loop->timer_heap =
+        (timer_entry_t **)alloc->alloc(alloc, sizeof(timer_entry_t *) * loop->timer_capacity);
     if (!loop->timer_heap) {
 #ifdef __linux__
         close(loop->epoll_fd);
 #elif __APPLE__
         close(loop->kq);
 #endif
-        free(loop);
+        loop->alloc->free(loop->alloc, loop);
         return NULL;
     }
 
     return loop;
+}
+
+cobalt_eventloop_t *cobalt_eventloop_create(void)
+{
+    return cobalt_eventloop_create_with_alloc(cobalt_allocator_get_system());
+}
+
+cobalt_eventloop_t *cobalt_eventloop_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    return cobalt_eventloop_create_with_alloc(alloc);
 }
 
 void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
@@ -487,33 +508,33 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
     if (loop->epoll_fd >= 0) {
         close(loop->epoll_fd);
     }
-    free(loop->epoll_events);
+    loop->alloc->free(loop->alloc, loop->epoll_events);
 #elif __APPLE__
     if (loop->kq >= 0) {
         close(loop->kq);
     }
 #else
-    free(loop->pollfds);
+    loop->alloc->free(loop->alloc, loop->pollfds);
 #endif
 
     fd_entry_t *fd = loop->fd_head;
     while (fd) {
         fd_entry_t *next = fd->next;
-        free(fd);
+        loop->alloc->free(loop->alloc, fd);
         fd = next;
     }
 
     for (int i = 0; i < loop->timer_count; i++) {
-        free(loop->timer_heap[i]);
+        loop->alloc->free(loop->alloc, loop->timer_heap[i]);
     }
-    free(loop->timer_heap);
+    loop->alloc->free(loop->alloc, loop->timer_heap);
 
     /* Invoke close callback */
     if (loop->close_callback) {
         loop->close_callback(-1, 0, loop->close_user_data);
     }
 
-    free(loop);
+    loop->alloc->free(loop->alloc, loop);
 }
 
 int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop,
@@ -583,10 +604,11 @@ int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
         return -1;
     }
 
-    fd_entry_t *entry = calloc(1, sizeof(fd_entry_t));
+    fd_entry_t *entry = (fd_entry_t *)loop->alloc->alloc(loop->alloc, sizeof(fd_entry_t));
     if (!entry) {
         return -1;
     }
+    memset(entry, 0, sizeof(fd_entry_t));
     entry->fd        = (int)fd;
     entry->events    = (short)events;
     entry->callback  = callback;
@@ -635,7 +657,7 @@ int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd)
     while (curr) {
         if (curr->fd == (int)fd) {
             *prev = curr->next;
-            free(curr);
+            loop->alloc->free(loop->alloc, curr);
             return 0;
         }
         prev = &curr->next;
@@ -655,10 +677,11 @@ uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t  *loop,
     }
 
     uint64_t       timer_id = ++loop->next_timer_id;
-    timer_entry_t *entry    = calloc(1, sizeof(timer_entry_t));
+    timer_entry_t *entry = (timer_entry_t *)loop->alloc->alloc(loop->alloc, sizeof(timer_entry_t));
     if (!entry) {
         return 0;
     }
+    memset(entry, 0, sizeof(timer_entry_t));
 
     entry->timer_id    = timer_id;
     entry->timeout_ms  = timeout_ms;
@@ -678,7 +701,7 @@ uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t  *loop,
     }
 
     if (heap_push(loop, entry) != 0) {
-        free(entry);
+        loop->alloc->free(loop->alloc, entry);
         return 0;
     }
     return timer_id;
@@ -694,7 +717,7 @@ int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
             loop->timer_count--;
             loop->timer_heap[i] = loop->timer_heap[loop->timer_count];
             heap_sift_down(loop->timer_heap, loop->timer_count, i);
-            free(loop->timer_heap[loop->timer_count]);
+            loop->alloc->free(loop->alloc, loop->timer_heap[loop->timer_count]);
             return 0;
         }
     }

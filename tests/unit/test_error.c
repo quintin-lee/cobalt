@@ -126,3 +126,4 @@ void test_error(void)
     test_error_hashmap_integration();
     printf("  Error tests completed\n");
 }
+

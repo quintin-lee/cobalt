@@ -159,3 +159,4 @@ void test_set_map_interface(void)
     map->destroy(map);
     printf("  Set map interface: PASS\n");
 }
+

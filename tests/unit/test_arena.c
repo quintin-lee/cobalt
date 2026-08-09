@@ -131,3 +131,4 @@ void test_arena(void)
     test_arena_alignment();
     printf("  Arena tests completed\n");
 }
+

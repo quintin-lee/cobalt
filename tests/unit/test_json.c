@@ -402,3 +402,4 @@ void test_json_fuzz(void)
 
     printf("  Fuzzing: OK\n");
 }
+

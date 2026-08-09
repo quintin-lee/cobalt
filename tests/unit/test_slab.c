@@ -106,3 +106,4 @@ void test_slab(void)
     test_slab_null_safe();
     printf("  Slab tests completed\n");
 }
+

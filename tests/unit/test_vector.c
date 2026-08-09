@@ -403,3 +403,4 @@ void test_vector(void)
     test_vector_large_capacity();
     test_vector_alternating_push_set();
 }
+

@@ -4,6 +4,7 @@
  */
 
 #include "cobalt/platform/platform.h"
+#include "test_framework.h"
 #include <stdio.h>
 
 void test_platform(void)

@@ -334,3 +334,4 @@ void test_thread_safety(void)
     test_thread_safety_container_not_safe();
     printf("  Thread safety tests completed\n");
 }
+

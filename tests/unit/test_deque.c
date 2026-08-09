@@ -92,3 +92,4 @@ void test_deque(void)
     test_deque_empty();
     printf("  Deque tests completed\n");
 }
+

@@ -303,3 +303,4 @@ void test_allocator_inject(void)
     test_allocator_alloc_failure();
     printf("  Allocator injection tests completed\n");
 }
+

@@ -273,14 +273,10 @@ int cobalt_vector_reserve(cobalt_vector_t *vec, size_t n)
     if (impl->capacity >= n) {
         return 0;
     }
-    void *new_items = impl->alloc->alloc(impl->alloc, n * sizeof(void *));
+    void *new_items = impl->alloc->realloc(impl->alloc, impl->items, n * sizeof(void *));
     if (!new_items) {
         return -1;
     }
-    if (impl->items && impl->size > 0) {
-        memcpy(new_items, impl->items, impl->size * sizeof(void *));
-    }
-    impl->alloc->free(impl->alloc, impl->items);
     impl->items    = new_items;
     impl->capacity = n;
     return 0;

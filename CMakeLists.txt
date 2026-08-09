@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(Cobalt VERSION 2.0.0 LANGUAGES C)
+project(Cobalt VERSION 2.3.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -97,6 +97,9 @@ target_include_directories(cobalt PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+# Linker script for test registry sections (used by cobalt_test)
+set(COBALT_LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/tests/test_registry.ld)
 
 # Examples
 if(COBALT_BUILD_EXAMPLES)

@@ -179,3 +179,4 @@ void test_stream(void)
     test_stream_drop_while();
     printf("  Stream tests completed\n");
 }
+

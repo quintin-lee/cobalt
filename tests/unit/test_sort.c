@@ -395,3 +395,4 @@ void test_sort_unique(void)
     TEST_ASSERT(arr[4] == 5);
     printf("  unique: OK\n");
 }
+

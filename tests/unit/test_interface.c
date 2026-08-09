@@ -6,6 +6,7 @@
 
 #include "cobalt/core/interface.h"
 #include "cobalt/core/object.h"
+#include "test_framework.h"
 #include <stdio.h>
 
 /* Dummy interface vtable */

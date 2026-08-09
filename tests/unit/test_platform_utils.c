@@ -107,3 +107,4 @@ void test_platform_utils(void)
     test_endian_idempotent();
     printf("  Platform utils tests completed\n");
 }
+

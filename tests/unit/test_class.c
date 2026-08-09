@@ -203,3 +203,4 @@ void test_class(void)
     test_class_inheritance();
     printf("  Class tests completed\n");
 }
+

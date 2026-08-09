@@ -151,3 +151,4 @@ void test_abi(void)
     test_abi_json_symbols();
     printf("  ABI tests completed\n");
 }
+

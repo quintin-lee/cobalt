@@ -261,3 +261,4 @@ void test_functional(void)
     test_functional_fold();
     printf("  Functional tests completed\n");
 }
+

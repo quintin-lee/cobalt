@@ -4,6 +4,7 @@
  */
 
 #include "cobalt/runtime/logger.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
 

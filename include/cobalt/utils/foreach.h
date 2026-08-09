@@ -29,11 +29,14 @@
  * @param seq   cobalt_vector_t*
  */
 #define cobalt_foreach_rev(var, seq)                                                               \
-    for (size_t _foreach_idx = cobalt_vector_size(((cobalt_vector_t *)(seq))); _foreach_idx > 0;   \
-         --_foreach_idx)                                                                           \
-        for (((var)) =                                                                             \
-                 cobalt_vector_get(((cobalt_vector_t *)(seq)), ((_foreach_idx) - (size_t)1));      \
-             (var) != NULL;                                                                        \
-             (var) = (void *)0)
+    do {                                                                                           \
+        size_t _foreach_seq_size = cobalt_vector_size(((cobalt_vector_t *)(seq)));                 \
+        for (size_t _foreach_idx = _foreach_seq_size; _foreach_idx > 0; --_foreach_idx)            \
+            for (((var)) =                                                                         \
+                     cobalt_vector_get(((cobalt_vector_t *)(seq)), (_foreach_idx - (size_t)1));    \
+                 (var) != NULL;                                                                    \
+                 (var) = (void *)0) {                                                              \
+            }                                                                                      \
+    } while (0)
 
 #endif /* COBALT_FOREACH_H */

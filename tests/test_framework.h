@@ -45,13 +45,18 @@ static void test_report(const char *name, int passed)
 /* Simple equality check with message */
 #define TEST_EQUAL(actual, expected)                                                               \
     do {                                                                                           \
-        if ((actual) != (expected)) {                                                              \
-            fprintf(stderr, "Expected %d but got %d\n", (expected), (actual));                     \
-            g_test_results.failed++;                                                               \
-            g_test_results.total++;                                                                \
-        } else {                                                                                   \
+        g_test_results.total++;                                                                    \
+        if ((actual) == (expected)) {                                                              \
             g_test_results.passed++;                                                               \
-            g_test_results.total++;                                                                \
+        } else {                                                                                   \
+            fprintf(stderr,                                                                        \
+                    "Assertion failed: %s == %s at %s:%d\n",                                       \
+                    #actual,                                                                       \
+                    #expected,                                                                     \
+                    __FILE__,                                                                      \
+                    __LINE__);                                                                     \
+            g_test_results.failed++;                                                               \
+            exit(1);                                                                               \
         }                                                                                          \
     } while (0)
 
@@ -68,6 +73,15 @@ typedef void (*test_func_t)(void);
     {                                                                                              \
         __register_##name();                                                                       \
     } /* placeholder */
+
+/*
+ * Auto-registration macro: use TEST_AUTO_REGISTER(name) after defining
+ * the test function to register it without modifying test_runner.c.
+ */
+#define TEST_AUTO_REGISTER(name)                                                                   \
+    static void *__test_entry_##name __attribute__((used, section(".test_registry"))) =            \
+        (void *)name;                                                                              \
+    static const char *__test_name_##name __attribute__((used, section(".test_names"))) = #name;
 
 /* Declare a test function - the actual registration will be done in runner */
 

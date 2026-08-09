@@ -140,3 +140,4 @@ void test_allocator(void)
     test_allocator_zero_size();
     printf("  Allocator tests completed\n");
 }
+

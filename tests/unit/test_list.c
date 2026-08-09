@@ -354,3 +354,4 @@ void test_list_sort(void)
     cobalt_list_destroy(list);
     printf("  list sort: OK\n");
 }
+

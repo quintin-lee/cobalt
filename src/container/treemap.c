@@ -491,12 +491,11 @@ static cobalt_map_iterator_t *treemap_map_iterator(cobalt_map_t *self)
     if (!iter_state) {
         return NULL;
     }
-    iter_state->impl      = &map->impl;
-    iter_state->stack     = NULL;
-    iter_state->stack_top = 0;
-    iter_state->stack_cap = 0;
-    iter_state->finished  = 0;
-
+    iter_state->impl            = &map->impl;
+    iter_state->stack           = NULL;
+    iter_state->stack_top       = 0;
+    iter_state->stack_cap       = 0;
+    iter_state->finished        = 0;
     cobalt_map_iterator_t *iter = (cobalt_map_iterator_t *)cobalt_allocator_get_system()->alloc(
         cobalt_allocator_get_system(), sizeof(cobalt_map_iterator_t));
     if (!iter) {

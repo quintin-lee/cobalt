@@ -415,3 +415,4 @@ void test_hashmap_collision_stress(void)
     cobalt_hashmap_destroy(map);
     printf("  Collision stress test passed\n");
 }
+

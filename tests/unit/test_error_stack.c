@@ -122,3 +122,4 @@ void test_error_stack(void)
     test_error_stack_clear();
     printf("  Error stack tests completed\n");
 }
+

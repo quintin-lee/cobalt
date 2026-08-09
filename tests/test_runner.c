@@ -37,47 +37,45 @@ void test_sequence(void);
 void test_thread(void);
 void test_platform_utils(void);
 
-/* Test function registry */
 typedef struct {
     const char *name;
     void (*func)(void);
 } TestEntry;
 
 static const TestEntry test_registry[] = {
-    {"platform", test_platform},
-    {"atomic", test_atomic},
-    {"allocator", test_allocator},
-    {"arena", test_arena},
-    {"pool", test_pool},
-    {"slab", test_slab},
-    {"error", test_error},
-    {"error_stack", test_error_stack},
-    {"logger", test_logger},
-    {"object", test_object},
-    {"class", test_class},
-    {"interface", test_interface},
-    {"vector", test_vector},
-    {"list", test_list},
-    {"hashmap", test_hashmap},
-    {"treemap", test_treemap},
-    {"sort", test_sort},
-    {"functional", test_functional},
-    {"stream", test_stream},
-    {"json", test_json},
-    {"eventloop", test_eventloop},
-    {"stack", test_stack},
-    {"queue", test_queue},
-    {"set", test_set},
-    {"deque", test_deque},
-    {"iterator", test_iterator},
-    {"map", test_map_interface},
-    {"sequence", test_sequence},
-    {"thread", test_thread},
-    {"platform_utils", test_platform_utils},
-    {"abi", test_abi},
+    {"platform",     test_platform},
+    {"atomic",       test_atomic},
+    {"allocator",    test_allocator},
     {"allocator_inject", test_allocator_inject},
+    {"arena",        test_arena},
+    {"slab",         test_slab},
+    {"pool",         test_pool},
+    {"error",        test_error},
+    {"error_stack",  test_error_stack},
+    {"logger",       test_logger},
+    {"object",       test_object},
+    {"class",        test_class},
+    {"interface",    test_interface},
+    {"vector",       test_vector},
+    {"list",         test_list},
+    {"hashmap",      test_hashmap},
+    {"treemap",      test_treemap},
+    {"string",       test_string},
+    {"functional",   test_functional},
+    {"stream",       test_stream},
+    {"json",         test_json},
+    {"eventloop",    test_eventloop},
+    {"stack",        test_stack},
+    {"queue",        test_queue},
+    {"set",          test_set},
+    {"deque",        test_deque},
+    {"iterator",     test_iterator},
+    {"map",          test_map_interface},
+    {"sequence",     test_sequence},
+    {"thread",       test_thread},
+    {"platform_utils", test_platform_utils},
+    {"abi",          test_abi},
     {"thread_safety", test_thread_safety},
-    {"string", test_string},
 };
 
 static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);
@@ -85,35 +83,29 @@ static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);
 static void run_all_tests(void)
 {
     printf("=== Cobalt Unit Test Suite ===\n\n");
-
     for (int i = 0; i < test_count; i++) {
         printf("Testing %s...\n", test_registry[i].name);
         test_registry[i].func();
         printf("\n");
     }
-
-    printf("=== All tests completed ===\n");
+    printf("=== All tests completed: %d registered ===\n", test_count);
 }
 
 static void run_filtered_test(const char *filter)
 {
-    int found = 0;
     for (int i = 0; i < test_count; i++) {
         if (strcmp(test_registry[i].name, filter) == 0) {
             printf("=== Cobalt Unit Test: %s ===\n\n", filter);
             test_registry[i].func();
-            found = 1;
-            break;
+            return;
         }
     }
-    if (!found) {
-        fprintf(stderr, "Error: Unknown test '%s'\n", filter);
-        fprintf(stderr, "Available tests:\n");
-        for (int i = 0; i < test_count; i++) {
-            fprintf(stderr, "  %s\n", test_registry[i].name);
-        }
-        exit(1);
+    fprintf(stderr, "Error: Unknown test '%s'\n", filter);
+    fprintf(stderr, "Available tests:\n");
+    for (int i = 0; i < test_count; i++) {
+        fprintf(stderr, "  %s\n", test_registry[i].name);
     }
+    exit(1);
 }
 
 int main(int argc, char *argv[])

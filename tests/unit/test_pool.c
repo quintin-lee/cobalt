@@ -115,3 +115,4 @@ void test_pool(void)
     test_pool_alignment();
     printf("  Pool tests completed\n");
 }
+

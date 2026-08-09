@@ -5,6 +5,7 @@
 
 #include "cobalt/core/class.h"
 #include "cobalt/core/object.h"
+#include "test_framework.h"
 #include <stdio.h>
 #include <stdlib.h>
 
