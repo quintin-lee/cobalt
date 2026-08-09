@@ -239,6 +239,20 @@ int cobalt_vector_set(cobalt_vector_t *vec, size_t index, void *item)
 }
 
 /**
+ * @brief Remove the element at the specified index
+ */
+void cobalt_vector_remove_at(cobalt_vector_t *vec, size_t index)
+{
+    if (!vec || index >= ((cobalt_vector_impl_t *)vec)->size) {
+        return;
+    }
+    cobalt_vector_impl_t *impl = (cobalt_vector_impl_t *)vec;
+    memmove(
+        impl->items + index, impl->items + index + 1, (impl->size - index - 1) * sizeof(void *));
+    impl->size--;
+}
+
+/**
  * @brief Get the number of elements currently stored in the dynamic array
  */
 size_t cobalt_vector_size(const cobalt_vector_t *vec)

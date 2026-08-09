@@ -503,6 +503,43 @@ int cobalt_list_remove_if(cobalt_list_t *list,
     return -1;
 }
 
+/**
+ * @brief Remove the element at the specified index
+ */
+int cobalt_list_remove_at(cobalt_list_t *list, size_t index)
+{
+    if (!list) {
+        return -1;
+    }
+    cobalt_list_node_t *node = list->head;
+    cobalt_list_node_t *prev = NULL;
+    size_t              i    = 0;
+
+    while (node && i < index) {
+        prev = node;
+        node = node->next;
+        i++;
+    }
+
+    if (!node) {
+        return -1; /* Index out of bounds */
+    }
+
+    if (prev) {
+        prev->next = node->next;
+    } else {
+        list->head = node->next;
+    }
+    if (node->next) {
+        node->next->prev = prev;
+    } else {
+        list->tail = prev;
+    }
+    list->alloc->free(list->alloc, node);
+    list->size--;
+    return 0;
+}
+
 /* ========================================================================= */
 /* Merge sort for linked list                                                */
 /* ========================================================================= */

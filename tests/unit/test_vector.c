@@ -11,6 +11,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+void test_vector_remove_at(void);
 void test_vector_basic(void)
 {
     printf("Testing vector basic operations...\n");
@@ -402,5 +403,48 @@ void test_vector(void)
     test_vector_remove();
     test_vector_large_capacity();
     test_vector_alternating_push_set();
+    test_vector_remove_at();
 }
 
+
+void test_vector_remove_at(void)
+{
+    printf("Testing vector remove_at...\n");
+    cobalt_vector_t *v = cobalt_vector_create(4);
+    TEST_ASSERT(v != NULL);
+
+    int a = 1, b = 2, c = 3, d = 4;
+    cobalt_vector_push(v, &a);
+    cobalt_vector_push(v, &b);
+    cobalt_vector_push(v, &c);
+    cobalt_vector_push(v, &d);
+    TEST_ASSERT(cobalt_vector_size(v) == 4);
+
+    /* Remove middle element */
+    cobalt_vector_remove_at(v, 1);
+    TEST_ASSERT(cobalt_vector_size(v) == 3);
+    TEST_ASSERT(*(int *)cobalt_vector_get(v, 1) == 3);
+    TEST_ASSERT(*(int *)cobalt_vector_get(v, 2) == 4);
+
+    /* Remove first element */
+    cobalt_vector_remove_at(v, 0);
+    TEST_ASSERT(cobalt_vector_size(v) == 2);
+    TEST_ASSERT(*(int *)cobalt_vector_get(v, 0) == 3);
+
+    /* Remove last element */
+    cobalt_vector_remove_at(v, 1);
+    TEST_ASSERT(cobalt_vector_size(v) == 1);
+    TEST_ASSERT(*(int *)cobalt_vector_get(v, 0) == 3);
+
+    /* Remove remaining */
+    cobalt_vector_remove_at(v, 0);
+    TEST_ASSERT(cobalt_vector_size(v) == 0);
+
+    /* Out of bounds — no crash, no change */
+    cobalt_vector_remove_at(v, 0);
+    cobalt_vector_remove_at(v, 999);
+    TEST_ASSERT(cobalt_vector_size(v) == 0);
+
+    cobalt_vector_destroy(v);
+    printf("  Vector remove_at test passed\n");
+}

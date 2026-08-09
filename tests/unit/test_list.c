@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+void test_list_remove_at(void);
 void test_list_basic(void)
 {
     printf("Testing list basic operations...\n");
@@ -311,6 +312,7 @@ void test_list(void)
     test_list_remove();
     test_list_remove_if();
     test_list_sort();
+    test_list_remove_at();
     printf("  List tests completed\n");
 }
 
@@ -355,3 +357,44 @@ void test_list_sort(void)
     printf("  list sort: OK\n");
 }
 
+
+void test_list_remove_at(void)
+{
+    printf("Testing list remove_at...\n");
+    cobalt_list_t *list = cobalt_list_create();
+    TEST_ASSERT(list != NULL);
+
+    int a = 1, b = 2, c = 3, d = 4;
+    cobalt_list_push_back(list, &a);
+    cobalt_list_push_back(list, &b);
+    cobalt_list_push_back(list, &c);
+    cobalt_list_push_back(list, &d);
+    TEST_ASSERT(cobalt_list_size(list) == 4);
+
+    /* Remove middle element (index 1) */
+    TEST_ASSERT(cobalt_list_remove_at(list, 1) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 3);
+    TEST_ASSERT(*(int *)cobalt_list_get(list, 1) == 3);
+    TEST_ASSERT(*(int *)cobalt_list_get(list, 2) == 4);
+
+    /* Remove first element */
+    TEST_ASSERT(cobalt_list_remove_at(list, 0) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 2);
+    TEST_ASSERT(*(int *)cobalt_list_get(list, 0) == 3);
+
+    /* Remove last element */
+    TEST_ASSERT(cobalt_list_remove_at(list, 1) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 1);
+    TEST_ASSERT(*(int *)cobalt_list_get(list, 0) == 3);
+
+    /* Remove last remaining */
+    TEST_ASSERT(cobalt_list_remove_at(list, 0) == 0);
+    TEST_ASSERT(cobalt_list_size(list) == 0);
+
+    /* Out of bounds */
+    TEST_ASSERT(cobalt_list_remove_at(list, 0) == -1);
+    TEST_ASSERT(cobalt_list_remove_at(list, 99) == -1);
+
+    cobalt_list_destroy(list);
+    printf("  List remove_at test passed\n");
+}

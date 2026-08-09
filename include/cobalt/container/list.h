@@ -152,6 +152,15 @@ int cobalt_list_remove_if(cobalt_list_t *list,
                           int (*predicate)(const void *item, void *user_data),
                           void *user_data);
 
+/**
+ * @brief Remove the element at the specified index
+ * @details Shifts all subsequent elements. Returns 0 on success, -1 on failure.
+ * @param list Pointer to the target list
+ * @param index The index of the element to remove
+ * @return Returns 0 on success, -1 if index is out of bounds
+ */
+int cobalt_list_remove_at(cobalt_list_t *list, size_t index);
+
 /** @} */
 
 /**

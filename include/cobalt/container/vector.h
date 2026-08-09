@@ -129,6 +129,15 @@ size_t cobalt_vector_capacity(const cobalt_vector_t *vec);
 int cobalt_vector_reserve(cobalt_vector_t *vec, size_t n);
 
 /**
+ * @brief Remove the element at the specified index
+ * @details Shifts all subsequent elements one position to the left.
+ *          If index is out of bounds, no operation is performed.
+ * @param vec Pointer to the target dynamic array
+ * @param index The index of the element to remove
+ */
+void cobalt_vector_remove_at(cobalt_vector_t *vec, size_t index);
+
+/**
  * @brief Shrink capacity to match current size
  * @details Reduces the internal allocation to hold exactly the current number of elements,
  *          freeing any unused capacity. If size is 0, frees the internal array entirely.
