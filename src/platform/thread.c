@@ -263,7 +263,7 @@ int cobalt_thread_create(cobalt_thread_fn_t fn, void *arg, cobalt_thread_t *out_
             return -1;
         }
     }
-    int rc = pthread_create(t ? t : (pthread_t *)0xDEAD, NULL, (void *(*)(void *))fn, arg);
+    int rc = pthread_create(t ? t : NULL, NULL, (void *(*)(void *))fn, arg);
     if (rc != 0) {
         free(t);
         return -1;
