@@ -1,3 +1,4 @@
+#include "cobalt/memory/allocator.h"
 #ifndef MEMORY_ARENA_H
 #define MEMORY_ARENA_H
 
@@ -28,6 +29,14 @@ typedef struct cobalt_arena cobalt_arena_t;
  * @return cobalt_arena_t* Pointer to the successfully created arena, or NULL if it fails
  */
 cobalt_arena_t *cobalt_arena_create(size_t initial_size);
+
+/**
+ * @brief Create a memory arena with a custom allocator
+ * @param initial_size Initial capacity of the arena (in bytes)
+ * @param alloc Custom allocator (must not be NULL)
+ * @return cobalt_arena_t* Pointer to the created arena, or NULL on failure
+ */
+cobalt_arena_t *cobalt_arena_create_with_allocator(size_t initial_size, cobalt_allocator_t *alloc);
 
 /**
  * @brief Destroy the memory arena and free all its underlying allocated memory

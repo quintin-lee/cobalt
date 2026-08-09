@@ -1,3 +1,4 @@
+#include "cobalt/memory/allocator.h"
 /**
  * @file arena.c
  * @brief Implementation of the memory arena
@@ -18,6 +19,7 @@ struct cobalt_arena {
     size_t size;     /**< Field currently not in actual use, represents initial or logical size */
     size_t used;     /**< Number of bytes currently allocated (used) */
     size_t capacity; /**< Total capacity of the arena's underlying memory block (in bytes) */
+    cobalt_allocator_t *alloc; /**< Allocator used for internal allocations */
 };
 
 /*
@@ -26,21 +28,29 @@ struct cobalt_arena {
  */
 cobalt_arena_t *cobalt_arena_create(size_t initial_size)
 {
-    cobalt_arena_t *arena = malloc(sizeof(cobalt_arena_t));
+    return cobalt_arena_create_with_allocator(initial_size, cobalt_allocator_get_system());
+}
+
+cobalt_arena_t *cobalt_arena_create_with_allocator(size_t initial_size, cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_arena_t *arena = (cobalt_arena_t *)alloc->alloc(alloc, sizeof(cobalt_arena_t));
     if (!arena) {
-        return NULL; // Control structure allocation failed
+        return NULL;
     }
 
-    arena->buffer = malloc(initial_size);
+    arena->buffer = alloc->alloc(alloc, initial_size);
     if (!arena->buffer) {
-        free(arena); // Reclaim control structure
-        return NULL; // Underlying memory block allocation failed
+        alloc->free(alloc, arena);
+        return NULL;
     }
 
-    // Initialize parameters
     arena->size     = initial_size;
     arena->used     = 0;
     arena->capacity = initial_size;
+    arena->alloc    = alloc;
     return arena;
 }
 
@@ -51,8 +61,8 @@ cobalt_arena_t *cobalt_arena_create(size_t initial_size)
 void cobalt_arena_destroy(cobalt_arena_t *arena)
 {
     if (arena) {
-        free(arena->buffer); // Free the large memory block
-        free(arena);         // Free the structure
+        arena->alloc->free(arena->alloc, arena->buffer);
+        arena->alloc->free(arena->alloc, arena);
     }
 }
 
@@ -76,7 +86,7 @@ void *cobalt_arena_alloc(cobalt_arena_t *arena, size_t size)
     if (arena->used + aligned_size > arena->capacity) {
         // Insufficient capacity, double the total capacity
         size_t new_capacity = arena->capacity * 2;
-        void  *new_buffer   = realloc(arena->buffer, new_capacity);
+        void  *new_buffer   = arena->alloc->realloc(arena->alloc, arena->buffer, new_capacity);
         if (!new_buffer) {
             return NULL; // Reallocation failed
         }
