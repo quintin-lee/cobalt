@@ -24,6 +24,7 @@ _build/
 out/
 target/
 build_*/
+build-*/
 
 docs/doxygen
 # --- IDE / Editor ---

@@ -51,7 +51,7 @@ typedef struct {
     size_t              size;
     cobalt_hash_func_t  hash_func;
     cobalt_equal_func_t equal_func;
-    cobalt_allocator_t *alloc; /* For destroy only; internal alloc uses stdlib */
+    cobalt_allocator_t *alloc; /* Allocator used for all internal allocations */
 } hashmap_impl_t;
 
 struct cobalt_hashmap {
@@ -64,9 +64,10 @@ struct cobalt_hashmap {
 /* -------------------------------------------------------------------------- */
 
 typedef struct {
-    hashmap_impl_t *impl;
-    hashmap_node_t *node;
-    size_t          bucket_idx;
+    hashmap_impl_t     *impl;
+    hashmap_node_t     *node;
+    size_t              bucket_idx;
+    cobalt_allocator_t *alloc;
 } hashmap_map_iter_t;
 
 static int hashmap_map_iter_has_next(void *ctx)
@@ -105,7 +106,8 @@ static cobalt_map_pair_t hashmap_map_iter_next(void *ctx)
 
 static void hashmap_map_iter_destroy(void *ctx)
 {
-    free(ctx);
+    hashmap_map_iter_t *iter = (hashmap_map_iter_t *)ctx;
+    iter->alloc->free(iter->alloc, ctx);
 }
 
 static const cobalt_map_iterator_vtable_t hashmap_map_iter_vtable = {
@@ -119,7 +121,12 @@ static cobalt_map_iterator_t *hashmap_map_iterator(cobalt_map_t *self)
     cobalt_hashmap_t *map  = (cobalt_hashmap_t *)self;
     hashmap_impl_t   *impl = &map->impl;
 
-    hashmap_map_iter_t *iter_state = calloc(1, sizeof(hashmap_map_iter_t));
+    hashmap_map_iter_t *iter_state =
+        (hashmap_map_iter_t *)impl->alloc->alloc(impl->alloc, sizeof(hashmap_map_iter_t));
+    if (iter_state) {
+        memset(iter_state, 0, sizeof(hashmap_map_iter_t));
+        iter_state->alloc = impl->alloc;
+    }
     if (!iter_state) {
         return NULL;
     }
@@ -139,9 +146,10 @@ static cobalt_map_iterator_t *hashmap_map_iterator(cobalt_map_t *self)
     iter_state->node       = node;
     iter_state->bucket_idx = bucket_idx;
 
-    cobalt_map_iterator_t *iter = malloc(sizeof(cobalt_map_iterator_t));
+    cobalt_map_iterator_t *iter =
+        (cobalt_map_iterator_t *)impl->alloc->alloc(impl->alloc, sizeof(cobalt_map_iterator_t));
     if (!iter) {
-        free(iter_state);
+        impl->alloc->free(impl->alloc, iter_state);
         return NULL;
     }
     iter->vtable = &hashmap_map_iter_vtable;
@@ -200,8 +208,8 @@ static void hashmap_free_node(hashmap_impl_t *impl, hashmap_node_t *node)
     if (!impl || !node) {
         return;
     }
-    if (node->key_owned) {
-        impl->alloc->free(impl->alloc, node->key);
+    if (node->key_owned && node->key) {
+        free(node->key);
     }
     impl->alloc->free(impl->alloc, node);
 }
@@ -314,18 +322,23 @@ static int hashmap_ensure_buckets(hashmap_impl_t *impl, size_t min_buckets)
 
 cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets)
 {
-    cobalt_hashmap_t *map = malloc(sizeof(cobalt_hashmap_t));
+    cobalt_allocator_t *alloc = cobalt_allocator_get_system();
+    cobalt_hashmap_t   *map   = (cobalt_hashmap_t *)alloc->alloc(alloc, sizeof(cobalt_hashmap_t));
     if (!map) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return NULL;
     }
     map->base            = hashmap_map_vtable;
     hashmap_impl_t *impl = &map->impl;
+    impl->alloc          = alloc;
     if (initial_buckets > 0) {
-        void *tmp_calloc = calloc(initial_buckets, sizeof(hashmap_node_t *));
-        impl->buckets    = (hashmap_node_t **)tmp_calloc;
+        impl->buckets =
+            (hashmap_node_t **)alloc->alloc(alloc, sizeof(hashmap_node_t *) * initial_buckets);
+        if (impl->buckets) {
+            memset(impl->buckets, 0, sizeof(hashmap_node_t *) * initial_buckets);
+        }
         if (!impl->buckets) {
-            free(map);
+            alloc->free(alloc, map);
             cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
             return NULL;
         }
@@ -337,7 +350,6 @@ cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets)
     impl->size       = 0;
     impl->hash_func  = NULL;
     impl->equal_func = NULL;
-    impl->alloc      = cobalt_allocator_get_system();
     return map;
 }
 
@@ -383,7 +395,8 @@ int cobalt_hashmap_put(cobalt_hashmap_t *map, const char *key, void *value)
         node = node->next;
     }
 
-    hashmap_node_t *new_node = malloc(sizeof(hashmap_node_t));
+    hashmap_node_t *new_node =
+        (hashmap_node_t *)impl->alloc->alloc(impl->alloc, sizeof(hashmap_node_t));
     if (!new_node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
@@ -477,7 +490,7 @@ void cobalt_hashmap_destroy(cobalt_hashmap_t *map)
         }
         impl->alloc->free(impl->alloc, (void *)impl->buckets);
     }
-    free(map);
+    impl->alloc->free(impl->alloc, map);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -537,7 +550,8 @@ int cobalt_hashmap_put_ext(cobalt_hashmap_t *map, const void *key, size_t key_le
         node = node->next;
     }
 
-    hashmap_node_t *new_node = malloc(sizeof(hashmap_node_t));
+    hashmap_node_t *new_node =
+        (hashmap_node_t *)impl->alloc->alloc(impl->alloc, sizeof(hashmap_node_t));
     if (!new_node) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
