@@ -256,25 +256,21 @@ int cobalt_thread_create(cobalt_thread_fn_t fn, void *arg, cobalt_thread_t *out_
     }
     return 0;
 #else
-    pthread_t *t = NULL;
-    if (out_handle) {
-        t = (pthread_t *)malloc(sizeof(pthread_t));
-        if (!t) {
-            return -1;
-        }
-    }
-    int rc;
-    if (out_handle) {
-        rc = pthread_create(t, NULL, (void *(*)(void *))fn, arg);
-    } else {
-        rc = pthread_create(NULL, NULL, (void *(*)(void *))fn, arg);
-    }
+    pthread_t tmp_tid;
+    int       rc = pthread_create(&tmp_tid, NULL, (void *(*)(void *))fn, arg);
     if (rc != 0) {
-        free(t);
         return -1;
     }
     if (out_handle) {
+        pthread_t *t = (pthread_t *)malloc(sizeof(pthread_t));
+        if (!t) {
+            pthread_detach(tmp_tid);
+            return -1;
+        }
+        *t          = tmp_tid;
         *out_handle = (cobalt_thread_t)t;
+    } else {
+        pthread_detach(tmp_tid);
     }
     return 0;
 #endif
