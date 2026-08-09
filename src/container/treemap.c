@@ -401,18 +401,20 @@ static treemap_node_t *rb_find_max(treemap_node_t *node)
 /* ========================================================================= */
 
 typedef struct {
-    treemap_impl_t  *impl;
-    treemap_node_t **stack;
-    size_t           stack_top;
-    size_t           stack_cap;
-    int              finished;
+    treemap_impl_t     *impl;
+    treemap_node_t    **stack;
+    size_t              stack_top;
+    size_t              stack_cap;
+    int                 finished;
+    cobalt_allocator_t *alloc;
 } treemap_map_iter_t;
 
 static void stack_push(treemap_map_iter_t *iter, treemap_node_t *node)
 {
     if (iter->stack_top == iter->stack_cap) {
         size_t           new_cap = iter->stack_cap == 0 ? 16 : iter->stack_cap * 2;
-        treemap_node_t **ns      = realloc(iter->stack, new_cap * sizeof(treemap_node_t *));
+        treemap_node_t **ns      = (treemap_node_t **)iter->alloc->realloc(
+            iter->alloc, iter->stack, new_cap * sizeof(treemap_node_t *));
         if (!ns) {
             iter->finished = 1;
             return;
@@ -472,8 +474,8 @@ static void treemap_map_iter_destroy(void *ctx)
 {
     if (ctx) {
         treemap_map_iter_t *iter = (treemap_map_iter_t *)ctx;
-        cobalt_allocator_get_system()->free(cobalt_allocator_get_system(), iter->stack);
-        cobalt_allocator_get_system()->free(cobalt_allocator_get_system(), iter);
+        iter->alloc->free(iter->alloc, iter->stack);
+        iter->alloc->free(iter->alloc, iter);
     }
 }
 
@@ -487,19 +489,24 @@ static cobalt_map_iterator_t *treemap_map_iterator(cobalt_map_t *self)
 {
     cobalt_treemap_t *map = (cobalt_treemap_t *)self;
 
-    treemap_map_iter_t *iter_state = calloc(1, sizeof(treemap_map_iter_t));
+    treemap_map_iter_t *iter_state =
+        (treemap_map_iter_t *)map->impl.alloc->alloc(map->impl.alloc, sizeof(treemap_map_iter_t));
+    if (iter_state) {
+        memset(iter_state, 0, sizeof(treemap_map_iter_t));
+        iter_state->impl      = &map->impl;
+        iter_state->stack     = NULL;
+        iter_state->stack_top = 0;
+        iter_state->stack_cap = 0;
+        iter_state->finished  = 0;
+        iter_state->alloc     = map->impl.alloc;
+    }
     if (!iter_state) {
         return NULL;
     }
-    iter_state->impl            = &map->impl;
-    iter_state->stack           = NULL;
-    iter_state->stack_top       = 0;
-    iter_state->stack_cap       = 0;
-    iter_state->finished        = 0;
-    cobalt_map_iterator_t *iter = (cobalt_map_iterator_t *)cobalt_allocator_get_system()->alloc(
-        cobalt_allocator_get_system(), sizeof(cobalt_map_iterator_t));
+    cobalt_map_iterator_t *iter = (cobalt_map_iterator_t *)map->impl.alloc->alloc(
+        map->impl.alloc, sizeof(cobalt_map_iterator_t));
     if (!iter) {
-        cobalt_allocator_get_system()->free(cobalt_allocator_get_system(), iter_state);
+        map->impl.alloc->free(map->impl.alloc, iter_state);
         return NULL;
     }
     iter->vtable = &treemap_map_iter_vtable;
