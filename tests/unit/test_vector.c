@@ -11,9 +11,87 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MOCK_ALLOC_SIZE 4096
+static char   mock_buf[MOCK_ALLOC_SIZE];
+static size_t mock_offset      = 0;
+static int    mock_alloc_count = 0;
+static int    mock_free_count  = 0;
+static int    mock_fail_next   = 0;
+#define MOCK_MAX_TRACKED 256
+static void *mock_tracked[MOCK_MAX_TRACKED];
+static int   mock_tracked_count = 0;
+
+static void *mock_alloc(cobalt_allocator_t *self, size_t size)
+{
+    (void)self;
+    mock_alloc_count++;
+    if (mock_fail_next) {
+        mock_fail_next = 0;
+        return NULL;
+    }
+    if (mock_offset + size > MOCK_ALLOC_SIZE) {
+        return NULL;
+    }
+    void *ptr = &mock_buf[mock_offset];
+    mock_offset += size;
+    if (mock_tracked_count < MOCK_MAX_TRACKED) {
+        mock_tracked[mock_tracked_count++] = ptr;
+    }
+    return ptr;
+}
+
+static void mock_free(cobalt_allocator_t *self, void *ptr)
+{
+    (void)self;
+    mock_free_count++;
+    for (int i = 0; i < mock_tracked_count; i++) {
+        if (mock_tracked[i] == ptr) {
+            mock_tracked[i] = NULL;
+            break;
+        }
+    }
+}
+
+static void mock_free_all(void)
+{
+    for (int i = 0; i < mock_tracked_count; i++) {
+        if (mock_tracked[i]) {
+            mock_free_count++;
+            mock_tracked[i] = NULL;
+        }
+    }
+}
+
+static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+{
+    (void)self;
+    mock_alloc_count++;
+    if (mock_fail_next) {
+        mock_fail_next = 0;
+        return NULL;
+    }
+    if (mock_offset + new_size > MOCK_ALLOC_SIZE) {
+        return NULL;
+    }
+    void *new_ptr = &mock_buf[mock_offset];
+    if (ptr && new_size > 0) {
+        size_t old_size = new_size;
+        memcpy(new_ptr, ptr, old_size < new_size ? old_size : new_size);
+    }
+    mock_offset += new_size;
+    return new_ptr;
+}
+
+static cobalt_allocator_t mock_allocator = {
+    .alloc   = mock_alloc,
+    .free    = mock_free,
+    .realloc = mock_realloc,
+};
+
 void test_vector_remove_at(void);
 void test_vector_null_safety(void);
 void test_vector_sequence_interface(void);
+void test_vector_allocator_failure(void);
 void test_vector_basic(void)
 {
     printf("Testing vector basic operations...\n");
@@ -394,6 +472,79 @@ void test_vector_reserve(void)
     printf("  Reserve/capacity/shrink: OK\n");
 }
 
+void test_vector_allocator_failure(void)
+{
+    printf("Testing vector allocator failure paths...\n");
+
+    /* Create with NULL allocator should fail */
+    cobalt_vector_t *vec = cobalt_vector_create_with_allocator(4, NULL);
+    TEST_ASSERT(vec == NULL);
+    printf("  Create with NULL allocator: OK\n");
+
+    /* Create with failing allocator */
+    mock_alloc_count = 0;
+    mock_free_count  = 0;
+    mock_offset      = 0;
+    mock_fail_next   = 1;
+
+    vec = cobalt_vector_create_with_allocator(4, &mock_allocator);
+    TEST_ASSERT(vec == NULL);
+    printf("  Create with failing allocator: OK\n");
+
+    /* Push with failing realloc */
+    mock_fail_next   = 0;
+    mock_alloc_count = 0;
+    mock_offset      = 0;
+    vec = cobalt_vector_create_with_allocator(2, &mock_allocator);
+    TEST_ASSERT(vec != NULL);
+
+    int val = 42;
+    TEST_ASSERT(cobalt_vector_push(vec, &val) == 0);
+    TEST_ASSERT(cobalt_vector_push(vec, &val) == 0);
+    TEST_ASSERT(cobalt_vector_size(vec) == 2);
+
+    mock_fail_next = 1;
+    int ret = cobalt_vector_push(vec, &val);
+    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(cobalt_vector_size(vec) == 2);
+    printf("  Push with failing realloc: OK\n");
+
+    /* Reserve with failing realloc */
+    mock_fail_next   = 0;
+    mock_alloc_count = 0;
+    mock_offset      = 0;
+    vec = cobalt_vector_create_with_allocator(2, &mock_allocator);
+    TEST_ASSERT(vec != NULL);
+
+    ret = cobalt_vector_reserve(vec, 100);
+    TEST_ASSERT(ret == 0);
+
+    mock_fail_next = 1;
+    ret = cobalt_vector_reserve(vec, 200);
+    TEST_ASSERT(ret == -1);
+    printf("  Reserve with failing realloc: OK\n");
+
+    /* Shrink_to_fit with failing alloc */
+    mock_fail_next   = 0;
+    mock_alloc_count = 0;
+    mock_offset      = 0;
+    vec = cobalt_vector_create_with_allocator(10, &mock_allocator);
+    TEST_ASSERT(vec != NULL);
+
+    for (int i = 0; i < 5; i++) {
+        TEST_ASSERT(cobalt_vector_push(vec, &val) == 0);
+    }
+
+    mock_fail_next = 1;
+    ret = cobalt_vector_shrink_to_fit(vec);
+    TEST_ASSERT(ret == -1);
+    printf("  Shrink_to_fit with failing alloc: OK\n");
+
+    mock_free_all();
+    cobalt_vector_destroy(vec);
+    printf("  Vector allocator failure test passed\n");
+}
+
 void test_vector(void)
 {
     printf("Testing vector...\n");
@@ -408,6 +559,7 @@ void test_vector(void)
     test_vector_remove_at();
     test_vector_null_safety();
     test_vector_sequence_interface();
+    test_vector_allocator_failure();
 }
 
 
