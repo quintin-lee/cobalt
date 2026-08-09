@@ -73,9 +73,6 @@ target_link_libraries(benchmark_vector cobalt)
 add_executable(benchmark_set benchmark/benchmark_set.c)
 add_executable(benchmark_set_map benchmark/benchmark_set_map.c)
 target_link_libraries(benchmark_set_map cobalt)
-
-add_test(NAME bench_set_map COMMAND benchmark_set_map
-         PASS_REGULAR_EXPRESSION "Benchmark completed")
 target_link_libraries(benchmark_set cobalt)
 
 add_executable(benchmark_deque benchmark/benchmark_deque.c)
@@ -84,10 +81,10 @@ target_link_libraries(benchmark_deque cobalt)
 add_executable(benchmark_treemap benchmark/benchmark_treemap.c)
 add_executable(benchmark_map benchmark/benchmark_map.c)
 target_link_libraries(benchmark_map cobalt)
-
-add_test(NAME bench_map COMMAND benchmark_map
-         PASS_REGULAR_EXPRESSION "Benchmark completed")
 target_link_libraries(benchmark_treemap cobalt)
+
+add_executable(benchmark_threadsafewrapper benchmark/benchmark_threadsafewrapper.c)
+target_link_libraries(benchmark_threadsafewrapper cobalt pthread m)
 
 # Register benchmarks with CTest
 add_test(NAME bench_vector COMMAND benchmark_vector
@@ -100,6 +97,8 @@ add_test(NAME bench_set COMMAND benchmark_set
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 add_test(NAME bench_deque COMMAND benchmark_deque
          PASS_REGULAR_EXPRESSION "Benchmark completed")
+add_test(NAME bench_threadsafewrapper COMMAND benchmark_threadsafewrapper
+         PASS_REGULAR_EXPRESSION "Benchmark suite complete")
 
 # Unified benchmark runner
 add_executable(bench_runner benchmark/bench_runner.c)
