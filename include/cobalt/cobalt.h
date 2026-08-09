@@ -44,6 +44,7 @@
 #include <cobalt/container/queue.h>
 #include <cobalt/container/set.h>
 #include <cobalt/container/stack.h>
+#include <cobalt/container/threadsafewrapper.h>
 #include <cobalt/container/treemap.h>
 #include <cobalt/container/vector.h>
 
