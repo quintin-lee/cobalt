@@ -449,6 +449,7 @@ static cobalt_eventloop_t *cobalt_eventloop_create_with_alloc(cobalt_allocator_t
     if (!loop) {
         return NULL;
     }
+    memset(loop, 0, sizeof(cobalt_eventloop_t));
     loop->alloc = alloc;
 
 #ifdef __linux__
