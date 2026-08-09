@@ -513,7 +513,7 @@ void test_eventloop_timer_periodic(void)
     cobalt_eventloop_t *loop = cobalt_eventloop_create();
     TEST_ASSERT(loop != NULL);
 
-    int fire_count = 0;
+    uint64_t fire_count = 0;
 
     /* Add a periodic timer with 10ms interval */
     uint64_t id = cobalt_eventloop_add_timer(loop, 10, 10, on_timer, &fire_count);
