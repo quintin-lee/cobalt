@@ -47,11 +47,17 @@ void test_thread_mutex_counter(void)
 
 static cobalt_cond_t *g_cond;
 static int            g_flag = 0;
+static int            g_signal_ready = 0;
 
 static void *signal_thread(void *arg)
 {
     (void)arg;
     cobalt_mutex_lock(g_mutex);
+    while (!g_signal_ready) {
+        cobalt_mutex_unlock(g_mutex);
+        cobalt_thread_yield();
+        cobalt_mutex_lock(g_mutex);
+    }
     g_flag = 1;
     cobalt_cond_signal(g_cond);
     cobalt_mutex_unlock(g_mutex);
@@ -63,6 +69,7 @@ void test_thread_cond_signal(void)
     printf("Testing condition variable signal...\n");
 
     g_flag  = 0;
+    g_signal_ready = 0;
     g_mutex = cobalt_mutex_create();
     g_cond  = cobalt_cond_create();
     TEST_ASSERT(g_mutex != NULL);
@@ -72,7 +79,9 @@ void test_thread_cond_signal(void)
     TEST_ASSERT(cobalt_thread_create(signal_thread, NULL, &thr) == 0);
 
     cobalt_mutex_lock(g_mutex);
+    g_signal_ready = 1;
     cobalt_cond_wait(g_cond, g_mutex);
+    g_signal_ready = 0;
     TEST_ASSERT(g_flag == 1);
     cobalt_mutex_unlock(g_mutex);
 
@@ -132,11 +141,13 @@ void test_thread_mutex_trylock(void)
 static cobalt_cond_t  *g_bcast_cond;
 static cobalt_mutex_t *g_bcast_mutex;
 static int             g_bcast_count;
+static int             g_bcast_waiters = 0;
 
 static void *bcast_waiter_thread(void *arg)
 {
     (void)arg;
     cobalt_mutex_lock(g_bcast_mutex);
+    g_bcast_waiters++;
     cobalt_cond_wait(g_bcast_cond, g_bcast_mutex);
     g_bcast_count++;
     cobalt_mutex_unlock(g_bcast_mutex);
@@ -148,6 +159,7 @@ void test_thread_cond_broadcast(void)
     printf("Testing condition variable broadcast...\n");
 
     g_bcast_count = 0;
+    g_bcast_waiters = 0;
     g_bcast_mutex = cobalt_mutex_create();
     g_bcast_cond  = cobalt_cond_create();
     TEST_ASSERT(g_bcast_mutex != NULL);
@@ -157,9 +169,13 @@ void test_thread_cond_broadcast(void)
     for (int i = 0; i < 8; i++) {
         TEST_ASSERT(cobalt_thread_create(bcast_waiter_thread, NULL, &threads[i]) == 0);
     }
-    cobalt_thread_yield();
 
     cobalt_mutex_lock(g_bcast_mutex);
+    while (g_bcast_waiters < 8) {
+        cobalt_mutex_unlock(g_bcast_mutex);
+        cobalt_thread_yield();
+        cobalt_mutex_lock(g_bcast_mutex);
+    }
     cobalt_cond_broadcast(g_bcast_cond);
     cobalt_mutex_unlock(g_bcast_mutex);
 
