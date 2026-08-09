@@ -359,10 +359,33 @@ cobalt_hashmap_t *cobalt_hashmap_create_with_allocator(size_t              initi
     if (!alloc) {
         return NULL;
     }
-    cobalt_hashmap_t *map = cobalt_hashmap_create(initial_buckets);
-    if (map) {
-        map->impl.alloc = alloc;
+    cobalt_hashmap_t *map = (cobalt_hashmap_t *)alloc->alloc(alloc, sizeof(cobalt_hashmap_t));
+    if (!map) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+        return NULL;
     }
+    map->base            = hashmap_map_vtable;
+    hashmap_impl_t *impl = &map->impl;
+    impl->alloc          = alloc;
+    if (initial_buckets > 0) {
+        impl->buckets =
+            (hashmap_node_t **)alloc->alloc(alloc, sizeof(hashmap_node_t *) * initial_buckets);
+        if (impl->buckets) {
+            memset(impl->buckets, 0, sizeof(hashmap_node_t *) * initial_buckets);
+        }
+        if (!impl->buckets) {
+            alloc->free(alloc, map);
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            return NULL;
+        }
+        impl->bucket_count = initial_buckets;
+    } else {
+        impl->buckets      = NULL;
+        impl->bucket_count = 0;
+    }
+    impl->size       = 0;
+    impl->hash_func  = NULL;
+    impl->equal_func = NULL;
     return map;
 }
 
