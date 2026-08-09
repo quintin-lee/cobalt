@@ -245,7 +245,7 @@ static void bench_mt_hashmap_put(void)
     for (int t = 0; t < BENCH_NTHREADS; t++) {
         for (int i = 0; i < BENCH_THREAD_ITERS; i++) {
             char key[32];
-            snprintf(key, sizeof(key), "key_%d_%d", t + 1, i);
+            snprintf(key, sizeof(key), "key_%d_%d", t, i);
             int *val = (int *)cobalt_tshashmap_get(map, key);
             if (val) {
                 free(val);
