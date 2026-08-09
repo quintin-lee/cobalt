@@ -74,10 +74,6 @@ static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
         return NULL;
     }
     void *new_ptr = &mock_buf[mock_offset];
-    if (ptr && new_size > 0) {
-        size_t old_size = new_size;
-        memcpy(new_ptr, ptr, old_size < new_size ? old_size : new_size);
-    }
     mock_offset += new_size;
     return new_ptr;
 }
