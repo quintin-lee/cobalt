@@ -11,6 +11,8 @@
 #include <string.h>
 
 void test_list_remove_at(void);
+void test_list_sequence_interface(void);
+void test_list_null_safety(void);
 void test_list_basic(void)
 {
     printf("Testing list basic operations...\n");
@@ -313,6 +315,8 @@ void test_list(void)
     test_list_remove_if();
     test_list_sort();
     test_list_remove_at();
+    test_list_sequence_interface();
+    test_list_null_safety();
     printf("  List tests completed\n");
 }
 
@@ -397,4 +401,64 @@ void test_list_remove_at(void)
 
     cobalt_list_destroy(list);
     printf("  List remove_at test passed\n");
+}
+
+void test_list_sequence_interface(void)
+{
+    printf("Testing list sequence interface...\n");
+
+    cobalt_list_t *list = cobalt_list_create();
+    TEST_ASSERT(list != NULL);
+
+    cobalt_sequence_t *seq = (cobalt_sequence_t *)list;
+
+    TEST_ASSERT(seq->size(seq) == 0);
+    TEST_ASSERT(seq->is_empty(seq) == 1);
+
+    int a = 1, b = 2;
+    seq->add(seq, &a);
+    seq->add(seq, &b);
+    TEST_ASSERT(seq->size(seq) == 2);
+    TEST_ASSERT(seq->is_empty(seq) == 0);
+
+    void *item = seq->get_at_index(seq, 0);
+    TEST_ASSERT(item != NULL && *(int *)item == 1);
+
+    item = seq->get_at_index(seq, 1);
+    TEST_ASSERT(item != NULL && *(int *)item == 2);
+
+    cobalt_iterator_t *iter = seq->iterator(seq);
+    TEST_ASSERT(iter != NULL);
+    int count = 0;
+    while (cobalt_iterator_has_next(iter)) {
+        cobalt_iterator_next(iter);
+        count++;
+    }
+    TEST_ASSERT(count == 2);
+    cobalt_iterator_destroy(iter);
+
+    seq->remove(seq, &a);
+    TEST_ASSERT(seq->size(seq) == 1);
+
+    cobalt_list_destroy(list);
+    printf("  List sequence interface: OK\n");
+}
+
+void test_list_null_safety(void)
+{
+    printf("Testing list NULL safety...\n");
+
+    TEST_ASSERT(cobalt_list_push_front(NULL, NULL) == -1);
+    TEST_ASSERT(cobalt_list_push_back(NULL, NULL) == -1);
+    TEST_ASSERT(cobalt_list_pop_front(NULL) == NULL);
+    TEST_ASSERT(cobalt_list_pop_back(NULL) == NULL);
+    TEST_ASSERT(cobalt_list_get(NULL, 0) == NULL);
+    TEST_ASSERT(cobalt_list_size(NULL) == 0);
+    TEST_ASSERT(cobalt_list_is_empty(NULL) == 0);
+    TEST_ASSERT(cobalt_list_remove(NULL, NULL) == -1);
+    TEST_ASSERT(cobalt_list_remove_if(NULL, NULL, NULL) == -1);
+    TEST_ASSERT(cobalt_list_remove_at(NULL, 0) == -1);
+    cobalt_list_destroy(NULL);
+
+    printf("  List NULL safety: OK\n");
 }

@@ -10,6 +10,83 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MOCK_ALLOC_SIZE 4096
+static char   mock_buf[MOCK_ALLOC_SIZE];
+static size_t mock_offset      = 0;
+static int    mock_alloc_count = 0;
+static int    mock_free_count  = 0;
+static int    mock_fail_next   = 0;
+#define MOCK_MAX_TRACKED 256
+static void *mock_tracked[MOCK_MAX_TRACKED];
+static int   mock_tracked_count = 0;
+
+static void *mock_alloc(cobalt_allocator_t *self, size_t size)
+{
+    (void)self;
+    mock_alloc_count++;
+    if (mock_fail_next) {
+        mock_fail_next = 0;
+        return NULL;
+    }
+    if (mock_offset + size > MOCK_ALLOC_SIZE) {
+        return NULL;
+    }
+    void *ptr = &mock_buf[mock_offset];
+    mock_offset += size;
+    if (mock_tracked_count < MOCK_MAX_TRACKED) {
+        mock_tracked[mock_tracked_count++] = ptr;
+    }
+    return ptr;
+}
+
+static void mock_free(cobalt_allocator_t *self, void *ptr)
+{
+    (void)self;
+    mock_free_count++;
+    for (int i = 0; i < mock_tracked_count; i++) {
+        if (mock_tracked[i] == ptr) {
+            mock_tracked[i] = NULL;
+            break;
+        }
+    }
+}
+
+static void mock_free_all(void)
+{
+    for (int i = 0; i < mock_tracked_count; i++) {
+        if (mock_tracked[i]) {
+            mock_free_count++;
+            mock_tracked[i] = NULL;
+        }
+    }
+}
+
+static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+{
+    (void)self;
+    mock_alloc_count++;
+    if (mock_fail_next) {
+        mock_fail_next = 0;
+        return NULL;
+    }
+    if (mock_offset + new_size > MOCK_ALLOC_SIZE) {
+        return NULL;
+    }
+    void *new_ptr = &mock_buf[mock_offset];
+    if (ptr && new_size > 0) {
+        size_t old_size = new_size;
+        memcpy(new_ptr, ptr, old_size < new_size ? old_size : new_size);
+    }
+    mock_offset += new_size;
+    return new_ptr;
+}
+
+static cobalt_allocator_t mock_allocator = {
+    .alloc   = mock_alloc,
+    .free    = mock_free,
+    .realloc = mock_realloc,
+};
+
 void test_hashmap_basic(void)
 {
     printf("Testing hashmap basic operations...\n");
@@ -147,6 +224,9 @@ static int equal_strcmp2(const void *a, const void *b, size_t len)
 }
 
 void test_hashmap_collision_stress(void);
+void test_hashmap_iterator(void);
+void test_hashmap_with_allocator(void);
+void test_hashmap_allocator_failure(void);
 void test_hashmap_set_funcs(void);
 
 static unsigned int hash_fnv1a(const void *key, size_t key_len)
@@ -215,6 +295,9 @@ void test_hashmap(void)
     test_hashmap_overwrite_then_remove();
     test_hashmap_collision_stress();
     test_hashmap_set_funcs();
+    test_hashmap_iterator();
+    test_hashmap_with_allocator();
+    test_hashmap_allocator_failure();
     printf("  Hashmap tests completed\n");
 }
 
@@ -415,4 +498,96 @@ void test_hashmap_collision_stress(void)
     cobalt_hashmap_destroy(map);
     printf("  Collision stress test passed\n");
 }
+
+void test_hashmap_iterator(void)
+{
+    printf("Testing hashmap iterator...\n");
+
+    cobalt_hashmap_t *map = cobalt_hashmap_create(4);
+    TEST_ASSERT(map != NULL);
+
+    static int v1 = 1, v2 = 2, v3 = 3;
+    TEST_ASSERT(cobalt_hashmap_put(map, "a", &v1) == 0);
+    TEST_ASSERT(cobalt_hashmap_put(map, "b", &v2) == 0);
+    TEST_ASSERT(cobalt_hashmap_put(map, "c", &v3) == 0);
+
+    cobalt_map_iterator_t *it = cobalt_hashmap_iterator_create(map);
+    TEST_ASSERT(it != NULL);
+
+    int count = 0;
+    while (cobalt_map_iterator_has_next(it)) {
+        cobalt_map_pair_t pair = cobalt_map_iterator_next(it);
+        TEST_ASSERT(pair.key != NULL);
+        TEST_ASSERT(pair.value != NULL);
+        count++;
+    }
+    TEST_ASSERT(count == 3);
+    cobalt_map_iterator_destroy(it);
+
+    /* Iterator on empty map */
+    cobalt_hashmap_t *empty = cobalt_hashmap_create(2);
+    TEST_ASSERT(empty != NULL);
+    cobalt_map_iterator_t *eit = cobalt_hashmap_iterator_create(empty);
+    TEST_ASSERT(eit != NULL);
+    TEST_ASSERT(cobalt_map_iterator_has_next(eit) == 0);
+    cobalt_map_pair_t epair = cobalt_map_iterator_next(eit);
+    TEST_ASSERT(epair.key == NULL && epair.value == NULL);
+    cobalt_map_iterator_destroy(eit);
+    cobalt_hashmap_destroy(empty);
+
+    printf("  Hashmap iterator test passed\n");
+}
+
+void test_hashmap_with_allocator(void)
+{
+    printf("Testing hashmap with custom allocator...\n");
+
+    cobalt_allocator_t *alloc = cobalt_allocator_get_system();
+    cobalt_hashmap_t *map = cobalt_hashmap_create_with_allocator(4, alloc);
+    TEST_ASSERT(map != NULL);
+
+    static int val = 42;
+    TEST_ASSERT(cobalt_hashmap_put(map, "key", &val) == 0);
+    TEST_ASSERT(*(int *)cobalt_hashmap_get(map, "key") == 42);
+
+    cobalt_hashmap_destroy(map);
+    printf("  Hashmap with allocator: OK\n");
+}
+
+void test_hashmap_allocator_failure(void)
+{
+    printf("Testing hashmap allocator failure paths...\n");
+
+    cobalt_allocator_t mock_allocator = {
+        .alloc   = mock_alloc,
+        .free    = mock_free,
+        .realloc = mock_realloc,
+    };
+
+    mock_alloc_count = 0;
+    mock_free_count  = 0;
+    mock_offset      = 0;
+    mock_fail_next   = 1;
+
+    cobalt_hashmap_t *map = cobalt_hashmap_create_with_allocator(4, &mock_allocator);
+    TEST_ASSERT(map == NULL);
+    printf("  Create with failing allocator: OK\n");
+
+    mock_fail_next   = 0;
+    mock_alloc_count = 0;
+    mock_offset      = 0;
+    map = cobalt_hashmap_create_with_allocator(4, &mock_allocator);
+    TEST_ASSERT(map != NULL);
+
+    int val = 42;
+    mock_fail_next = 1;
+    int ret = cobalt_hashmap_put(map, "key", &val);
+    TEST_ASSERT(ret == -1);
+    printf("  Put with failing allocator: OK\n");
+
+    mock_free_all();
+    cobalt_hashmap_destroy(map);
+    printf("  Allocator failure test passed\n");
+}
+
 

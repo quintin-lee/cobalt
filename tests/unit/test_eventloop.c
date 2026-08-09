@@ -59,6 +59,8 @@ static void on_fd(int fd, short events, void *user_data)
 void test_eventloop_timer_edge_cases(void);
 void test_eventloop_fd_edge_cases(void);
 void test_eventloop_unix_socket(void);
+void test_eventloop_timer_periodic(void);
+void test_eventloop_rapid_signals(void);
 
 void test_eventloop_create_destroy(void)
 {
@@ -449,6 +451,41 @@ void test_eventloop_close_callback(void)
     printf("  Close callback: OK\n");
 }
 
+static int g_rapid_signal_count = 0;
+
+static void rapid_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
+{
+    (void)fd;
+    (void)events;
+    g_rapid_signal_count++;
+}
+
+void test_eventloop_rapid_signals(void)
+{
+    printf("Testing eventloop rapid signals...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    g_rapid_signal_count = 0;
+
+    int ret = cobalt_eventloop_add_signal(loop, SIGUSR2, rapid_signal_handler, NULL);
+    TEST_ASSERT(ret == 0);
+
+    /* Send multiple signals rapidly */
+    for (int i = 0; i < 5; i++) {
+        kill(getpid(), SIGUSR2);
+    }
+    usleep(10000);
+    cobalt_eventloop_iteration(loop);
+
+    printf("  Rapid signals: %d processed\n", g_rapid_signal_count);
+    TEST_ASSERT(g_rapid_signal_count == 5);
+
+    cobalt_eventloop_destroy(loop);
+    printf("  Rapid signals test completed\n");
+}
+
 void test_eventloop(void)
 {
     printf("Testing eventloop...\n");
@@ -464,6 +501,8 @@ void test_eventloop(void)
     test_eventloop_signal();
     test_eventloop_close_callback();
     test_eventloop_unix_socket();
+    test_eventloop_timer_periodic();
+    test_eventloop_rapid_signals();
     printf("  Eventloop tests completed\n");
 }
 

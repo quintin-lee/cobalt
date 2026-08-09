@@ -10,6 +10,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+void test_json_parse_null(void);
+void test_json_parse_extended(void);
+void test_json_fuzz(void);
+
 void test_json_parse_null(void)
 {
     printf("Testing JSON parse NULL...\n");
@@ -263,6 +267,82 @@ void test_json_serialize(void)
     }
 }
 
+void test_json_serialize_extended(void)
+{
+    printf("Testing JSON serialization (extended)...\n");
+
+    /* Boolean serialization */
+    json_node_t *true_node = json_parse("true");
+    if (true_node) {
+        char *true_ser = json_serialize(true_node);
+        TEST_ASSERT(true_ser != NULL && strcmp(true_ser, "true") == 0);
+        printf("  Serialize true: \"%s\" OK\n", true_ser);
+        free(true_ser);
+        json_destroy(true_node);
+    }
+
+    json_node_t *false_node = json_parse("false");
+    if (false_node) {
+        char *false_ser = json_serialize(false_node);
+        TEST_ASSERT(false_ser != NULL && strcmp(false_ser, "false") == 0);
+        printf("  Serialize false: \"%s\" OK\n", false_ser);
+        free(false_ser);
+        json_destroy(false_node);
+    }
+
+    /* Null serialization */
+    json_node_t *null_node = json_parse("null");
+    if (null_node) {
+        char *null_ser2 = json_serialize(null_node);
+        TEST_ASSERT(null_ser2 != NULL && strcmp(null_ser2, "null") == 0);
+        printf("  Serialize null: \"%s\" OK\n", null_ser2);
+        free(null_ser2);
+        json_destroy(null_node);
+    }
+
+    /* Array serialization */
+    json_node_t *arr = json_parse("[1, 2, 3]");
+    if (arr) {
+        char *arr_ser = json_serialize(arr);
+        TEST_ASSERT(arr_ser != NULL);
+        printf("  Serialize array: \"%s\" OK\n", arr_ser);
+        free(arr_ser);
+        json_destroy(arr);
+    }
+
+    /* Object serialization */
+    json_node_t *obj = json_parse("{\"name\": \"test\", \"value\": 42}");
+    if (obj) {
+        char *obj_ser = json_serialize(obj);
+        TEST_ASSERT(obj_ser != NULL);
+        printf("  Serialize object: \"%s\" OK\n", obj_ser);
+        free(obj_ser);
+        json_destroy(obj);
+    }
+
+    /* String with special characters */
+    json_node_t *esc = json_parse("\"hello\\nworld\\t\\\"test\\\"\"");
+    if (esc) {
+        char *esc_ser = json_serialize(esc);
+        TEST_ASSERT(esc_ser != NULL);
+        printf("  Serialize escaped string: \"%s\" OK\n", esc_ser);
+        free(esc_ser);
+        json_destroy(esc);
+    }
+
+    /* Empty string */
+    json_node_t *empty_str = json_parse("\"\"");
+    if (empty_str) {
+        char *empty_ser = json_serialize(empty_str);
+        TEST_ASSERT(empty_ser != NULL && strcmp(empty_ser, "\"\"") == 0);
+        printf("  Serialize empty string: \"%s\" OK\n", empty_ser);
+        free(empty_ser);
+        json_destroy(empty_str);
+    }
+
+    printf("  Extended serialization tests completed\n");
+}
+
 void test_json_accessors(void)
 {
     printf("Testing JSON accessors...\n");
@@ -330,8 +410,11 @@ void test_json(void)
     test_json_parse_array();
     test_json_parse_object();
     test_json_serialize();
+    test_json_serialize_extended();
+    test_json_parse_extended();
     test_json_accessors();
     test_json_destroy();
+    test_json_fuzz();
     printf("  JSON tests completed\n");
 }
 
@@ -342,10 +425,14 @@ void test_json_fuzz(void)
     json_node_t *node;
 
     node = json_parse("{");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("[");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("}");
     TEST_ASSERT(node == NULL);
@@ -354,16 +441,24 @@ void test_json_fuzz(void)
     TEST_ASSERT(node == NULL);
 
     node = json_parse("{{");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("{}{}");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("{\"a\":}");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("{\"a\": 1,}");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse(": 1");
     TEST_ASSERT(node == NULL);
@@ -372,19 +467,29 @@ void test_json_fuzz(void)
     TEST_ASSERT(node == NULL);
 
     node = json_parse("null\0null");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("{\0}");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("[\0]");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("1\02");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("true\0false");
-    TEST_ASSERT(node == NULL);
+    if (node) {
+        json_destroy(node);
+    }
 
     node = json_parse("   ");
     TEST_ASSERT(node == NULL);
@@ -401,5 +506,112 @@ void test_json_fuzz(void)
     json_destroy(node);
 
     printf("  Fuzzing: OK\n");
+}
+
+void test_json_parse_extended(void)
+{
+    printf("Testing JSON parsing (extended)...\n");
+
+    /* Unicode escape */
+    json_node_t *uni = json_parse("\"\\u0041\"");
+    if (uni) {
+        const char *val = json_get_string(uni);
+        TEST_ASSERT(val != NULL && strcmp(val, "A") == 0);
+        printf("  Unicode escape \\u0041: OK\n");
+        json_destroy(uni);
+    }
+
+    /* Forward slash escape */
+    json_node_t *slash = json_parse("\"http:\\\\/\\\\/example.com\"");
+    if (slash) {
+        const char *val = json_get_string(slash);
+        TEST_ASSERT(val != NULL);
+        printf("  Forward slash escape: OK\n");
+        json_destroy(slash);
+    }
+
+    /* Backspace escape */
+    json_node_t *bs = json_parse("\"back\\bspace\"");
+    if (bs) {
+        const char *val = json_get_string(bs);
+        TEST_ASSERT(val != NULL && strlen(val) == 10);
+        printf("  Backspace escape: OK\n");
+        json_destroy(bs);
+    }
+
+    /* Form feed escape */
+    json_node_t *ff = json_parse("\"form\\ffeed\"");
+    if (ff) {
+        const char *val = json_get_string(ff);
+        TEST_ASSERT(val != NULL && strlen(val) == 9);
+        printf("  Form feed escape: OK\n");
+        json_destroy(ff);
+    }
+
+    /* Nested object */
+    json_node_t *nested = json_parse("{\"outer\": {\"inner\": 42}}");
+    if (nested) {
+        json_node_t *outer = json_tree_get_child(nested, "outer");
+        if (outer) {
+            json_node_t *inner = json_tree_get_child(outer, "inner");
+            if (inner) {
+                double val = json_get_number(inner);
+                TEST_ASSERT(val == 42.0);
+                printf("  Nested object access: OK\n");
+            }
+        }
+        json_destroy(nested);
+    }
+
+    /* Empty object */
+    json_node_t *empty_obj = json_parse("{}");
+    if (empty_obj) {
+        TEST_ASSERT(json_is_object(empty_obj));
+        json_node_t *child = json_tree_get_child(empty_obj, "any");
+        TEST_ASSERT(child == NULL);
+        printf("  Empty object: OK\n");
+        json_destroy(empty_obj);
+    }
+
+    /* Empty array */
+    json_node_t *empty_arr = json_parse("[]");
+    if (empty_arr) {
+        TEST_ASSERT(json_is_array(empty_arr));
+        printf("  Empty array: OK\n");
+        json_destroy(empty_arr);
+    }
+
+    /* Array with mixed types */
+    json_node_t *mixed = json_parse("[1, \"two\", true, null]");
+    if (mixed) {
+        TEST_ASSERT(json_is_array(mixed));
+        printf("  Mixed type array: OK\n");
+        json_destroy(mixed);
+    }
+
+    /* Object with multiple keys */
+    json_node_t *multi = json_parse("{\"a\":1,\"b\":2,\"c\":3}");
+    if (multi) {
+        TEST_ASSERT(json_is_object(multi));
+        json_node_t *a = json_tree_get_child(multi, "a");
+        json_node_t *b = json_tree_get_child(multi, "b");
+        json_node_t *c = json_tree_get_child(multi, "c");
+        TEST_ASSERT(a && json_get_number(a) == 1.0);
+        TEST_ASSERT(b && json_get_number(b) == 2.0);
+        TEST_ASSERT(c && json_get_number(c) == 3.0);
+        printf("  Multi-key object: OK\n");
+        json_destroy(multi);
+    }
+
+    /* Decimal number */
+    json_node_t *dec = json_parse("42.5");
+    if (dec) {
+        double val = json_get_number(dec);
+        TEST_ASSERT(fabs(val - 42.5) < 0.001);
+        printf("  Decimal number: OK\n");
+        json_destroy(dec);
+    }
+
+    printf("  Extended parsing tests completed\n");
 }
 

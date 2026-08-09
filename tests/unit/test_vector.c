@@ -12,6 +12,8 @@
 #include <string.h>
 
 void test_vector_remove_at(void);
+void test_vector_null_safety(void);
+void test_vector_sequence_interface(void);
 void test_vector_basic(void)
 {
     printf("Testing vector basic operations...\n");
@@ -404,6 +406,8 @@ void test_vector(void)
     test_vector_large_capacity();
     test_vector_alternating_push_set();
     test_vector_remove_at();
+    test_vector_null_safety();
+    test_vector_sequence_interface();
 }
 
 
@@ -447,4 +451,59 @@ void test_vector_remove_at(void)
 
     cobalt_vector_destroy(v);
     printf("  Vector remove_at test passed\n");
+}
+
+void test_vector_null_safety(void)
+{
+    printf("Testing vector NULL safety...\n");
+
+    TEST_ASSERT(cobalt_vector_push(NULL, NULL) == -1);
+    TEST_ASSERT(cobalt_vector_get(NULL, 0) == NULL);
+    TEST_ASSERT(cobalt_vector_set(NULL, 0, NULL) == -1);
+    TEST_ASSERT(cobalt_vector_size(NULL) == 0);
+    TEST_ASSERT(cobalt_vector_is_empty(NULL) == 0);
+    TEST_ASSERT(cobalt_vector_capacity(NULL) == 0);
+    TEST_ASSERT(cobalt_vector_reserve(NULL, 10) == -1);
+    TEST_ASSERT(cobalt_vector_shrink_to_fit(NULL) == -1);
+    cobalt_vector_destroy(NULL);
+
+    printf("  Vector NULL safety: OK\n");
+}
+
+void test_vector_sequence_interface(void)
+{
+    printf("Testing vector sequence interface...\n");
+
+    cobalt_vector_t *vec = cobalt_vector_create(4);
+    TEST_ASSERT(vec != NULL);
+
+    cobalt_sequence_t *seq = (cobalt_sequence_t *)vec;
+
+    TEST_ASSERT(seq->size(seq) == 0);
+    TEST_ASSERT(seq->is_empty(seq) == 1);
+
+    int val = 42;
+    seq->add(seq, &val);
+    TEST_ASSERT(seq->size(seq) == 1);
+    TEST_ASSERT(seq->is_empty(seq) == 0);
+
+    void *item = seq->get_at_index(seq, 0);
+    TEST_ASSERT(item != NULL && *(int *)item == 42);
+
+    cobalt_iterator_t *iter = seq->iterator(seq);
+    TEST_ASSERT(iter != NULL);
+    int count = 0;
+    while (cobalt_iterator_has_next(iter)) {
+        cobalt_iterator_next(iter);
+        count++;
+    }
+    TEST_ASSERT(count == 1);
+    cobalt_iterator_destroy(iter);
+
+    seq->remove(seq, &val);
+    TEST_ASSERT(seq->size(seq) == 0);
+    TEST_ASSERT(seq->is_empty(seq) == 1);
+
+    cobalt_vector_destroy(vec);
+    printf("  Vector sequence interface: OK\n");
 }
