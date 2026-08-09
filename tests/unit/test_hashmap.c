@@ -534,6 +534,7 @@ void test_hashmap_iterator(void)
     TEST_ASSERT(epair.key == NULL && epair.value == NULL);
     cobalt_map_iterator_destroy(eit);
     cobalt_hashmap_destroy(empty);
+    cobalt_hashmap_destroy(map);
 
     printf("  Hashmap iterator test passed\n");
 }

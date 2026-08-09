@@ -112,6 +112,12 @@ void json_destroy(json_node_t *node)
             free(value);
             value = NULL;
 
+            // If the child node itself is a string (array element), free its string data
+            if (child && child->type == JSON_STRING && child->value.string) {
+                free(child->value.string);
+                child->value.string = NULL;
+            }
+
             // Free the key string of the key node
             if (child->key) {
                 free(child->key);

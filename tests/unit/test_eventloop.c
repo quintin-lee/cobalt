@@ -529,6 +529,7 @@ void test_eventloop_timer_periodic(void)
     printf("  Periodic timer fired %d times\n", fire_count);
     TEST_ASSERT(fire_count >= 1);
 
+    cobalt_eventloop_del_timer(loop, id);
     cobalt_eventloop_destroy(loop);
     printf("  Periodic timer test passed\n");
 }
