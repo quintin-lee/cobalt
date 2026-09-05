@@ -1,21 +1,53 @@
 /**
  * @file json.c
  * @brief Implementation of JSON query and memory management interfaces
+ *
+ * @details Provides a lightweight, in-memory representation of parsed JSON documents.
+ *          The internal `json_node` structure forms a linked-list tree where:
+ *          - JSON objects are represented as alternating key/value nodes
+ *          - JSON arrays are represented as a chain of value nodes
+ *          - Scalars (string, number, boolean, null) are leaf nodes
+ *
+ *          The tree is intentionally simple: no separate dictionary or vector types
+ *          are exposed. Traversal is performed by walking the `next` pointers with
+ *          stride-2 skipping for object key-value pairs.
  */
+
 #include "cobalt/module/json.h"
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * @brief Internal JSON node structure
+ *
+ * @details Forms the building block of the JSON document tree. For composite types
+ *          (objects and arrays), child nodes are linked via the `next` pointer:
+ *          - Objects: Object_Node -> Key_Node -> Value_Node -> Key_Node -> ...
+ *          - Arrays:  Array_Node -> Element_Node -> Element_Node -> ...
+ *
+ *          The `key` field is only valid for object key nodes and string scalar nodes.
+ *          The `value` union holds the actual data for leaf nodes.
+ */
 struct json_node {
-    json_type_t       type;
-    json_value_t      value;
-    struct json_node *next;
-    char             *key;
+    json_type_t       type;  /**< Node type: scalar, array, or object */
+    json_value_t      value; /**< Union holding scalar data (number, string, bool) */
+    struct json_node *next;  /**< Next sibling node in the parent's child list */
+    char *key; /**< Key string for object members; NULL for array elements and scalars */
 };
 
-/*
- * @brief Safely get the numeric value of a JSON node
- * @return Returns the actual value if it's JSON_NUMBER, otherwise returns 0.0
+/* ========================================================================= */
+/* Type-predicate accessors                                                  */
+/* ========================================================================= */
+
+/**
+ * @brief Safely retrieve the numeric value of a JSON node
+ *
+ * @details Returns the `number` field if the node is a JSON_NUMBER; otherwise
+ *          returns 0.0. This provides a safe default rather than requiring the
+ *          caller to check the type first.
+ *
+ * @param node Pointer to the JSON node (may be NULL)
+ * @return The numeric value, or 0.0 if the node is NULL or not a number
  */
 double json_get_number(json_node_t *node)
 {
@@ -25,10 +57,15 @@ double json_get_number(json_node_t *node)
     return 0.0;
 }
 
-/*
- * @brief Safely get the string content of a JSON node
- * @return Returns the corresponding C string pointer if it's JSON_STRING, otherwise returns an
- * empty string ""
+/**
+ * @brief Safely retrieve the string value of a JSON node
+ *
+ * @details Returns the `string` field if the node is a JSON_STRING and the string
+ *          pointer is non-NULL; otherwise returns an empty string "". The returned
+ *          pointer points to internal storage — do not free it.
+ *
+ * @param node Pointer to the JSON node (may be NULL)
+ * @return The string value, or "" if the node is NULL or not a string
  */
 const char *json_get_string(json_node_t *node)
 {
@@ -38,58 +75,90 @@ const char *json_get_string(json_node_t *node)
     return "";
 }
 
-/*
- * @brief Check if the JSON node is of type JSON_NULL
+/**
+ * @brief Check whether a JSON node is of type JSON_NULL
+ *
+ * @param node Pointer to the JSON node (may be NULL)
+ * @return Non-zero if the node is JSON_NULL, 0 otherwise
  */
 int json_is_null(json_node_t *node)
 {
     return node && node->type == JSON_NULL;
 }
 
-/*
- * @brief Check if the JSON node is of type JSON_OBJECT
+/**
+ * @brief Check whether a JSON node is of type JSON_OBJECT
+ *
+ * @param node Pointer to the JSON node (may be NULL)
+ * @return Non-zero if the node is JSON_OBJECT, 0 otherwise
  */
 int json_is_object(json_node_t *node)
 {
     return node && node->type == JSON_OBJECT;
 }
 
-/*
- * @brief Check if the JSON node is of type JSON_ARRAY
+/**
+ * @brief Check whether a JSON node is of type JSON_ARRAY
+ *
+ * @param node Pointer to the JSON node (may be NULL)
+ * @return Non-zero if the node is JSON_ARRAY, 0 otherwise
  */
 int json_is_array(json_node_t *node)
 {
     return node && node->type == JSON_ARRAY;
 }
 
-/*
- * @brief Get the child node of the specified key in a JSON object
+/* ========================================================================= */
+/* Tree traversal                                                            */
+/* ========================================================================= */
+
+/**
+ * @brief Retrieve a child node by key from a JSON object
  *
- * Iterates through the key-value pair linked list under the object. Since each key-value pair uses
- * a dummy node, its actual structure is: Object Node -> Key Node -> Value Node -> Next Key Node...
+ * @details Walks the linked list of key-value pairs under `parent`. Because objects
+ *          store children as alternating key/value nodes, the traversal advances by
+ *          two `next` pointers per iteration (skipping from key to next key).
+ *
+ *          The node layout for an object is:
+ * @code
+ *          Object_Node -> Key_Node("foo") -> Value_Node(...) -> Key_Node("bar") -> Value_Node(...)
+ * @endcode
+ *
+ * @param parent Pointer to the JSON object node
+ * @param key    Null-terminated key string to search for
+ * @return Pointer to the value node associated with `key`, or NULL if not found
  */
 json_node_t *json_tree_get_child(json_node_t *parent, const char *key)
 {
-    // If the parent node is invalid, the key to query is null, or the parent node is not an object,
-    // return NULL directly
     if (!parent || !key || parent->type != JSON_OBJECT) {
         return NULL;
     }
 
-    json_node_t *kv = parent->next; // Get the first key node
+    json_node_t *kv = parent->next; /* First key node */
     while (kv) {
-        // Compare if the key names match
         if (kv->key && strcmp(kv->key, key) == 0) {
-            return kv->next; // Return the value node associated with the key
+            return kv->next; /* Return the value node paired with this key */
         }
-        // Jump to the next key node, step is 2 (i.e., skip the current value node)
         kv = kv->next ? kv->next->next : NULL;
     }
-    return NULL; // Corresponding key not found
+    return NULL;
 }
 
-/*
- * @brief Deeply destroy the entire JSON node tree and free memory
+/* ========================================================================= */
+/* Memory management                                                         */
+/* ========================================================================= */
+
+/**
+ * @brief Recursively destroy a JSON node tree and free all associated memory
+ *
+ * @details Walks the entire subtree rooted at `node`, freeing:
+ *          - For objects/arrays: all child key-value pairs or elements, including
+ *            their string data and key strings
+ *          - For string scalars: the heap-allocated string buffer
+ *          - The node structure itself
+ *
+ *          This function is safe to call with NULL. After destruction, all pointers
+ *          into the freed tree become dangling — callers should discard them.
  */
 void json_destroy(json_node_t *node)
 {
@@ -97,14 +166,12 @@ void json_destroy(json_node_t *node)
         return;
     }
 
-    // For composite nodes like objects and arrays, free their child nodes
     if (node->type == JSON_OBJECT || node->type == JSON_ARRAY) {
         json_node_t *child = node->next;
         while (child) {
             json_node_t *value   = child->next;
             json_node_t *next_kv = value ? value->next : NULL;
 
-            // If the value node is a string type, the string memory needs to be freed separately
             if (value && value->type == JSON_STRING && value->value.string) {
                 free(value->value.string);
                 value->value.string = NULL;
@@ -112,25 +179,21 @@ void json_destroy(json_node_t *node)
             free(value);
             value = NULL;
 
-            // If the child node itself is a string (array element), free its string data
             if (child && child->type == JSON_STRING && child->value.string) {
                 free(child->value.string);
                 child->value.string = NULL;
             }
 
-            // Free the key string of the key node
             if (child->key) {
                 free(child->key);
                 child->key = NULL;
             }
             free(child);
-            // Advance to the next key-value pair or element
             child = next_kv;
         }
         node->next = NULL;
     }
 
-    // Handle the case where the current node itself is a string or has a key
     if (node->type == JSON_STRING && node->value.string) {
         free(node->value.string);
         node->value.string = NULL;
@@ -140,6 +203,5 @@ void json_destroy(json_node_t *node)
         node->key = NULL;
     }
 
-    // Free the node structure itself
     free(node);
 }
