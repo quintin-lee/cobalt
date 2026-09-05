@@ -248,127 +248,337 @@ int cobalt_tslist_is_empty(const cobalt_tslist_t *list);
 /* Thread-Safe Deque                                                         */
 /* ======================================================================== */
 
+/**
+ * @brief Opaque thread-safe deque type
+ */
 typedef struct cobalt_tsdeque cobalt_tsdeque_t;
 
+/**
+ * @brief Create a thread-safe deque
+ * @return Pointer to the new thread-safe deque, or NULL on failure
+ */
 cobalt_tsdeque_t *cobalt_tsdeque_create(void);
 
+/**
+ * @brief Create a thread-safe deque with a custom allocator
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the new thread-safe deque, or NULL on failure
+ */
 cobalt_tsdeque_t *cobalt_tsdeque_create_with_allocator(cobalt_allocator_t *alloc);
 
+/**
+ * @brief Destroy a thread-safe deque and free all memory
+ */
 void cobalt_tsdeque_destroy(cobalt_tsdeque_t *d);
 
+/**
+ * @brief Push an element to the front (thread-safe)
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsdeque_push_front(cobalt_tsdeque_t *d, void *item);
 
+/**
+ * @brief Push an element to the back (thread-safe)
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsdeque_push_back(cobalt_tsdeque_t *d, void *item);
 
+/**
+ * @brief Pop an element from the front (thread-safe)
+ * @return Element pointer, or NULL when empty
+ */
 void *cobalt_tsdeque_pop_front(cobalt_tsdeque_t *d);
 
+/**
+ * @brief Pop an element from the back (thread-safe)
+ * @return Element pointer, or NULL when empty
+ */
 void *cobalt_tsdeque_pop_back(cobalt_tsdeque_t *d);
 
+/**
+ * @brief Peek at the front element without removal (thread-safe)
+ * @return Element pointer, or NULL when empty
+ */
 void *cobalt_tsdeque_peek_front(const cobalt_tsdeque_t *d);
 
+/**
+ * @brief Peek at the back element without removal (thread-safe)
+ * @return Element pointer, or NULL when empty
+ */
 void *cobalt_tsdeque_peek_back(const cobalt_tsdeque_t *d);
 
+/**
+ * @brief Get the number of elements (thread-safe)
+ */
 size_t cobalt_tsdeque_size(const cobalt_tsdeque_t *d);
 
+/**
+ * @brief Check if empty (thread-safe)
+ */
 int cobalt_tsdeque_is_empty(const cobalt_tsdeque_t *d);
 
 /* ======================================================================== */
 /* Thread-Safe Queue                                                         */
 /* ======================================================================== */
 
+/**
+ * @brief Opaque thread-safe queue type
+ */
 typedef struct cobalt_tsqueue cobalt_tsqueue_t;
 
+/**
+ * @brief Create a thread-safe queue
+ * @return Pointer to the new thread-safe queue, or NULL on failure
+ */
 cobalt_tsqueue_t *cobalt_tsqueue_create(void);
 
+/**
+ * @brief Create a thread-safe queue with a custom allocator
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the new thread-safe queue, or NULL on failure
+ */
 cobalt_tsqueue_t *cobalt_tsqueue_create_with_allocator(cobalt_allocator_t *alloc);
 
+/**
+ * @brief Destroy a thread-safe queue and free all memory
+ */
 void cobalt_tsqueue_destroy(cobalt_tsqueue_t *q);
 
+/**
+ * @brief Enqueue an element to the back (thread-safe)
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsqueue_enqueue(cobalt_tsqueue_t *q, void *item);
 
+/**
+ * @brief Dequeue an element from the front (thread-safe)
+ * @return Element pointer, or NULL when empty
+ */
 void *cobalt_tsqueue_dequeue(cobalt_tsqueue_t *q);
 
+/**
+ * @brief Peek at the front element without removal (thread-safe)
+ * @return Element pointer, or NULL when empty
+ */
 void *cobalt_tsqueue_peek(const cobalt_tsqueue_t *q);
 
+/**
+ * @brief Get the number of elements (thread-safe)
+ */
 size_t cobalt_tsqueue_size(const cobalt_tsqueue_t *q);
 
+/**
+ * @brief Check if empty (thread-safe)
+ */
 int cobalt_tsqueue_is_empty(const cobalt_tsqueue_t *q);
 
 /* ======================================================================== */
 /* Thread-Safe Stack                                                         */
 /* ======================================================================== */
 
+/**
+ * @brief Opaque thread-safe stack type
+ */
 typedef struct cobalt_tsstack cobalt_tsstack_t;
 
+/**
+ * @brief Create a thread-safe stack
+ * @return Pointer to the new thread-safe stack, or NULL on failure
+ */
 cobalt_tsstack_t *cobalt_tsstack_create(void);
 
+/**
+ * @brief Create a thread-safe stack with a custom allocator
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the new thread-safe stack, or NULL on failure
+ */
 cobalt_tsstack_t *cobalt_tsstack_create_with_allocator(cobalt_allocator_t *alloc);
 
+/**
+ * @brief Destroy a thread-safe stack and free all memory
+ */
 void cobalt_tsstack_destroy(cobalt_tsstack_t *s);
 
+/**
+ * @brief Push an element onto the stack (thread-safe)
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsstack_push(cobalt_tsstack_t *s, void *item);
 
+/**
+ * @brief Pop an element from the stack (thread-safe)
+ * @return Element pointer, or NULL when empty
+ */
 void *cobalt_tsstack_pop(cobalt_tsstack_t *s);
 
+/**
+ * @brief Peek at the top element without removal (thread-safe)
+ * @return Element pointer, or NULL when empty
+ */
 void *cobalt_tsstack_peek(const cobalt_tsstack_t *s);
 
+/**
+ * @brief Get the number of elements (thread-safe)
+ */
 size_t cobalt_tsstack_size(const cobalt_tsstack_t *s);
 
+/**
+ * @brief Check if empty (thread-safe)
+ */
 int cobalt_tsstack_is_empty(const cobalt_tsstack_t *s);
 
 /* ======================================================================== */
 /* Thread-Safe TreeMap                                                       */
 /* ======================================================================== */
 
+/**
+ * @brief Opaque thread-safe treemap type
+ */
 typedef struct cobalt_tstreemap cobalt_tstreemap_t;
 
+/**
+ * @brief Create a thread-safe treemap using default string comparator
+ * @return Pointer to the new thread-safe treemap, or NULL on failure
+ */
 cobalt_tstreemap_t *cobalt_tstreemap_create(void);
 
+/**
+ * @brief Create a thread-safe treemap with a custom comparator
+ * @param compare_func Custom key comparison function
+ * @return Pointer to the new thread-safe treemap, or NULL on failure
+ */
 cobalt_tstreemap_t *cobalt_tstreemap_create_ext(cobalt_compare_func_t compare_func);
 
+/**
+ * @brief Create a thread-safe treemap with a custom allocator
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the new thread-safe treemap, or NULL on failure
+ */
 cobalt_tstreemap_t *cobalt_tstreemap_create_with_allocator(cobalt_allocator_t *alloc);
 
+/**
+ * @brief Destroy a thread-safe treemap and free all memory
+ */
 void cobalt_tstreemap_destroy(cobalt_tstreemap_t *m);
 
+/**
+ * @brief Insert or update a key-value pair (thread-safe)
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tstreemap_put(cobalt_tstreemap_t *m, const char *key, void *value);
 
+/**
+ * @brief Look up a value by key (thread-safe)
+ * @return Value pointer, or NULL if not found
+ */
 void *cobalt_tstreemap_get(const cobalt_tstreemap_t *m, const char *key);
 
+/**
+ * @brief Remove a key (thread-safe)
+ * @return 0 on success, -1 if key not found
+ */
 int cobalt_tstreemap_remove(cobalt_tstreemap_t *m, const char *key);
 
+/**
+ * @brief Get the minimum key (thread-safe)
+ * @return Minimum key string, or NULL when empty
+ */
 const char *cobalt_tstreemap_min_key(const cobalt_tstreemap_t *m);
 
+/**
+ * @brief Get the maximum key (thread-safe)
+ * @return Maximum key string, or NULL when empty
+ */
 const char *cobalt_tstreemap_max_key(const cobalt_tstreemap_t *m);
 
+/**
+ * @brief Get the number of entries (thread-safe)
+ */
 size_t cobalt_tstreemap_size(const cobalt_tstreemap_t *m);
 
 /* ======================================================================== */
 /* Thread-Safe Set                                                           */
 /* ======================================================================== */
 
+/**
+ * @brief Opaque thread-safe set type
+ */
 typedef struct cobalt_tsset cobalt_tsset_t;
 
+/**
+ * @brief Create a thread-safe set
+ * @param initial_capacity Initial bucket count. If 0, grows lazily.
+ * @return Pointer to the new thread-safe set, or NULL on failure
+ */
 cobalt_tsset_t *cobalt_tsset_create(size_t initial_capacity);
 
+/**
+ * @brief Create a thread-safe set with a custom allocator
+ * @param initial_capacity Initial bucket count
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the new thread-safe set, or NULL on failure
+ */
 cobalt_tsset_t *cobalt_tsset_create_with_allocator(size_t              initial_capacity,
                                                    cobalt_allocator_t *alloc);
 
+/**
+ * @brief Destroy a thread-safe set and free all memory
+ */
 void cobalt_tsset_destroy(cobalt_tsset_t *s);
 
+/**
+ * @brief Insert an element by pointer comparison (thread-safe)
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsset_insert(cobalt_tsset_t *s, void *item);
 
+/**
+ * @brief Insert an element by raw bytes (thread-safe)
+ * @param s Thread-safe set instance
+ * @param item Raw bytes to insert
+ * @param item_len Length of raw bytes in bytes
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsset_insert_ext(cobalt_tsset_t *s, const void *item, size_t item_len);
 
+/**
+ * @brief Remove an element by pointer comparison (thread-safe)
+ * @return 0 on success, -1 if element not found
+ */
 int cobalt_tsset_remove(cobalt_tsset_t *s, void *item);
 
+/**
+ * @brief Remove an element by raw bytes (thread-safe)
+ * @param s Thread-safe set instance
+ * @param item Raw bytes to match
+ * @param item_len Length of raw bytes in bytes
+ * @return 0 on success, -1 if element not found
+ */
 int cobalt_tsset_remove_ext(cobalt_tsset_t *s, const void *item, size_t item_len);
 
+/**
+ * @brief Check if an element exists by pointer comparison (thread-safe)
+ * @return 1 if present, 0 if not
+ */
 int cobalt_tsset_contains(cobalt_tsset_t *s, void *item);
 
+/**
+ * @brief Check if an element exists by raw bytes (thread-safe)
+ * @param s Thread-safe set instance
+ * @param item Raw bytes to match
+ * @param item_len Length of raw bytes in bytes
+ * @return 1 if present, 0 if not
+ */
 int cobalt_tsset_contains_ext(cobalt_tsset_t *s, const void *item, size_t item_len);
 
+/**
+ * @brief Get the number of elements (thread-safe)
+ */
 size_t cobalt_tsset_size(const cobalt_tsset_t *s);
 
+/**
+ * @brief Check if empty (thread-safe)
+ */
 int cobalt_tsset_is_empty(const cobalt_tsset_t *s);
 
 #endif /* THREADSAFE_WRAPPER_H */
