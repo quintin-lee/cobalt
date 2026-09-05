@@ -113,5 +113,12 @@ __pycache__/
 *.temp
 build-asan/
 
+# --- Test & coverage artifacts ---
+Testing/
+coverage.info
+coverage_report/
+lcov.info
+*.info
+
 # --- AI ---
 AGENTS.md
