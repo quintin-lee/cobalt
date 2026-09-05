@@ -104,6 +104,13 @@ struct cobalt_eventloop {
 /* -------------------------------------------------------------------------- */
 /* Signal handling                                                            */
 /* -------------------------------------------------------------------------- */
+/**
+ * @brief Record a caught signal into the ring buffer for deferred dispatch.
+ *
+ * @param signum Signal number caught by the OS handler.
+ *
+ * @note Async-signal-safe: only touches sig_atomic_t state, never calls back directly.
+ */
 static void cobalt_signal_handler(int signum)
 {
     /* Ring-buffer write is async-signal-safe (no malloc, no stdio) */
@@ -115,6 +122,11 @@ static void cobalt_signal_handler(int signum)
     }
 }
 
+/**
+ * @brief Dispatch all signals pending in the ring buffer to registered handlers.
+ *
+ * @param loop Unused; signal state is process-global.
+ */
 static void cobalt_drain_signals(cobalt_eventloop_t *loop)
 {
     (void)loop;
@@ -135,6 +147,13 @@ static void cobalt_drain_signals(cobalt_eventloop_t *loop)
 /* -------------------------------------------------------------------------- */
 /* Heap operations                                                            */
 /* -------------------------------------------------------------------------- */
+/**
+ * @brief Order two timers by fire time, breaking ties by timer id.
+ *
+ * @param a First timer entry.
+ * @param b Second timer entry.
+ * @return Negative if a fires first, positive if b fires first, zero if equal.
+ */
 static int timer_compare(const timer_entry_t *a, const timer_entry_t *b)
 {
     if (a->next_fire.tv_sec < b->next_fire.tv_sec) {
@@ -156,6 +175,12 @@ static int timer_compare(const timer_entry_t *a, const timer_entry_t *b)
     return a->timer_id > b->timer_id ? 1 : 0;
 }
 
+/**
+ * @brief Restore the heap invariant by moving an entry up toward the root.
+ *
+ * @param heap Timer heap array.
+ * @param idx Index of the entry to sift up.
+ */
 static void heap_sift_up(timer_entry_t **heap, int idx)
 {
     while (idx > 0) {
@@ -170,6 +195,13 @@ static void heap_sift_up(timer_entry_t **heap, int idx)
     }
 }
 
+/**
+ * @brief Restore the heap invariant by moving an entry down toward the leaves.
+ *
+ * @param heap Timer heap array.
+ * @param count Number of entries in the heap.
+ * @param idx Index of the entry to sift down.
+ */
 static void heap_sift_down(timer_entry_t **heap, int count, int idx)
 {
     while (1) {
@@ -192,6 +224,13 @@ static void heap_sift_down(timer_entry_t **heap, int count, int idx)
     }
 }
 
+/**
+ * @brief Insert a timer entry into the loop timer heap, growing it as needed.
+ *
+ * @param loop Event loop owning the timer heap.
+ * @param entry Timer entry to insert.
+ * @return 0 on success, -1 when heap growth fails.
+ */
 static int heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
 {
     if (loop->timer_count >= loop->timer_capacity) {
@@ -210,6 +249,12 @@ static int heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
     return 0;
 }
 
+/**
+ * @brief Remove and return the earliest-firing timer from the heap.
+ *
+ * @param loop Event loop owning the timer heap.
+ * @return Earliest timer entry, or NULL when the heap is empty.
+ */
 static timer_entry_t *heap_pop_min(cobalt_eventloop_t *loop)
 {
     if (loop->timer_count == 0) {
@@ -222,16 +267,34 @@ static timer_entry_t *heap_pop_min(cobalt_eventloop_t *loop)
     return min;
 }
 
+/**
+ * @brief Return the earliest-firing timer without removing it.
+ *
+ * @param loop Event loop owning the timer heap.
+ * @return Earliest timer entry, or NULL when the heap is empty.
+ */
 static timer_entry_t *heap_peek(const cobalt_eventloop_t *loop)
 {
     return loop->timer_count > 0 ? loop->timer_heap[0] : NULL;
 }
 
+/**
+ * @brief Sample the monotonic clock.
+ *
+ * @param ts Receives the current monotonic time.
+ */
 static void get_time_now(struct timespec *ts)
 {
     clock_gettime(CLOCK_MONOTONIC, ts);
 }
 
+/**
+ * @brief Test whether fire time a has been reached relative to time b.
+ *
+ * @param a Timer fire time.
+ * @param b Reference time.
+ * @return Nonzero when a is at or before b, zero otherwise.
+ */
 static int timer_expired(const struct timespec *a, const struct timespec *b)
 {
     long secs  = a->tv_sec - b->tv_sec;
@@ -239,6 +302,12 @@ static int timer_expired(const struct timespec *a, const struct timespec *b)
     return secs < 0 || (secs == 0 && nsecs <= 0);
 }
 
+/**
+ * @brief Fire due timers and requeue repeating ones.
+ *
+ * @param loop Event loop owning the timer heap.
+ * @param now Current time used to decide which timers are due.
+ */
 static void process_expired_timers(cobalt_eventloop_t *loop, const struct timespec *now)
 {
     while (loop->timer_count > 0) {
@@ -267,6 +336,13 @@ static void process_expired_timers(cobalt_eventloop_t *loop, const struct timesp
     }
 }
 
+/**
+ * @brief Compute how long the backend may block before the next timer fires.
+ *
+ * @param loop Event loop owning the timer heap.
+ * @param now Current time, or NULL to use the default timeout.
+ * @return Milliseconds to wait; never negative.
+ */
 static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct timespec *now)
 {
     int                  timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
@@ -285,6 +361,14 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
 /* -------------------------------------------------------------------------- */
 /* Platform-specific FD management                                            */
 /* -------------------------------------------------------------------------- */
+/**
+ * @brief Register a file descriptor with the platform wait backend.
+ *
+ * @param loop Event loop owning the backend state.
+ * @param fd Descriptor to watch.
+ * @param events Event mask to wait for.
+ * @return 0 on success, nonzero when the backend rejects the descriptor.
+ */
 static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
 {
 #ifdef __linux__
@@ -318,6 +402,14 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
 #endif
 }
 
+/**
+ * @brief Change the watched event mask of a registered descriptor.
+ *
+ * @param loop Event loop owning the backend state.
+ * @param fd Descriptor already registered with the backend.
+ * @param events New event mask to wait for.
+ * @return 0 on success, nonzero when the backend rejects the change.
+ */
 static int platform_mod_fd(cobalt_eventloop_t *loop, int fd, short events)
 {
 #ifdef __linux__
@@ -338,6 +430,13 @@ static int platform_mod_fd(cobalt_eventloop_t *loop, int fd, short events)
 #endif
 }
 
+/**
+ * @brief Remove a descriptor from the platform wait backend.
+ *
+ * @param loop Event loop owning the backend state.
+ * @param fd Descriptor to stop watching.
+ * @return 0 on success, nonzero when the backend rejects the removal.
+ */
 static int platform_del_fd(cobalt_eventloop_t *loop, int fd)
 {
 #ifdef __linux__
@@ -356,6 +455,14 @@ static int platform_del_fd(cobalt_eventloop_t *loop, int fd)
 #endif
 }
 
+/**
+ * @brief Block until backend events arrive or the timer timeout elapses.
+ *
+ * @param loop Event loop owning the backend state.
+ * @param event_count_out Receives the number of ready events.
+ * @param entries_out Receives the backend event array.
+ * @param max_events Capacity of the caller event buffer (poll backend only).
+ */
 static void
 platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out, int max_events)
 {
@@ -382,6 +489,13 @@ platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out
 /* UNIX domain socket helpers                                                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief Create, bind and listen a UNIX domain server socket.
+ *
+ * @param path Filesystem path for the socket; a stale file is removed first.
+ * @param sock_out Receives the listening socket on success.
+ * @return 0 on success, -1 on invalid arguments or socket failure.
+ */
 int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out)
 {
     if (!path || !sock_out) {
@@ -415,6 +529,16 @@ int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out)
     return 0;
 }
 
+/**
+ * @brief Accept one client connection and register it with the loop.
+ *
+ * @param loop Event loop receiving the new connection.
+ * @param listen_fd Listening socket created by create_unix_server.
+ * @param events Event mask to watch the client for.
+ * @param callback Handler invoked on client activity.
+ * @param user_data Opaque value passed to the handler.
+ * @return 0 on success, -1 on invalid arguments or accept failure.
+ */
 int cobalt_eventloop_accept(cobalt_eventloop_t *loop,
                             cobalt_fd_t         listen_fd,
                             cobalt_events_t     events,
@@ -442,6 +566,12 @@ int cobalt_eventloop_accept(cobalt_eventloop_t *loop,
 /* -------------------------------------------------------------------------- */
 /* Public API                                                                 */
 /* -------------------------------------------------------------------------- */
+/**
+ * @brief Allocate and initialize an event loop with an explicit allocator.
+ *
+ * @param alloc Allocator used for the loop and all its state.
+ * @return New event loop, or NULL when allocation or backend setup fails.
+ */
 static cobalt_eventloop_t *cobalt_eventloop_create_with_alloc(cobalt_allocator_t *alloc)
 {
     cobalt_eventloop_t *loop =
@@ -490,11 +620,22 @@ static cobalt_eventloop_t *cobalt_eventloop_create_with_alloc(cobalt_allocator_t
     return loop;
 }
 
+/**
+ * @brief Create an event loop using the system allocator.
+ *
+ * @return New event loop, or NULL on failure.
+ */
 cobalt_eventloop_t *cobalt_eventloop_create(void)
 {
     return cobalt_eventloop_create_with_alloc(cobalt_allocator_get_system());
 }
 
+/**
+ * @brief Create an event loop using a caller-supplied allocator.
+ *
+ * @param alloc Allocator used for the loop and all its state.
+ * @return New event loop, or NULL on NULL allocator or setup failure.
+ */
 cobalt_eventloop_t *cobalt_eventloop_create_with_allocator(cobalt_allocator_t *alloc)
 {
     if (!alloc) {
@@ -503,6 +644,13 @@ cobalt_eventloop_t *cobalt_eventloop_create_with_allocator(cobalt_allocator_t *a
     return cobalt_eventloop_create_with_alloc(alloc);
 }
 
+/**
+ * @brief Release an event loop and all its descriptors, timers and state.
+ *
+ * @param loop Loop to destroy; NULL is ignored.
+ *
+ * @note Invokes the registered close callback before freeing the loop itself.
+ */
 void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
 {
     if (!loop) {
@@ -542,6 +690,15 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
     loop->alloc->free(loop->alloc, loop);
 }
 
+/**
+ * @brief Register a handler invoked when the process receives a signal.
+ *
+ * @param loop Unused; signal state is process-global.
+ * @param signum Signal number to watch.
+ * @param callback Handler invoked with the signal number on delivery.
+ * @param user_data Opaque value passed to the handler.
+ * @return 0 on success, -1 on invalid arguments, duplicates or a full table.
+ */
 int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop,
                                 int                 signum,
                                 fd_handler_t        callback,
@@ -584,6 +741,14 @@ int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop,
     return 0;
 }
 
+/**
+ * @brief Set the callback invoked when the loop is destroyed.
+ *
+ * @param loop Event loop storing the callback.
+ * @param callback Handler invoked at destroy time; may be NULL to clear.
+ * @param user_data Opaque value passed to the handler.
+ * @return 0 on success, -1 on NULL loop.
+ */
 int cobalt_eventloop_add_close_callback(cobalt_eventloop_t *loop,
                                         fd_handler_t        callback,
                                         void               *user_data)
@@ -596,6 +761,16 @@ int cobalt_eventloop_add_close_callback(cobalt_eventloop_t *loop,
     return 0;
 }
 
+/**
+ * @brief Watch a file descriptor and invoke a handler on activity.
+ *
+ * @param loop Event loop receiving the descriptor.
+ * @param fd Descriptor to watch.
+ * @param events Event mask to wait for.
+ * @param callback Handler invoked on descriptor activity.
+ * @param user_data Opaque value passed to the handler.
+ * @return 0 on success, -1 on invalid arguments or backend failure.
+ */
 int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
                             cobalt_fd_t         fd,
                             cobalt_events_t     events,
@@ -637,6 +812,16 @@ int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
     return 0;
 }
 
+/**
+ * @brief Replace the watch on a descriptor by re-adding it.
+ *
+ * @param loop Event loop owning the watch.
+ * @param fd Descriptor to re-register.
+ * @param events New event mask to wait for.
+ * @param callback New handler invoked on descriptor activity.
+ * @param user_data Opaque value passed to the handler.
+ * @return 0 on success, -1 on invalid arguments or backend failure.
+ */
 int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
                             cobalt_fd_t         fd,
                             cobalt_events_t     events,
@@ -650,6 +835,13 @@ int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
     return cobalt_eventloop_add_fd(loop, fd, events, callback, user_data);
 }
 
+/**
+ * @brief Stop watching a descriptor and release its loop state.
+ *
+ * @param loop Event loop owning the watch.
+ * @param fd Descriptor to stop watching.
+ * @return 0 on success, -1 when the descriptor is not watched.
+ */
 int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd)
 {
     if (!loop || fd < 0) {
@@ -671,6 +863,16 @@ int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd)
     return -1;
 }
 
+/**
+ * @brief Arm a one-shot or repeating timer on the loop.
+ *
+ * @param loop Event loop owning the timer heap.
+ * @param timeout_ms Delay before the first firing.
+ * @param interval_ms Repeat period; zero makes the timer one-shot.
+ * @param callback Handler invoked with the timer id on each firing.
+ * @param user_data Opaque value passed to the handler.
+ * @return Nonzero timer id on success, 0 on invalid arguments or failure.
+ */
 uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t  *loop,
                                     cobalt_timeout_ms_t  timeout_ms,
                                     cobalt_interval_ms_t interval_ms,
@@ -712,6 +914,13 @@ uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t  *loop,
     return timer_id;
 }
 
+/**
+ * @brief Cancel a timer and release its entry.
+ *
+ * @param loop Event loop owning the timer heap.
+ * @param timer_id Id returned by add_timer.
+ * @return 0 on success, -1 when the id is not found.
+ */
 int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
 {
     if (!loop) {
@@ -729,6 +938,11 @@ int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
     return -1;
 }
 
+/**
+ * @brief Run the loop until stop is requested.
+ *
+ * @param loop Event loop to run; NULL is ignored.
+ */
 void cobalt_eventloop_run(cobalt_eventloop_t *loop)
 {
     if (!loop) {
@@ -742,6 +956,13 @@ void cobalt_eventloop_run(cobalt_eventloop_t *loop)
     loop->running = 0;
 }
 
+/**
+ * @brief Request a running loop to exit after the current iteration.
+ *
+ * @param loop Event loop to stop; NULL is ignored.
+ *
+ * @note Safe to call from within a loop callback.
+ */
 void cobalt_eventloop_stop(cobalt_eventloop_t *loop)
 {
     if (loop) {
@@ -749,6 +970,12 @@ void cobalt_eventloop_stop(cobalt_eventloop_t *loop)
     }
 }
 
+/**
+ * @brief Fire due timers, dispatch signals and wait for one backend event batch.
+ *
+ * @param loop Event loop to drive forward.
+ * @return 0 on success, -1 on NULL loop.
+ */
 int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
 {
     if (!loop) {
