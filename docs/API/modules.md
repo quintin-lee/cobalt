@@ -44,6 +44,30 @@ void         json_destroy(json_node_t *node);
 | `json_serialize` | Serializes node tree to JSON string. Returns heap-allocated string (caller must `free`). Returns `"{}"` on failure. |
 | `json_destroy` | Recursively frees all nodes and their string values. Safe to call with NULL. |
 
+### Custom Allocators
+
+```c
+json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc);
+char        *json_serialize_with_alloc(json_node_t *node, cobalt_allocator_t *alloc);
+void         json_destroy_with_alloc(json_node_t *node, cobalt_allocator_t *alloc);
+```
+
+Passing NULL for `alloc` falls back to the system allocator, making the
+`_with_alloc` variants drop-in replacements for the plain trio. A tree built by
+`json_parse_with_alloc` MUST be freed with `json_destroy_with_alloc` using the
+same allocator, and the string from `json_serialize_with_alloc` with that
+allocator's `free` (not plain `free`).
+
+**Usage example:**
+
+```c
+cobalt_allocator_t *alloc = cobalt_allocator_get_system();
+json_node_t *root = json_parse_with_alloc("{\"a\": 1}", alloc);
+char *s = json_serialize_with_alloc(root, alloc);
+json_destroy_with_alloc(root, alloc);
+cobalt_allocator_free(alloc, s);
+```
+
 ### Navigation
 
 ```c
