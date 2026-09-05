@@ -1022,7 +1022,7 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
             entry = entry->next;
         }
         if (entry && entry->callback) {
-            short ev = (events[i].filter == EVFILT_READ) ? POLLIN : POLLOUT;
+            short ev = (events[i].filter == EVFILT_READ) ? EVFILT_READ : EVFILT_WRITE;
             entry->callback(fd, ev, entry->user_data);
         }
     }
