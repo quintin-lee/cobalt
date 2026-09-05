@@ -316,6 +316,7 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
     ctx->pos++;
 
     json_node_t *root = json_node_create(ctx, JSON_ARRAY);
+    json_node_t *tail = NULL;
     json_skip_whitespace(ctx);
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
         ctx->pos++;
@@ -328,8 +329,13 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
             break;
         }
 
-        elem->next = root->next;
-        root->next = elem;
+        elem->next = NULL;
+        if (!tail) {
+            root->next = elem;
+        } else {
+            tail->next = elem;
+        }
+        tail = elem;
 
         json_skip_whitespace(ctx);
         if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ',') {

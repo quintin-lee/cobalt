@@ -343,21 +343,21 @@ void test_json_serialize_extended(void)
         json_destroy(null_node);
     }
 
-    /* Array serialization */
+    /* Array serialization preserves element order */
     json_node_t *arr = json_parse("[1, 2, 3]");
     if (arr) {
         char *arr_ser = json_serialize(arr);
-        TEST_ASSERT(arr_ser != NULL);
+        TEST_ASSERT(arr_ser != NULL && strcmp(arr_ser, "[1,2,3]") == 0);
         printf("  Serialize array: \"%s\" OK\n", arr_ser);
         free(arr_ser);
         json_destroy(arr);
     }
 
-    /* Object serialization */
+    /* Object serialization preserves key order */
     json_node_t *obj = json_parse("{\"name\": \"test\", \"value\": 42}");
     if (obj) {
         char *obj_ser = json_serialize(obj);
-        TEST_ASSERT(obj_ser != NULL);
+        TEST_ASSERT(obj_ser != NULL && strcmp(obj_ser, "{\"name\":\"test\",\"value\":42}") == 0);
         printf("  Serialize object: \"%s\" OK\n", obj_ser);
         free(obj_ser);
         json_destroy(obj);
@@ -466,7 +466,7 @@ void test_json_allocator(void)
     TEST_ASSERT(counter.alloc_count > 0);
 
     char *ser = json_serialize_with_alloc(root, alloc);
-    TEST_ASSERT(ser != NULL && strstr(ser, "\"tags\":[3,2,1]") != NULL);
+    TEST_ASSERT(ser != NULL && strstr(ser, "\"tags\":[1,2,3]") != NULL);
     cobalt_allocator_free(alloc, ser);
 
     json_destroy_with_alloc(root, alloc);
