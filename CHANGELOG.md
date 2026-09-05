@@ -1,6 +1,6 @@
 # Cobalt Change Log
 
-## Unreleased
+## v2.4.0 (2026-09-05) — Allocator Support, OOM Fixes & Test Cleanup Release
 
 ### Added
 - **JSON injectable allocator**: `cobalt_json_parse_with_alloc()`, `cobalt_json_serialize_with_alloc()`, and `cobalt_json_destroy_with_alloc()` for arena/custom-allocator support; `NULL` falls back to the system allocator and destroy must pair with the same allocator used at creation
