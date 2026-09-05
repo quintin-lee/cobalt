@@ -10,9 +10,12 @@
 
 /* Wrapper functions for system allocator vtable - self is ignored */
 
-/*
+/**
  * @brief System allocator - memory allocation
  * @details Directly calls standard library `malloc`
+ * @param self Allocator instance (ignored, required by the vtable signature)
+ * @param size Number of bytes to allocate
+ * @return Pointer to the allocated memory, or NULL on failure
  */
 static void *sys_alloc(cobalt_allocator_t *self, size_t size)
 {
@@ -20,9 +23,11 @@ static void *sys_alloc(cobalt_allocator_t *self, size_t size)
     return malloc(size);
 }
 
-/*
+/**
  * @brief System allocator - memory deallocation
  * @details Directly calls standard library `free`
+ * @param self Allocator instance (ignored, required by the vtable signature)
+ * @param ptr Pointer to the memory to free
  */
 static void sys_free(cobalt_allocator_t *self, void *ptr)
 {
@@ -30,9 +35,13 @@ static void sys_free(cobalt_allocator_t *self, void *ptr)
     free(ptr);
 }
 
-/*
+/**
  * @brief System allocator - memory reallocation
  * @details Directly calls standard library `realloc`
+ * @param self Allocator instance (ignored, required by the vtable signature)
+ * @param ptr Pointer to the memory to resize (may be NULL)
+ * @param new_size New size in bytes
+ * @return Pointer to the resized memory, or NULL on failure
  */
 static void *sys_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
 {
@@ -44,10 +53,11 @@ static void *sys_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
 static const cobalt_allocator_t system_allocator = {
     .alloc = sys_alloc, .free = sys_free, .realloc = sys_realloc};
 
-/*
+/**
  * @brief Get the system allocator instance
  * @details Returns a statically initialized system allocator pointer. The cast removes the const
  * qualifier to adapt to the interface specification.
+ * @return Pointer to the shared read-only system allocator
  */
 cobalt_allocator_t *cobalt_allocator_get_system(void)
 {
@@ -56,24 +66,33 @@ cobalt_allocator_t *cobalt_allocator_get_system(void)
 
 /* Allocator-specific allocation wrappers */
 
-/*
+/**
  * @brief Call the allocator's alloc method
+ * @param self Allocator instance
+ * @param size Number of bytes to allocate
+ * @return Pointer to the allocated memory, or NULL on failure
  */
 void *cobalt_allocator_alloc(cobalt_allocator_t *self, size_t size)
 {
     return self->alloc(self, size);
 }
 
-/*
+/**
  * @brief Call the allocator's free method
+ * @param self Allocator instance
+ * @param ptr Pointer to the memory to free
  */
 void cobalt_allocator_free(cobalt_allocator_t *self, void *ptr)
 {
     self->free(self, ptr);
 }
 
-/*
+/**
  * @brief Call the allocator's realloc method
+ * @param self Allocator instance
+ * @param ptr Pointer to the memory to resize (may be NULL)
+ * @param new_size New size in bytes
+ * @return Pointer to the resized memory, or NULL on failure
  */
 void *cobalt_allocator_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
 {

@@ -17,12 +17,27 @@ struct cobalt_pool {
     cobalt_allocator_t *alloc;     /**< Allocator instance */
 };
 
+/**
+ * @brief Create a fixed-size block pool using the system allocator
+ * @param block_size Size of each block in bytes
+ * @param block_count Number of blocks in the pool
+ * @return Pointer to the created pool, or NULL on failure
+ */
 cobalt_pool_t *cobalt_pool_create(size_t block_size, size_t block_count)
 {
     return cobalt_pool_create_with_allocator(
         block_size, block_count, cobalt_allocator_get_system());
 }
 
+/**
+ * @brief Create a fixed-size block pool with a custom backing allocator
+ * @details Block sizes smaller than a pointer are rounded up so the free-list link fits.
+ * The blocks are chained into a free-list up front.
+ * @param block_size Size of each block in bytes (must not be 0)
+ * @param block_count Number of blocks in the pool (must not be 0)
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Pointer to the created pool, or NULL on invalid arguments or allocation failure
+ */
 cobalt_pool_t *
 cobalt_pool_create_with_allocator(size_t block_size, size_t block_count, cobalt_allocator_t *alloc)
 {
@@ -63,6 +78,11 @@ cobalt_pool_create_with_allocator(size_t block_size, size_t block_count, cobalt_
     return pool;
 }
 
+/**
+ * @brief Destroy a pool and release its memory
+ * @details Does not track outstanding allocations; all blocks must be freed first
+ * @param pool Pointer to the pool; if NULL, no action is taken
+ */
 void cobalt_pool_destroy(cobalt_pool_t *pool)
 {
     if (!pool) {
@@ -72,6 +92,11 @@ void cobalt_pool_destroy(cobalt_pool_t *pool)
     pool->alloc->free(pool->alloc, pool);
 }
 
+/**
+ * @brief Allocate one zero-initialized block from the pool
+ * @param pool Pointer to the pool
+ * @return Pointer to the block, or NULL if the pool is NULL or exhausted
+ */
 void *cobalt_pool_alloc(cobalt_pool_t *pool)
 {
     if (!pool || pool->free_count == 0) {
@@ -88,6 +113,13 @@ void *cobalt_pool_alloc(cobalt_pool_t *pool)
     return block;
 }
 
+/**
+ * @brief Return a block to the pool
+ * @details Validates that the pointer falls inside the pool region and is block-aligned;
+ * foreign or misaligned pointers are silently ignored
+ * @param pool Pointer to the pool
+ * @param ptr Block to free; if NULL, no action is taken
+ */
 void cobalt_pool_free(cobalt_pool_t *pool, void *ptr)
 {
     if (!pool || !ptr) {
@@ -110,11 +142,21 @@ void cobalt_pool_free(cobalt_pool_t *pool, void *ptr)
     pool->free_count++;
 }
 
+/**
+ * @brief Check whether the pool has no free blocks left
+ * @param pool Pointer to the pool (NULL counts as full)
+ * @return 1 if full or NULL, 0 otherwise
+ */
 int cobalt_pool_is_full(const cobalt_pool_t *pool)
 {
     return pool ? (pool->free_count == 0) : 1;
 }
 
+/**
+ * @brief Get the number of currently free blocks
+ * @param pool Pointer to the pool (NULL yields 0)
+ * @return Number of free blocks
+ */
 size_t cobalt_pool_free_count(const cobalt_pool_t *pool)
 {
     return pool ? pool->free_count : 0;
