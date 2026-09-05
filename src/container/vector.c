@@ -74,9 +74,8 @@ static int vector_is_empty_seq(cobalt_sequence_t *self)
  * When the capacity is insufficient, it will automatically expand using a 2x strategy.
  * If memory allocation fails, the COBALT_ERROR_OUT_OF_MEMORY error will be set.
  */
-static void vector_add_seq(cobalt_sequence_t *self, void *item)
+static int vector_push_internal(cobalt_vector_impl_t *vec, void *item)
 {
-    cobalt_vector_impl_t *vec = (cobalt_vector_impl_t *)self;
     // Check if expansion is needed
     if (vec->size >= vec->capacity) {
         // Capacity doubling strategy; if current capacity is 0, initially allocate 1
@@ -85,13 +84,21 @@ static void vector_add_seq(cobalt_sequence_t *self, void *item)
             (void **)vec->alloc->realloc(vec->alloc, vec->items, new_cap * sizeof(void *));
         if (!new_items) {
             cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
-            return;
+            return -1;
         }
         vec->items    = new_items;
         vec->capacity = new_cap;
     }
     // Add element and update size
     vec->items[vec->size++] = item;
+    return 0;
+}
+
+static void vector_add_seq(cobalt_sequence_t *self, void *item)
+{
+    /* Sequence interface is void-returning (ABI); errors are signaled
+     * via cobalt_error_set and observable through vector size. */
+    (void)vector_push_internal((cobalt_vector_impl_t *)self, item);
 }
 
 /**
@@ -204,8 +211,7 @@ int cobalt_vector_push(cobalt_vector_t *vec, void *item)
     // Reuse the sequence interface addition logic.
     // The cast is safe: cobalt_vector_impl_t and struct cobalt_vector
     // share the same cobalt_sequence_t base at offset 0.
-    vector_add_seq((cobalt_sequence_t *)vec, item);
-    return 0;
+    return vector_push_internal((cobalt_vector_impl_t *)vec, item);
 }
 
 /**

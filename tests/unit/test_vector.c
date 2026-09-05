@@ -501,7 +501,7 @@ void test_vector_allocator_failure(void)
 
     mock_fail_next = 1;
     int ret = cobalt_vector_push(vec, &val);
-    TEST_ASSERT(ret == 0);
+    TEST_ASSERT(ret == -1);
     TEST_ASSERT(cobalt_vector_size(vec) == 2);
     printf("  Push with failing realloc: OK\n");
 
