@@ -224,6 +224,8 @@ static int equal_strcmp2(const void *a, const void *b, size_t len)
 }
 
 void test_hashmap_collision_stress(void);
+void test_hashmap_ext_int_keys(void);
+void test_hashmap_ext_null_callbacks(void);
 void test_hashmap_iterator(void);
 void test_hashmap_with_allocator(void);
 void test_hashmap_allocator_failure(void);
@@ -293,6 +295,8 @@ void test_hashmap(void)
     test_hashmap_single_element();
     test_hashmap_null_key();
     test_hashmap_overwrite_then_remove();
+    test_hashmap_ext_int_keys();
+    test_hashmap_ext_null_callbacks();
     test_hashmap_collision_stress();
     test_hashmap_set_funcs();
     test_hashmap_iterator();

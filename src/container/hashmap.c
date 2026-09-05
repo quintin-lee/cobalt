@@ -639,7 +639,7 @@ int cobalt_hashmap_remove_ext(cobalt_hashmap_t *map, const void *key, size_t key
         return -1;
     }
     hashmap_impl_t *impl = &map->impl;
-    unsigned int    idx  = node_hash(impl, key, key_len) % impl->bucket_count;
+    unsigned int    idx  = node_hash(impl, key, key_len) & (impl->bucket_count - 1);
 
     hashmap_node_t **prev = &impl->buckets[idx];
     hashmap_node_t  *node = *prev;
