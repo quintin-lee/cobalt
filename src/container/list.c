@@ -357,6 +357,7 @@ int cobalt_list_is_empty(const cobalt_list_t *list)
 typedef struct {
     cobalt_list_t      *list;    /**< The iterated list itself (currently unused) */
     cobalt_list_node_t *current; /**< Node currently pointed to */
+    cobalt_allocator_t *alloc;   /**< Allocator used for this iterator's memory */
 } list_iterator_impl_t;
 
 /**
@@ -389,7 +390,8 @@ static void *list_iterator_next(void *ctx)
 static void list_iterator_destroy(void *ctx)
 {
     if (ctx) {
-        free(ctx);
+        list_iterator_impl_t *impl = (list_iterator_impl_t *)ctx;
+        impl->alloc->free(impl->alloc, ctx);
     }
 }
 
@@ -409,22 +411,21 @@ cobalt_iterator_t *cobalt_list_iterator_create(cobalt_list_t *list)
         return NULL;
     }
 
-    cobalt_list_t        *impl      = list;
-    list_iterator_impl_t *iter_data = (list_iterator_impl_t *)cobalt_allocator_get_system()->alloc(
-        cobalt_allocator_get_system(), sizeof(list_iterator_impl_t));
+    cobalt_list_t        *impl  = list;
+    cobalt_allocator_t   *alloc = impl->alloc;
+    list_iterator_impl_t *iter_data =
+        (list_iterator_impl_t *)alloc->alloc(alloc, sizeof(list_iterator_impl_t));
     if (!iter_data) {
         return NULL;
     }
-
-    // Initialize iterator progress
+    iter_data->alloc   = alloc;
     iter_data->list    = impl;
     iter_data->current = impl->head;
 
     // Create common iterator structure and bind method table
-    cobalt_iterator_t *iter = (cobalt_iterator_t *)cobalt_allocator_get_system()->alloc(
-        cobalt_allocator_get_system(), sizeof(cobalt_iterator_t));
+    cobalt_iterator_t *iter = (cobalt_iterator_t *)alloc->alloc(alloc, sizeof(cobalt_iterator_t));
     if (!iter) {
-        free(iter_data);
+        alloc->free(alloc, iter_data);
         return NULL;
     }
 

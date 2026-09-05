@@ -635,6 +635,7 @@ static cobalt_map_iterator_t *treemap_map_iterator(cobalt_map_t *self)
     }
     iter->vtable = &treemap_map_iter_vtable;
     iter->data   = iter_state;
+    iter->alloc  = map->impl.alloc;
     return iter;
 }
 

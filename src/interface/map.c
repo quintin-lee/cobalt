@@ -57,7 +57,11 @@ void cobalt_map_iterator_destroy(cobalt_map_iterator_t *iter)
     if (iter->vtable && iter->vtable->destroy) {
         iter->vtable->destroy(iter->data);
     }
-    free(iter);
+    if (iter->alloc) {
+        iter->alloc->free(iter->alloc, iter);
+    } else {
+        free(iter);
+    }
 }
 
 /* -------------------------------------------------------------------------- */

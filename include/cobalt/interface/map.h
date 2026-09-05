@@ -9,6 +9,7 @@
  * embed this as their first member to support polymorphic map operations.
  */
 
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -74,7 +75,7 @@ typedef struct cobalt_map_iterator_vtable {
     int (*has_next)(void *ctx);
     /** Get the next key-value pair */
     cobalt_map_pair_t (*next)(void *ctx);
-    /** Destroy the iterator */
+    /** Destroy the iterator state (impl-specific data) */
     void (*destroy)(void *ctx);
 } cobalt_map_iterator_vtable_t;
 
@@ -86,6 +87,8 @@ struct cobalt_map_iterator {
     const cobalt_map_iterator_vtable_t *vtable;
     /** Iterator implementation-specific data */
     void *data;
+    /** Allocator used to create this iterator (used by the public destroy) */
+    cobalt_allocator_t *alloc;
 };
 
 /* -------------------------------------------------------------------------- */
