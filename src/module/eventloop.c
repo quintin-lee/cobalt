@@ -41,22 +41,28 @@
 /* -------------------------------------------------------------------------- */
 /* Internal types                                                             */
 /* -------------------------------------------------------------------------- */
+/**
+ * @brief Timer entry stored in the expiry min-heap
+ */
 typedef struct timer_entry {
-    uint64_t        timer_id;
-    uint64_t        timeout_ms;
-    uint64_t        interval_ms;
-    timer_handler_t callback;
-    void           *user_data;
-    int             active;
-    struct timespec next_fire;
+    uint64_t        timer_id;    /**< Unique id returned to the caller */
+    uint64_t        timeout_ms;  /**< Initial delay before first fire */
+    uint64_t        interval_ms; /**< Repeat interval (0 for one-shot) */
+    timer_handler_t callback;    /**< Function invoked on expiry */
+    void           *user_data;   /**< Opaque callback argument */
+    int             active;      /**< Non-zero while the timer is armed */
+    struct timespec next_fire;   /**< Absolute monotonic time of next fire */
 } timer_entry_t;
 
+/**
+ * @brief File descriptor registration in the fd list
+ */
 typedef struct fd_entry {
-    int              fd;
-    short            events;
-    fd_handler_t     callback;
-    void            *user_data;
-    struct fd_entry *next;
+    int              fd;        /**< Watched file descriptor */
+    short            events;    /**< Subscribed event mask */
+    fd_handler_t     callback;  /**< Function invoked on readiness */
+    void            *user_data; /**< Opaque callback argument */
+    struct fd_entry *next;      /**< Next registration in the list */
 } fd_entry_t;
 
 /* Signal ring buffer — async-signal-safe, fixed size */
@@ -66,16 +72,24 @@ static volatile sig_atomic_t g_signal_tail  = 0;
 static int                   g_signal_count = 0;
 
 /* Signal handler table (signum -> callback + user_data) */
+/**
+ * @brief Signal handler table entry mapping one signal to its callback
+ */
 typedef struct {
-    fd_handler_t callback;
-    void        *user_data;
-    int          signum;
-    int          active;
+    fd_handler_t callback;  /**< Function invoked on deferred dispatch */
+    void        *user_data; /**< Opaque callback argument */
+    int          signum;    /**< Signal number handled */
+    int          active;    /**< Non-zero while the slot is registered */
 } signal_handler_entry_t;
 
 #define COBALT_MAX_SIGNAL_HANDLERS 32
 static signal_handler_entry_t g_signal_table[COBALT_MAX_SIGNAL_HANDLERS];
 
+/**
+ * @brief Opaque event loop structure
+ * @details Owns the platform wait handle (epoll/kqueue/poll), the fd list,
+ *          the timer min-heap, and the signal dispatch table.
+ */
 struct cobalt_eventloop {
 #ifdef __linux__
     int                 epoll_fd;

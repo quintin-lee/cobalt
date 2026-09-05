@@ -8,13 +8,16 @@
 #include <stdint.h>
 #include <string.h>
 
+/**
+ * @brief Fixed-size block pool structure
+ */
 struct cobalt_pool {
-    size_t              block_size;
-    size_t              block_count;
-    size_t              free_count;
-    void               *memory;    /**< Contiguous block of memory */
-    void               *free_list; /**< Linked list of free blocks */
-    cobalt_allocator_t *alloc;     /**< Allocator instance */
+    size_t              block_size;  /**< Byte size of each block */
+    size_t              block_count; /**< Total number of blocks in the pool */
+    size_t              free_count;  /**< Number of currently unallocated blocks */
+    void               *memory;      /**< Contiguous block of memory */
+    void               *free_list;   /**< Linked list of free blocks */
+    cobalt_allocator_t *alloc;       /**< Allocator instance */
 };
 
 /**

@@ -28,6 +28,10 @@
 /* Mutex                                                                      */
 /* ========================================================================= */
 
+/**
+ * @brief Opaque mutex structure
+ * @details Wraps CRITICAL_SECTION on Windows, pthread_mutex_t otherwise.
+ */
 struct cobalt_mutex {
 #ifdef _WIN32
     CRITICAL_SECTION cs;
@@ -132,6 +136,10 @@ void cobalt_mutex_unlock(cobalt_mutex_t *m)
 /* Condition Variable                                                          */
 /* ========================================================================= */
 
+/**
+ * @brief Opaque condition variable structure
+ * @details Wraps an event plus mutex on Windows, pthread_cond_t otherwise.
+ */
 struct cobalt_cond {
 #ifdef _WIN32
     HANDLE          event;

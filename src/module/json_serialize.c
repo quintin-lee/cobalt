@@ -5,7 +5,9 @@
 #include "cobalt/memory/allocator.h"
 #include "cobalt/module/json.h"
 
-/* Opaque node structure — definition kept private to JSON module */
+/**
+ * @brief Opaque node structure — definition kept private to JSON module
+ */
 struct json_node {
     json_type_t       type;
     json_value_t      value;
