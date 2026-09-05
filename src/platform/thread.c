@@ -36,6 +36,10 @@ struct cobalt_mutex {
 #endif
 };
 
+/**
+ * @brief Create and initialize a mutex
+ * @return Pointer to the created mutex, or NULL on allocation or init failure
+ */
 cobalt_mutex_t *cobalt_mutex_create(void)
 {
     cobalt_mutex_t *m = (cobalt_mutex_t *)malloc(sizeof(cobalt_mutex_t));
@@ -53,6 +57,10 @@ cobalt_mutex_t *cobalt_mutex_create(void)
     return m;
 }
 
+/**
+ * @brief Destroy a mutex and release its resources
+ * @param m Pointer to the mutex; if NULL, no action is taken
+ */
 void cobalt_mutex_destroy(cobalt_mutex_t *m)
 {
     if (!m) {
@@ -66,6 +74,10 @@ void cobalt_mutex_destroy(cobalt_mutex_t *m)
     free(m);
 }
 
+/**
+ * @brief Lock a mutex, blocking until acquired
+ * @param m Pointer to the mutex; if NULL, no action is taken
+ */
 void cobalt_mutex_lock(cobalt_mutex_t *m)
 {
     if (!m) {
@@ -78,6 +90,11 @@ void cobalt_mutex_lock(cobalt_mutex_t *m)
 #endif
 }
 
+/**
+ * @brief Attempt to lock a mutex without blocking
+ * @param m Pointer to the mutex; if NULL, -1 is returned
+ * @return 0 on success, -1 if the mutex is already locked or unavailable
+ */
 int cobalt_mutex_trylock(cobalt_mutex_t *m)
 {
     if (!m) {
@@ -95,6 +112,10 @@ int cobalt_mutex_trylock(cobalt_mutex_t *m)
 #endif
 }
 
+/**
+ * @brief Unlock a mutex
+ * @param m Pointer to the mutex; if NULL, no action is taken
+ */
 void cobalt_mutex_unlock(cobalt_mutex_t *m)
 {
     if (!m) {
@@ -120,6 +141,10 @@ struct cobalt_cond {
 #endif
 };
 
+/**
+ * @brief Create and initialize a condition variable
+ * @return Pointer to the created condition variable, or NULL on failure
+ */
 cobalt_cond_t *cobalt_cond_create(void)
 {
     cobalt_cond_t *c = (cobalt_cond_t *)malloc(sizeof(cobalt_cond_t));
@@ -142,6 +167,10 @@ cobalt_cond_t *cobalt_cond_create(void)
     return c;
 }
 
+/**
+ * @brief Destroy a condition variable and release its resources
+ * @param c Pointer to the condition variable; if NULL, no action is taken
+ */
 void cobalt_cond_destroy(cobalt_cond_t *c)
 {
     if (!c) {
@@ -157,6 +186,12 @@ void cobalt_cond_destroy(cobalt_cond_t *c)
     free(c);
 }
 
+/**
+ * @brief Wait on a condition variable, releasing the mutex while blocked
+ * @details The mutex must be locked by the caller; it is re-acquired before returning
+ * @param c Pointer to the condition variable
+ * @param m Pointer to the associated mutex
+ */
 void cobalt_cond_wait(cobalt_cond_t *c, cobalt_mutex_t *m)
 {
     if (!c || !m) {
@@ -172,6 +207,10 @@ void cobalt_cond_wait(cobalt_cond_t *c, cobalt_mutex_t *m)
 #endif
 }
 
+/**
+ * @brief Wake one thread waiting on a condition variable
+ * @param c Pointer to the condition variable; if NULL, no action is taken
+ */
 void cobalt_cond_signal(cobalt_cond_t *c)
 {
     if (!c) {
@@ -184,6 +223,10 @@ void cobalt_cond_signal(cobalt_cond_t *c)
 #endif
 }
 
+/**
+ * @brief Wake all threads waiting on a condition variable
+ * @param c Pointer to the condition variable; if NULL, no action is taken
+ */
 void cobalt_cond_broadcast(cobalt_cond_t *c)
 {
     if (!c) {
@@ -200,6 +243,14 @@ void cobalt_cond_broadcast(cobalt_cond_t *c)
 #endif
 }
 
+/**
+ * @brief Wait on a condition variable with a timeout
+ * @details A negative timeout waits indefinitely; otherwise waits at most timeout_ms
+ * @param c Pointer to the condition variable
+ * @param m Pointer to the associated mutex
+ * @param timeout_ms Maximum wait time in milliseconds, or negative for no timeout
+ * @return 0 if signaled, -1 on timeout, invalid arguments, or wait failure
+ */
 int cobalt_cond_timedwait(cobalt_cond_t *c, cobalt_mutex_t *m, int64_t timeout_ms)
 {
     if (!c || !m) {
@@ -234,6 +285,11 @@ int cobalt_cond_timedwait(cobalt_cond_t *c, cobalt_mutex_t *m, int64_t timeout_m
 /* ========================================================================= */
 
 #ifdef _WIN32
+/**
+ * @brief Win32 thread entry trampoline (adapts cobalt_thread_fn_t to _beginthreadex)
+ * @param arg Thread function pointer passed through _beginthreadex
+ * @return Return value of the wrapped thread function
+ */
 static unsigned __stdcall thread_proxy(void *arg)
 {
     cobalt_thread_fn_t fn = (cobalt_thread_fn_t)arg;
@@ -241,6 +297,15 @@ static unsigned __stdcall thread_proxy(void *arg)
 }
 #endif
 
+/**
+ * @brief Create a new thread running the given function
+ * @details If out_handle is NULL the thread is detached; otherwise the caller must join it.
+ * On allocation failure after thread creation the new thread is detached to avoid leaking it.
+ * @param fn Thread entry function (must not be NULL)
+ * @param arg Argument passed to the thread function
+ * @param out_handle Optional output receiving the thread handle (may be NULL)
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_thread_create(cobalt_thread_fn_t fn, void *arg, cobalt_thread_t *out_handle)
 {
     if (!fn) {
@@ -276,6 +341,10 @@ int cobalt_thread_create(cobalt_thread_fn_t fn, void *arg, cobalt_thread_t *out_
 #endif
 }
 
+/**
+ * @brief Wait for a thread to finish and release its handle
+ * @param handle Thread handle from cobalt_thread_create; if NULL, no action is taken
+ */
 void cobalt_thread_join(cobalt_thread_t handle)
 {
     if (!handle) {
@@ -290,6 +359,9 @@ void cobalt_thread_join(cobalt_thread_t handle)
 #endif
 }
 
+/**
+ * @brief Yield the processor, allowing another thread to run
+ */
 void cobalt_thread_yield(void)
 {
 #ifdef _WIN32
@@ -299,6 +371,10 @@ void cobalt_thread_yield(void)
 #endif
 }
 
+/**
+ * @brief Get an identifier for the calling thread
+ * @return Opaque numeric thread identifier
+ */
 uintptr_t cobalt_thread_self(void)
 {
 #ifdef _WIN32

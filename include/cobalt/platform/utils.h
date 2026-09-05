@@ -189,11 +189,21 @@ static inline uint16_t cobalt_swap16(uint16_t val)
     return COBALT_BSWAP16(val);
 }
 
+/**
+ * @brief Convert between host and network byte order for 32-bit integers
+ * @param val  Value to convert
+ * @return     Byte-swapped value on little-endian, same value on big-endian
+ */
 static inline uint32_t cobalt_swap32(uint32_t val)
 {
     return COBALT_BSWAP32(val);
 }
 
+/**
+ * @brief Convert between host and network byte order for 64-bit integers
+ * @param val  Value to convert
+ * @return     Byte-swapped value on little-endian, same value on big-endian
+ */
 static inline uint64_t cobalt_swap64(uint64_t val)
 {
     return COBALT_BSWAP64(val);

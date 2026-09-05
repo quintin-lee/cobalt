@@ -7,10 +7,11 @@
 
 #include "cobalt/platform/platform.h"
 
-/*
+/**
  * @brief Get the ID of the currently running platform
  * @details Relies on preprocessor macros at compile time to determine the platform and returns the
  * corresponding enumerator.
+ * @return Platform identifier (1 for Windows, 2 for macOS, 3 for Linux by default)
  */
 cobalt_platform_id_t cobalt_platform_get_id(void)
 {
@@ -23,9 +24,10 @@ cobalt_platform_id_t cobalt_platform_get_id(void)
 #endif
 }
 
-/*
+/**
  * @brief Get the main platform handle
  * @details Returns NULL as no platform-specific handle is bound in this framework.
+ * @return Platform handle, currently always NULL (not implemented)
  */
 cobalt_platform_handle_t cobalt_platform_get_handle(void)
 {
