@@ -6,6 +6,14 @@
 #include <stddef.h>
 #include <string.h>
 
+/**
+ * @brief Test two elements for equality via a comparator
+ *
+ * @param a First element, NULL compares equal only to NULL
+ * @param b Second element
+ * @param comp Comparator returning 0 for equal elements
+ * @return Non-zero when equal, 0 otherwise
+ */
 int predicate_equal(const void *a, const void *b, compare_func_t comp)
 {
     if (!a || !b) {
@@ -14,21 +22,51 @@ int predicate_equal(const void *a, const void *b, compare_func_t comp)
     return comp(a, b) == 0;
 }
 
+/**
+ * @brief Test two elements for inequality via a comparator
+ *
+ * @param a First element
+ * @param b Second element
+ * @param comp Comparator returning 0 for equal elements
+ * @return Non-zero when not equal, 0 otherwise
+ */
 int predicate_not_equal(const void *a, const void *b, compare_func_t comp)
 {
     return !predicate_equal(a, b, comp);
 }
 
+/**
+ * @brief Test whether an element pointer is NULL
+ *
+ * @param item Element pointer to test
+ * @return Non-zero when item is NULL, 0 otherwise
+ */
 int predicate_null(const void *item)
 {
     return item == NULL;
 }
 
+/**
+ * @brief Test whether an element pointer is non-NULL
+ *
+ * @param item Element pointer to test
+ * @return Non-zero when item is not NULL, 0 otherwise
+ */
 int predicate_nonnull(const void *item)
 {
     return item != NULL;
 }
 
+/**
+ * @brief Binary-search a sorted array for a key
+ *
+ * @param key Key to search for
+ * @param base Pointer to the first array element
+ * @param nmemb Number of elements in the array
+ * @param size Size of each element in bytes
+ * @param compar Comparator establishing the sort order
+ * @return Pointer to the matching element, or NULL when not found or on invalid input
+ */
 void *
 cobalt_bsearch(const void *key, const void *base, size_t nmemb, size_t size, compare_func_t compar)
 {
@@ -57,6 +95,15 @@ cobalt_bsearch(const void *key, const void *base, size_t nmemb, size_t size, com
     return NULL;
 }
 
+/**
+ * @brief Find the first element satisfying a predicate
+ *
+ * @param base Pointer to the first array element
+ * @param nmemb Number of elements in the array
+ * @param size Size of each element in bytes
+ * @param pred Predicate selecting the wanted element
+ * @return Pointer to the first matching element, or NULL when none matches
+ */
 void *cobalt_find_if(const void *base, size_t nmemb, size_t size, predicate_func_t pred)
 {
     if (!base || nmemb == 0 || !pred) {
@@ -73,6 +120,14 @@ void *cobalt_find_if(const void *base, size_t nmemb, size_t size, predicate_func
     return NULL;
 }
 
+/**
+ * @brief Apply an operation to every array element in order
+ *
+ * @param base Pointer to the first array element
+ * @param nmemb Number of elements in the array
+ * @param size Size of each element in bytes
+ * @param op Operation applied to each element
+ */
 void cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func_t op)
 {
     if (!base || nmemb == 0 || !op) {
@@ -85,6 +140,17 @@ void cobalt_for_each(const void *base, size_t nmemb, size_t size, operation_func
     }
 }
 
+/**
+ * @brief Transform each input element into the output array
+ *
+ * @param input Pointer to the first input element
+ * @param output Pointer to the first output element
+ * @param nmemb Number of elements to transform
+ * @param size Size of each element in bytes
+ * @param fn Mapping applied to each element pair
+ * @param user_data Opaque context forwarded to fn
+ * @return 0 on success, -1 on invalid input
+ */
 int cobalt_map(
     const void *input, void *output, size_t nmemb, size_t size, map_func_t fn, void *user_data)
 {
@@ -100,6 +166,16 @@ int cobalt_map(
     return 0;
 }
 
+/**
+ * @brief Copy elements satisfying a predicate, compacting in place-safe order
+ *
+ * @param input Pointer to the first input element
+ * @param output Destination buffer (may overlap input for in-place filtering)
+ * @param nmemb On entry the input count, on exit the number of kept elements
+ * @param size Size of each element in bytes
+ * @param pred Predicate selecting kept elements
+ * @return 0 on success, -1 on invalid input
+ */
 int cobalt_filter(
     const void *input, void *output, size_t *nmemb, size_t size, predicate_func_t pred)
 {
@@ -124,6 +200,17 @@ int cobalt_filter(
     return 0;
 }
 
+/**
+ * @brief Reduce array elements into a single accumulator value
+ *
+ * @param input Pointer to the first input element
+ * @param nmemb Number of elements to fold
+ * @param size Size of each element in bytes
+ * @param initial Starting accumulator value (returned untouched on invalid input)
+ * @param fn Folding function combining accumulator with each element
+ * @param user_data Opaque context forwarded to fn
+ * @return Final accumulator value
+ */
 void *cobalt_fold(
     const void *input, size_t nmemb, size_t size, void *initial, fold_func_t fn, void *user_data)
 {
