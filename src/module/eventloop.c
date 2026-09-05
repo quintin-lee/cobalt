@@ -433,7 +433,7 @@ static int platform_mod_fd(cobalt_eventloop_t *loop, int fd, short events)
     return epoll_ctl(loop->epoll_fd, EPOLL_CTL_MOD, fd, &ev);
 #elif __APPLE__
     struct kevent kev;
-    EV_SET(&kev, fd, EVFILT_READ, EV_CHANGE, 0, 0, NULL);
+    EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
 #else
     if (fd < 0 || fd >= loop->pollfds_capacity) {
