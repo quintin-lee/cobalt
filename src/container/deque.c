@@ -36,24 +36,44 @@ struct cobalt_deque {
 /* Sequence Interface vtable                                                 */
 /* ========================================================================= */
 
+/**
+ * @brief report element count through sequence interface slot
+ * @param self sequence interface pointer
+ * @return number of elements
+ */
 static size_t deque_size_seq(cobalt_sequence_t *self)
 {
     cobalt_deque_t *deque = (cobalt_deque_t *)self;
     return deque->size;
 }
 
+/**
+ * @brief report emptiness through sequence interface slot
+ * @param self sequence interface pointer
+ * @return nonzero when deque holds no elements
+ */
 static int deque_is_empty_seq(cobalt_sequence_t *self)
 {
     cobalt_deque_t *deque = (cobalt_deque_t *)self;
     return deque->size == 0;
 }
 
+/**
+ * @brief append element through sequence interface slot
+ * @param self sequence interface pointer
+ * @param item element to append at back
+ */
 static void deque_add_seq(cobalt_sequence_t *self, void *item)
 {
     cobalt_deque_t *deque = (cobalt_deque_t *)self;
     cobalt_deque_push_back(deque, item);
 }
 
+/**
+ * @brief remove first matching element through sequence interface slot
+ * @param self sequence interface pointer
+ * @param item element pointer to remove by identity
+ */
 static void deque_remove_seq(cobalt_sequence_t *self, void *item)
 {
     cobalt_deque_t *deque = (cobalt_deque_t *)self;
@@ -81,6 +101,13 @@ static void deque_remove_seq(cobalt_sequence_t *self, void *item)
     }
 }
 
+/**
+ * @brief fetch element by index through sequence interface slot
+ * @param self sequence interface pointer
+ * @param index position to fetch
+ * @return element pointer, or NULL when index out of range
+ * @note traverses from closer end for shorter walk
+ */
 static void *deque_get_at_index_seq(cobalt_sequence_t *self, size_t index)
 {
     cobalt_deque_t *deque = (cobalt_deque_t *)self;
@@ -102,6 +129,11 @@ static void *deque_get_at_index_seq(cobalt_sequence_t *self, size_t index)
     return node->data;
 }
 
+/**
+ * @brief create iterator through sequence interface slot
+ * @param self sequence interface pointer
+ * @return new iterator over deque elements
+ */
 static cobalt_iterator_t *deque_iterator_seq(cobalt_sequence_t *self)
 {
     return cobalt_iterator_new(self);

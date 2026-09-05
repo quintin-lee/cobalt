@@ -30,6 +30,13 @@ struct cobalt_set {
 /* Map vtable (set-specific)                                                */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief look up membership sentinel through map interface slot
+ * @param self map interface pointer
+ * @param key element pointer
+ * @param key_len element length
+ * @return sentinel pointer when member, NULL otherwise
+ */
 static void *set_map_get(cobalt_map_t *self, const void *key, size_t key_len)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
@@ -39,6 +46,14 @@ static void *set_map_get(cobalt_map_t *self, const void *key, size_t key_len)
     return NULL;
 }
 
+/**
+ * @brief insert element through map interface slot
+ * @param self map interface pointer
+ * @param key element pointer
+ * @param key_len element length
+ * @param value unused value slot
+ * @return 0 on success, -1 on failure
+ */
 static int set_map_put(cobalt_map_t *self, const void *key, size_t key_len, void *value)
 {
     (void)value;
@@ -47,18 +62,37 @@ static int set_map_put(cobalt_map_t *self, const void *key, size_t key_len, void
     return (ret == 0) ? 0 : -1;
 }
 
+/**
+ * @brief remove element through map interface slot
+ * @param self map interface pointer
+ * @param key element pointer
+ * @param key_len element length
+ * @return 0 on success, -1 when element absent
+ */
 static int set_map_remove(cobalt_map_t *self, const void *key, size_t key_len)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
     return cobalt_hashmap_remove_ext(set->map, key, key_len);
 }
 
+/**
+ * @brief test membership through map interface slot
+ * @param self map interface pointer
+ * @param key element pointer
+ * @param key_len element length
+ * @return nonzero when element is a member
+ */
 static int set_map_contains(cobalt_map_t *self, const void *key, size_t key_len)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
     return cobalt_hashmap_get_ext(set->map, key, key_len) != NULL;
 }
 
+/**
+ * @brief drop all elements through map interface slot
+ * @param self map interface pointer
+ * @note rebuilds backing map, reports allocation failure via error stack
+ */
 static void set_map_clear(cobalt_map_t *self)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
@@ -69,24 +103,43 @@ static void set_map_clear(cobalt_map_t *self)
     }
 }
 
+/**
+ * @brief report member count through map interface slot
+ * @param self map interface pointer
+ * @return number of members
+ */
 static size_t set_map_size(cobalt_map_t *self)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
     return cobalt_hashmap_size(set->map);
 }
 
+/**
+ * @brief report emptiness through map interface slot
+ * @param self map interface pointer
+ * @return nonzero when set holds no members
+ */
 static int set_map_is_empty(cobalt_map_t *self)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
     return cobalt_hashmap_size(set->map) == 0;
 }
 
+/**
+ * @brief create member iterator through map interface slot
+ * @param self map interface pointer
+ * @return new iterator, or NULL on allocation failure
+ */
 static cobalt_map_iterator_t *set_map_iterator(cobalt_map_t *self)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
     return cobalt_hashmap_iterator_create(set->map);
 }
 
+/**
+ * @brief destroy set through map interface slot
+ * @param self map interface pointer
+ */
 static void set_map_destroy(cobalt_map_t *self)
 {
     cobalt_set_t *set = (cobalt_set_t *)self;
@@ -109,11 +162,22 @@ static const cobalt_map_t set_map_vtable = {
 /* Public API                                                                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief create empty set using system allocator
+ * @param initial_capacity backing map bucket hint
+ * @return new set, or NULL on allocation failure
+ */
 cobalt_set_t *cobalt_set_create(size_t initial_capacity)
 {
     return cobalt_set_create_with_allocator(initial_capacity, cobalt_allocator_get_system());
 }
 
+/**
+ * @brief create empty set using given allocator
+ * @param initial_capacity backing map bucket hint
+ * @param alloc allocator backing set and map
+ * @return new set, or NULL on allocation failure
+ */
 cobalt_set_t *cobalt_set_create_with_allocator(size_t initial_capacity, cobalt_allocator_t *alloc)
 {
     if (!alloc) {
@@ -134,6 +198,13 @@ cobalt_set_t *cobalt_set_create_with_allocator(size_t initial_capacity, cobalt_a
     return set;
 }
 
+/**
+ * @brief create empty set with custom hash and equality functions
+ * @param initial_capacity backing map bucket hint
+ * @param hash_func element hash function
+ * @param equal_func element equality function
+ * @return new set, or NULL on allocation failure
+ */
 cobalt_set_t *cobalt_set_create_ext(size_t                  initial_capacity,
                                     cobalt_set_hash_func_t  hash_func,
                                     cobalt_set_equal_func_t equal_func)
@@ -142,6 +213,14 @@ cobalt_set_t *cobalt_set_create_ext(size_t                  initial_capacity,
         initial_capacity, hash_func, equal_func, cobalt_allocator_get_system());
 }
 
+/**
+ * @brief create empty set with custom callbacks and allocator
+ * @param initial_capacity backing map bucket hint
+ * @param hash_func element hash function
+ * @param equal_func element equality function
+ * @param alloc allocator backing set and map
+ * @return new set, or NULL on allocation failure
+ */
 cobalt_set_t *cobalt_set_create_ext_with_allocator(size_t                  initial_capacity,
                                                    cobalt_set_hash_func_t  hash_func,
                                                    cobalt_set_equal_func_t equal_func,
@@ -166,6 +245,10 @@ cobalt_set_t *cobalt_set_create_ext_with_allocator(size_t                  initi
     return set;
 }
 
+/**
+ * @brief destroy set and release backing map
+ * @param set set to destroy, NULL is no-op
+ */
 void cobalt_set_destroy(cobalt_set_t *set)
 {
     if (set) {
@@ -174,6 +257,12 @@ void cobalt_set_destroy(cobalt_set_t *set)
     }
 }
 
+/**
+ * @brief insert string element into set
+ * @param set set instance
+ * @param item string element to insert
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_set_insert(cobalt_set_t *set, void *item)
 {
     if (!set || !item) {
@@ -182,6 +271,13 @@ int cobalt_set_insert(cobalt_set_t *set, void *item)
     return cobalt_hashmap_put(set->map, (const char *)item, item) == 0 ? 0 : -1;
 }
 
+/**
+ * @brief insert binary element of given length into set
+ * @param set set instance
+ * @param item element bytes to insert
+ * @param item_len element length in bytes
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_set_insert_ext(cobalt_set_t *set, const void *item, size_t item_len)
 {
     if (!set || !item) {
@@ -190,6 +286,12 @@ int cobalt_set_insert_ext(cobalt_set_t *set, const void *item, size_t item_len)
     return cobalt_hashmap_put_ext(set->map, item, item_len, (void *)item) == 0 ? 0 : -1;
 }
 
+/**
+ * @brief remove string element from set
+ * @param set set instance
+ * @param item string element to remove
+ * @return 0 on success, -1 when element absent
+ */
 int cobalt_set_remove(cobalt_set_t *set, void *item)
 {
     if (!set || !item) {
@@ -198,6 +300,13 @@ int cobalt_set_remove(cobalt_set_t *set, void *item)
     return cobalt_hashmap_remove(set->map, (const char *)item) == 0 ? 0 : -1;
 }
 
+/**
+ * @brief remove binary element of given length from set
+ * @param set set instance
+ * @param item element bytes to remove
+ * @param item_len element length in bytes
+ * @return 0 on success, -1 when element absent
+ */
 int cobalt_set_remove_ext(cobalt_set_t *set, const void *item, size_t item_len)
 {
     if (!set || !item) {
@@ -206,6 +315,12 @@ int cobalt_set_remove_ext(cobalt_set_t *set, const void *item, size_t item_len)
     return cobalt_hashmap_remove_ext(set->map, item, item_len) == 0 ? 0 : -1;
 }
 
+/**
+ * @brief test whether string element is a member
+ * @param set set instance
+ * @param item string element to test
+ * @return nonzero when member, zero otherwise
+ */
 int cobalt_set_contains(cobalt_set_t *set, void *item)
 {
     if (!set || !item) {
@@ -214,6 +329,13 @@ int cobalt_set_contains(cobalt_set_t *set, void *item)
     return cobalt_hashmap_get(set->map, (const char *)item) != NULL;
 }
 
+/**
+ * @brief test whether binary element of given length is a member
+ * @param set set instance
+ * @param item element bytes to test
+ * @param item_len element length in bytes
+ * @return nonzero when member, zero otherwise
+ */
 int cobalt_set_contains_ext(cobalt_set_t *set, const void *item, size_t item_len)
 {
     if (!set || !item) {
@@ -222,11 +344,21 @@ int cobalt_set_contains_ext(cobalt_set_t *set, const void *item, size_t item_len
     return cobalt_hashmap_get_ext(set->map, item, item_len) != NULL;
 }
 
+/**
+ * @brief report number of members in set
+ * @param set set instance
+ * @return member count, zero for NULL set
+ */
 size_t cobalt_set_size(const cobalt_set_t *set)
 {
     return set ? cobalt_hashmap_size(set->map) : 0;
 }
 
+/**
+ * @brief report whether set holds no members
+ * @param set set instance
+ * @return nonzero when empty, zero otherwise
+ */
 int cobalt_set_is_empty(const cobalt_set_t *set)
 {
     return set ? cobalt_hashmap_size(set->map) == 0 : 1;

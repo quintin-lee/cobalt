@@ -18,11 +18,22 @@ struct cobalt_tsvector {
     cobalt_vector_t *vec;
 };
 
+/**
+ * @brief create thread-safe vector using system allocator
+ * @param initial_capacity backing vector capacity hint
+ * @return new wrapper, or NULL on allocation failure
+ */
 cobalt_tsvector_t *cobalt_tsvector_create(size_t initial_capacity)
 {
     return cobalt_tsvector_create_with_allocator(initial_capacity, cobalt_allocator_get_system());
 }
 
+/**
+ * @brief create thread-safe vector using given allocator
+ * @param initial_capacity backing vector capacity hint
+ * @param alloc allocator backing wrapper and vector
+ * @return new wrapper, or NULL on allocation failure
+ */
 cobalt_tsvector_t *cobalt_tsvector_create_with_allocator(size_t              initial_capacity,
                                                          cobalt_allocator_t *alloc)
 {
@@ -48,6 +59,10 @@ cobalt_tsvector_t *cobalt_tsvector_create_with_allocator(size_t              ini
     return ts;
 }
 
+/**
+ * @brief destroy wrapper, vector and mutex
+ * @param vec wrapper to destroy, NULL is no-op
+ */
 void cobalt_tsvector_destroy(cobalt_tsvector_t *vec)
 {
     if (!vec) {
@@ -59,6 +74,12 @@ void cobalt_tsvector_destroy(cobalt_tsvector_t *vec)
     alloc->free(alloc, vec);
 }
 
+/**
+ * @brief append item under lock
+ * @param vec wrapper instance
+ * @param item element to append
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsvector_push(cobalt_tsvector_t *vec, void *item)
 {
     if (!vec) {
@@ -71,6 +92,12 @@ int cobalt_tsvector_push(cobalt_tsvector_t *vec, void *item)
     return ret;
 }
 
+/**
+ * @brief fetch element by index under lock
+ * @param vec wrapper instance
+ * @param index position to fetch
+ * @return element pointer, or NULL when index out of range
+ */
 void *cobalt_tsvector_get(const cobalt_tsvector_t *vec, size_t index)
 {
     if (!vec) {
@@ -82,6 +109,13 @@ void *cobalt_tsvector_get(const cobalt_tsvector_t *vec, size_t index)
     return item;
 }
 
+/**
+ * @brief replace element at index under lock
+ * @param vec wrapper instance
+ * @param index position to overwrite
+ * @param item new element pointer
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsvector_set(cobalt_tsvector_t *vec, size_t index, void *item)
 {
     if (!vec) {
@@ -93,6 +127,11 @@ int cobalt_tsvector_set(cobalt_tsvector_t *vec, size_t index, void *item)
     return ret;
 }
 
+/**
+ * @brief remove element at index under lock
+ * @param vec wrapper instance
+ * @param index position to remove
+ */
 void cobalt_tsvector_remove_at(cobalt_tsvector_t *vec, size_t index)
 {
     if (!vec) {
@@ -103,6 +142,11 @@ void cobalt_tsvector_remove_at(cobalt_tsvector_t *vec, size_t index)
     cobalt_mutex_unlock(vec->mutex);
 }
 
+/**
+ * @brief report element count under lock
+ * @param vec wrapper instance
+ * @return number of elements, zero for NULL wrapper
+ */
 size_t cobalt_tsvector_size(const cobalt_tsvector_t *vec)
 {
     if (!vec) {
@@ -114,6 +158,11 @@ size_t cobalt_tsvector_size(const cobalt_tsvector_t *vec)
     return sz;
 }
 
+/**
+ * @brief report emptiness under lock
+ * @param vec wrapper instance
+ * @return nonzero when empty, zero otherwise
+ */
 int cobalt_tsvector_is_empty(const cobalt_tsvector_t *vec)
 {
     if (!vec) {
@@ -125,6 +174,11 @@ int cobalt_tsvector_is_empty(const cobalt_tsvector_t *vec)
     return empty;
 }
 
+/**
+ * @brief report backing capacity under lock
+ * @param vec wrapper instance
+ * @return capacity, zero for NULL wrapper
+ */
 size_t cobalt_tsvector_capacity(const cobalt_tsvector_t *vec)
 {
     if (!vec) {
@@ -136,6 +190,12 @@ size_t cobalt_tsvector_capacity(const cobalt_tsvector_t *vec)
     return cap;
 }
 
+/**
+ * @brief preallocate capacity under lock
+ * @param vec wrapper instance
+ * @param n minimum capacity to reserve
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsvector_reserve(cobalt_tsvector_t *vec, size_t n)
 {
     if (!vec) {
@@ -147,6 +207,11 @@ int cobalt_tsvector_reserve(cobalt_tsvector_t *vec, size_t n)
     return ret;
 }
 
+/**
+ * @brief release spare capacity under lock
+ * @param vec wrapper instance
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tsvector_shrink_to_fit(cobalt_tsvector_t *vec)
 {
     if (!vec) {
@@ -167,11 +232,22 @@ struct cobalt_tshashmap {
     cobalt_hashmap_t *map;
 };
 
+/**
+ * @brief create thread-safe hash map using system allocator
+ * @param initial_buckets backing map bucket hint
+ * @return new wrapper, or NULL on allocation failure
+ */
 cobalt_tshashmap_t *cobalt_tshashmap_create(size_t initial_buckets)
 {
     return cobalt_tshashmap_create_with_allocator(initial_buckets, cobalt_allocator_get_system());
 }
 
+/**
+ * @brief create thread-safe hash map using given allocator
+ * @param initial_buckets backing map bucket hint
+ * @param alloc allocator backing wrapper and map
+ * @return new wrapper, or NULL on allocation failure
+ */
 cobalt_tshashmap_t *cobalt_tshashmap_create_with_allocator(size_t              initial_buckets,
                                                            cobalt_allocator_t *alloc)
 {
@@ -197,6 +273,10 @@ cobalt_tshashmap_t *cobalt_tshashmap_create_with_allocator(size_t              i
     return ts;
 }
 
+/**
+ * @brief destroy wrapper, map and mutex
+ * @param map wrapper to destroy, NULL is no-op
+ */
 void cobalt_tshashmap_destroy(cobalt_tshashmap_t *map)
 {
     if (!map) {
@@ -208,6 +288,13 @@ void cobalt_tshashmap_destroy(cobalt_tshashmap_t *map)
     alloc->free(alloc, map);
 }
 
+/**
+ * @brief insert or replace value under lock
+ * @param map wrapper instance
+ * @param key string key to copy
+ * @param value value pointer to store
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tshashmap_put(cobalt_tshashmap_t *map, const char *key, void *value)
 {
     if (!map || !key) {
@@ -220,6 +307,12 @@ int cobalt_tshashmap_put(cobalt_tshashmap_t *map, const char *key, void *value)
     return ret;
 }
 
+/**
+ * @brief look up value under lock
+ * @param map wrapper instance
+ * @param key string key to search
+ * @return value pointer, or NULL when absent
+ */
 void *cobalt_tshashmap_get(const cobalt_tshashmap_t *map, const char *key)
 {
     if (!map || !key) {
@@ -231,6 +324,12 @@ void *cobalt_tshashmap_get(const cobalt_tshashmap_t *map, const char *key)
     return val;
 }
 
+/**
+ * @brief remove entry under lock
+ * @param map wrapper instance
+ * @param key string key to remove
+ * @return 0 on success, -1 when key absent
+ */
 int cobalt_tshashmap_remove(cobalt_tshashmap_t *map, const char *key)
 {
     if (!map || !key) {
@@ -242,6 +341,12 @@ int cobalt_tshashmap_remove(cobalt_tshashmap_t *map, const char *key)
     return ret;
 }
 
+/**
+ * @brief test key presence under lock
+ * @param map wrapper instance
+ * @param key string key to test
+ * @return nonzero when key exists, zero otherwise
+ */
 int cobalt_tshashmap_contains(const cobalt_tshashmap_t *map, const char *key)
 {
     if (!map || !key) {
@@ -253,6 +358,11 @@ int cobalt_tshashmap_contains(const cobalt_tshashmap_t *map, const char *key)
     return found;
 }
 
+/**
+ * @brief report entry count under lock
+ * @param map wrapper instance
+ * @return number of entries, zero for NULL wrapper
+ */
 size_t cobalt_tshashmap_size(const cobalt_tshashmap_t *map)
 {
     if (!map) {
@@ -264,6 +374,11 @@ size_t cobalt_tshashmap_size(const cobalt_tshashmap_t *map)
     return sz;
 }
 
+/**
+ * @brief report backing bucket count under lock
+ * @param map wrapper instance
+ * @return bucket count, zero for NULL wrapper
+ */
 size_t cobalt_tshashmap_capacity(const cobalt_tshashmap_t *map)
 {
     if (!map) {
@@ -284,11 +399,20 @@ struct cobalt_tslist {
     cobalt_list_t  *list;
 };
 
+/**
+ * @brief create thread-safe list using system allocator
+ * @return new wrapper, or NULL on allocation failure
+ */
 cobalt_tslist_t *cobalt_tslist_create(void)
 {
     return cobalt_tslist_create_with_allocator(cobalt_allocator_get_system());
 }
 
+/**
+ * @brief create thread-safe list using given allocator
+ * @param alloc allocator backing wrapper and list
+ * @return new wrapper, or NULL on allocation failure
+ */
 cobalt_tslist_t *cobalt_tslist_create_with_allocator(cobalt_allocator_t *alloc)
 {
     if (!alloc) {
@@ -313,6 +437,10 @@ cobalt_tslist_t *cobalt_tslist_create_with_allocator(cobalt_allocator_t *alloc)
     return ts;
 }
 
+/**
+ * @brief destroy wrapper, list and mutex
+ * @param list wrapper to destroy, NULL is no-op
+ */
 void cobalt_tslist_destroy(cobalt_tslist_t *list)
 {
     if (!list) {
@@ -324,6 +452,12 @@ void cobalt_tslist_destroy(cobalt_tslist_t *list)
     alloc->free(alloc, list);
 }
 
+/**
+ * @brief push item at front under lock
+ * @param list wrapper instance
+ * @param item element to prepend
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tslist_push_front(cobalt_tslist_t *list, void *item)
 {
     if (!list) {
@@ -335,6 +469,12 @@ int cobalt_tslist_push_front(cobalt_tslist_t *list, void *item)
     return ret;
 }
 
+/**
+ * @brief push item at back under lock
+ * @param list wrapper instance
+ * @param item element to append
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tslist_push_back(cobalt_tslist_t *list, void *item)
 {
     if (!list) {
@@ -346,6 +486,11 @@ int cobalt_tslist_push_back(cobalt_tslist_t *list, void *item)
     return ret;
 }
 
+/**
+ * @brief pop front item under lock
+ * @param list wrapper instance
+ * @return front element, or NULL when empty
+ */
 void *cobalt_tslist_pop_front(cobalt_tslist_t *list)
 {
     if (!list) {
@@ -357,6 +502,11 @@ void *cobalt_tslist_pop_front(cobalt_tslist_t *list)
     return item;
 }
 
+/**
+ * @brief pop back item under lock
+ * @param list wrapper instance
+ * @return back element, or NULL when empty
+ */
 void *cobalt_tslist_pop_back(cobalt_tslist_t *list)
 {
     if (!list) {
@@ -368,6 +518,12 @@ void *cobalt_tslist_pop_back(cobalt_tslist_t *list)
     return item;
 }
 
+/**
+ * @brief fetch element by index under lock
+ * @param list wrapper instance
+ * @param index position to fetch
+ * @return element pointer, or NULL when index out of range
+ */
 void *cobalt_tslist_get(const cobalt_tslist_t *list, size_t index)
 {
     if (!list) {
@@ -379,6 +535,12 @@ void *cobalt_tslist_get(const cobalt_tslist_t *list, size_t index)
     return item;
 }
 
+/**
+ * @brief remove element at index under lock
+ * @param list wrapper instance
+ * @param index position to remove
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_tslist_remove_at(cobalt_tslist_t *list, size_t index)
 {
     if (!list) {
@@ -390,6 +552,11 @@ int cobalt_tslist_remove_at(cobalt_tslist_t *list, size_t index)
     return ret;
 }
 
+/**
+ * @brief report element count under lock
+ * @param list wrapper instance
+ * @return number of elements, zero for NULL wrapper
+ */
 size_t cobalt_tslist_size(const cobalt_tslist_t *list)
 {
     if (!list) {
@@ -401,6 +568,11 @@ size_t cobalt_tslist_size(const cobalt_tslist_t *list)
     return sz;
 }
 
+/**
+ * @brief report emptiness under lock
+ * @param list wrapper instance
+ * @return nonzero when empty, zero otherwise
+ */
 int cobalt_tslist_is_empty(const cobalt_tslist_t *list)
 {
     if (!list) {
