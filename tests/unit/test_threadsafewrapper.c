@@ -511,6 +511,18 @@ void test_threadsafewrapper_treemap_stress(void)
         pthread_join(threads[i], NULL);
     }
 
+    /* Clean up: release all allocated value pointers */
+    for (int t = 0; t < TS_THREAD_COUNT; t++) {
+        for (int i = 0; i < TS_ITERATIONS; i++) {
+            char key[64];
+            snprintf(key, sizeof(key), "tmkey_%d_%d", t + 1, i);
+            int *val = (int *)cobalt_tstreemap_get(tm, key);
+            if (val) {
+                free(val);
+            }
+        }
+    }
+
     TEST_ASSERT(cobalt_tstreemap_size(tm) > 0);
     cobalt_tstreemap_destroy(tm);
     printf("  Thread-safe treemap stress: OK\n");
