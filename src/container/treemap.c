@@ -49,11 +49,26 @@ rb_node_create_ext(treemap_impl_t *impl, const void *key, void *value, int owned
 /* Node helpers                                                               */
 /* ========================================================================= */
 
+/**
+ * @brief allocate node with owned copy of string key
+ * @param impl tree state holding allocator
+ * @param key string key to duplicate
+ * @param value value pointer to store
+ * @return new node, or NULL on allocation failure
+ */
 static treemap_node_t *rb_node_create(treemap_impl_t *impl, const char *key, void *value)
 {
     return rb_node_create_ext(impl, key, value, 1);
 }
 
+/**
+ * @brief allocate node with optional key ownership
+ * @param impl tree state holding allocator
+ * @param key key pointer to store or duplicate
+ * @param value value pointer to store
+ * @param owned nonzero to duplicate key, zero to borrow pointer
+ * @return new node, or NULL on allocation failure
+ */
 static treemap_node_t *
 rb_node_create_ext(treemap_impl_t *impl, const void *key, void *value, int owned)
 {
@@ -83,6 +98,11 @@ rb_node_create_ext(treemap_impl_t *impl, const void *key, void *value, int owned
     return node;
 }
 
+/**
+ * @brief release node and owned key back to allocator
+ * @param impl tree state holding allocator
+ * @param node node to free
+ */
 static void rb_node_free(treemap_impl_t *impl, treemap_node_t *node)
 {
     if (!node || !impl) {
@@ -94,6 +114,11 @@ static void rb_node_free(treemap_impl_t *impl, treemap_node_t *node)
     impl->alloc->free(impl->alloc, node);
 }
 
+/**
+ * @brief recursively free subtree in post order
+ * @param impl tree state holding allocator
+ * @param node subtree root to destroy
+ */
 static void rb_destroy_tree(treemap_impl_t *impl, treemap_node_t *node)
 {
     if (!node || !impl) {
@@ -108,6 +133,11 @@ static void rb_destroy_tree(treemap_impl_t *impl, treemap_node_t *node)
 /* Rotations — both take the full impl so they can update the root pointer   */
 /* ========================================================================= */
 
+/**
+ * @brief rotate subtree left around node
+ * @param tree tree state whose root pointer may change
+ * @param x rotation pivot
+ */
 static void rb_rotate_left(treemap_impl_t *tree, treemap_node_t *x)
 {
     treemap_node_t *y = x->right;
@@ -127,6 +157,11 @@ static void rb_rotate_left(treemap_impl_t *tree, treemap_node_t *x)
     x->parent = y;
 }
 
+/**
+ * @brief rotate subtree right around node
+ * @param tree tree state whose root pointer may change
+ * @param x rotation pivot
+ */
 static void rb_rotate_right(treemap_impl_t *tree, treemap_node_t *x)
 {
     treemap_node_t *y = x->left;
@@ -150,6 +185,11 @@ static void rb_rotate_right(treemap_impl_t *tree, treemap_node_t *x)
 /* Insert fixup                                                               */
 /* ========================================================================= */
 
+/**
+ * @brief restore red-black invariants after insertion
+ * @param tree tree state whose root pointer may change
+ * @param z newly inserted node
+ */
 static void rb_insert_fixup(treemap_impl_t *tree, treemap_node_t *z)
 {
     while (z->parent && z->parent->color == RB_RED) {
@@ -190,6 +230,12 @@ static void rb_insert_fixup(treemap_impl_t *tree, treemap_node_t *z)
     tree->root->color = RB_BLACK;
 }
 
+/**
+ * @brief insert node into binary search position and rebalance
+ * @param tree tree state to modify
+ * @param z node to insert
+ * @note duplicate key updates stored value and discards new node
+ */
 static void rb_insert(treemap_impl_t *tree, treemap_node_t *z)
 {
     treemap_node_t *y = NULL;
@@ -228,6 +274,12 @@ static void rb_insert(treemap_impl_t *tree, treemap_node_t *z)
 /* Delete fixup                                                               */
 /* ========================================================================= */
 
+/**
+ * @brief transplant subtree replacing old node with new node
+ * @param tree tree state whose root pointer may change
+ * @param old_node node being removed
+ * @param new_node replacement subtree, may be NULL
+ */
 static void rb_replace(treemap_impl_t *tree, treemap_node_t *old_node, treemap_node_t *new_node)
 {
     if (!old_node->parent) {
@@ -242,6 +294,11 @@ static void rb_replace(treemap_impl_t *tree, treemap_node_t *old_node, treemap_n
     }
 }
 
+/**
+ * @brief restore red-black invariants after deletion
+ * @param tree tree state whose root pointer may change
+ * @param x child that replaced removed black node, may be NULL
+ */
 static void rb_delete_fixup(treemap_impl_t *tree, treemap_node_t *x)
 {
     while (x && x != tree->root && x->color == RB_BLACK) {
@@ -310,6 +367,11 @@ static void rb_delete_fixup(treemap_impl_t *tree, treemap_node_t *x)
     }
 }
 
+/**
+ * @brief unlink node from tree, rebalance and free it
+ * @param tree tree state to modify
+ * @param z node to delete, must belong to tree
+ */
 static void rb_delete(treemap_impl_t *tree, treemap_node_t *z)
 {
     treemap_node_t *y                = z;
@@ -357,6 +419,13 @@ static void rb_delete(treemap_impl_t *tree, treemap_node_t *z)
 /* Find helpers                                                               */
 /* ========================================================================= */
 
+/**
+ * @brief compare two keys with custom comparator or strcmp fallback
+ * @param impl tree state holding optional comparator
+ * @param a first key
+ * @param b second key
+ * @return negative if a < b, zero if equal, positive if a > b
+ */
 static int rb_compare(const treemap_impl_t *impl, const void *a, const void *b)
 {
     if (impl->compare_func) {
@@ -365,6 +434,13 @@ static int rb_compare(const treemap_impl_t *impl, const void *a, const void *b)
     return strcmp((const char *)a, (const char *)b);
 }
 
+/**
+ * @brief search subtree for node holding key
+ * @param node subtree root to search
+ * @param key key to find
+ * @param impl tree state holding comparator
+ * @return matching node, or NULL when absent
+ */
 static treemap_node_t *rb_find(treemap_node_t *node, const void *key, const treemap_impl_t *impl)
 {
     while (node) {
@@ -380,6 +456,11 @@ static treemap_node_t *rb_find(treemap_node_t *node, const void *key, const tree
     return NULL;
 }
 
+/**
+ * @brief descend to leftmost node of subtree
+ * @param node subtree root to search
+ * @return minimum node, or NULL for empty subtree
+ */
 static treemap_node_t *rb_find_min(treemap_node_t *node)
 {
     while (node && node->left) {
@@ -388,6 +469,11 @@ static treemap_node_t *rb_find_min(treemap_node_t *node)
     return node;
 }
 
+/**
+ * @brief descend to rightmost node of subtree
+ * @param node subtree root to search
+ * @return maximum node, or NULL for empty subtree
+ */
 static treemap_node_t *rb_find_max(treemap_node_t *node)
 {
     while (node && node->right) {
@@ -409,6 +495,12 @@ typedef struct {
     cobalt_allocator_t *alloc;
 } treemap_map_iter_t;
 
+/**
+ * @brief push node onto iterator traversal stack growing it as needed
+ * @param iter iterator holding stack
+ * @param node node to push
+ * @note marks iterator finished when stack growth fails
+ */
 static void stack_push(treemap_map_iter_t *iter, treemap_node_t *node)
 {
     if (iter->stack_top == iter->stack_cap) {
@@ -425,12 +517,22 @@ static void stack_push(treemap_map_iter_t *iter, treemap_node_t *node)
     iter->stack[iter->stack_top++] = node;
 }
 
+/**
+ * @brief report whether iterator has remaining pairs
+ * @param ctx iterator state
+ * @return nonzero while pairs remain
+ */
 static int treemap_map_iter_has_next(void *ctx)
 {
     treemap_map_iter_t *iter = (treemap_map_iter_t *)ctx;
     return !iter->finished;
 }
 
+/**
+ * @brief yield next key-value pair in sorted key order
+ * @param ctx iterator state
+ * @return next pair, or empty pair when exhausted
+ */
 static cobalt_map_pair_t treemap_map_iter_next(void *ctx)
 {
     treemap_map_iter_t *iter = (treemap_map_iter_t *)ctx;
@@ -470,6 +572,10 @@ static cobalt_map_pair_t treemap_map_iter_next(void *ctx)
     return pair;
 }
 
+/**
+ * @brief release iterator stack and state
+ * @param ctx iterator state to destroy
+ */
 static void treemap_map_iter_destroy(void *ctx)
 {
     if (ctx) {
@@ -485,6 +591,11 @@ static const cobalt_map_iterator_vtable_t treemap_map_iter_vtable = {
     .destroy  = treemap_map_iter_destroy,
 };
 
+/**
+ * @brief create in-order iterator over map entries
+ * @param self map interface pointer
+ * @return new iterator, or NULL on allocation failure
+ */
 static cobalt_map_iterator_t *treemap_map_iterator(cobalt_map_t *self)
 {
     cobalt_treemap_t *map = (cobalt_treemap_t *)self;
@@ -518,6 +629,13 @@ static cobalt_map_iterator_t *treemap_map_iterator(cobalt_map_t *self)
 /* Map interface functions                                                  */
 /* ========================================================================= */
 
+/**
+ * @brief look up value through map interface slot
+ * @param self map interface pointer
+ * @param key key pointer
+ * @param key_len unused key length
+ * @return value pointer, or NULL when absent
+ */
 static void *treemap_map_get(cobalt_map_t *self, const void *key, size_t key_len)
 {
     (void)key_len;
@@ -525,6 +643,14 @@ static void *treemap_map_get(cobalt_map_t *self, const void *key, size_t key_len
     return cobalt_treemap_get(map, (const char *)key);
 }
 
+/**
+ * @brief insert value through map interface slot
+ * @param self map interface pointer
+ * @param key key pointer
+ * @param key_len unused key length
+ * @param value value pointer to store
+ * @return 0 on success, -1 on failure
+ */
 static int treemap_map_put(cobalt_map_t *self, const void *key, size_t key_len, void *value)
 {
     (void)key_len;
@@ -532,6 +658,13 @@ static int treemap_map_put(cobalt_map_t *self, const void *key, size_t key_len, 
     return cobalt_treemap_put(map, (const char *)key, value);
 }
 
+/**
+ * @brief remove entry through map interface slot
+ * @param self map interface pointer
+ * @param key key pointer
+ * @param key_len unused key length
+ * @return 0 on success, -1 when key absent
+ */
 static int treemap_map_remove(cobalt_map_t *self, const void *key, size_t key_len)
 {
     (void)key_len;
@@ -539,24 +672,45 @@ static int treemap_map_remove(cobalt_map_t *self, const void *key, size_t key_le
     return cobalt_treemap_remove(map, (const char *)key);
 }
 
+/**
+ * @brief report entry count through map interface slot
+ * @param self map interface pointer
+ * @return number of entries
+ */
 static size_t treemap_map_size(cobalt_map_t *self)
 {
     cobalt_treemap_t *map = (cobalt_treemap_t *)self;
     return cobalt_treemap_size(map);
 }
 
+/**
+ * @brief report emptiness through map interface slot
+ * @param self map interface pointer
+ * @return nonzero when map holds no entries
+ */
 static int treemap_map_is_empty(cobalt_map_t *self)
 {
     cobalt_treemap_t *map = (cobalt_treemap_t *)self;
     return cobalt_treemap_size(map) == 0;
 }
 
+/**
+ * @brief destroy map through map interface slot
+ * @param self map interface pointer
+ */
 static void treemap_map_destroy(cobalt_map_t *self)
 {
     cobalt_treemap_t *map = (cobalt_treemap_t *)self;
     cobalt_treemap_destroy(map);
 }
 
+/**
+ * @brief test key presence through map interface slot
+ * @param self map interface pointer
+ * @param key key pointer
+ * @param key_len unused key length
+ * @return nonzero when key exists
+ */
 static int treemap_map_contains(cobalt_map_t *self, const void *key, size_t key_len)
 {
     (void)key_len;
@@ -564,6 +718,10 @@ static int treemap_map_contains(cobalt_map_t *self, const void *key, size_t key_
     return rb_find(map->impl.root, key, &map->impl) != NULL;
 }
 
+/**
+ * @brief remove all entries through map interface slot
+ * @param self map interface pointer
+ */
 static void treemap_map_clear(cobalt_map_t *self)
 {
     cobalt_treemap_t *map = (cobalt_treemap_t *)self;
@@ -608,11 +766,20 @@ cobalt_map_iterator_t *cobalt_treemap_iterator_create(cobalt_treemap_t *map)
 /* ========================================================================= */
 
 cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc);
+/**
+ * @brief create empty tree map using system allocator
+ * @return new map, or NULL on allocation failure
+ */
 cobalt_treemap_t *cobalt_treemap_create(void)
 {
     return cobalt_treemap_create_with_allocator(cobalt_allocator_get_system());
 }
 
+/**
+ * @brief create empty tree map with custom key comparator
+ * @param compare_func comparator used instead of strcmp, may be NULL
+ * @return new map, or NULL on allocation failure
+ */
 cobalt_treemap_t *cobalt_treemap_create_ext(cobalt_compare_func_t compare_func)
 {
     cobalt_treemap_t *map = cobalt_treemap_create();
@@ -623,6 +790,11 @@ cobalt_treemap_t *cobalt_treemap_create_ext(cobalt_compare_func_t compare_func)
     return map;
 }
 
+/**
+ * @brief create empty tree map using given allocator
+ * @param alloc allocator backing map and nodes
+ * @return new map, or NULL on allocation failure
+ */
 cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc)
 {
     if (!alloc) {
@@ -641,6 +813,10 @@ cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc
     return map;
 }
 
+/**
+ * @brief destroy map and release all nodes
+ * @param map map to destroy, NULL is no-op
+ */
 void cobalt_treemap_destroy(cobalt_treemap_t *map)
 {
     if (!map) {
@@ -652,6 +828,13 @@ void cobalt_treemap_destroy(cobalt_treemap_t *map)
     map->impl.alloc->free(map->impl.alloc, map);
 }
 
+/**
+ * @brief insert or replace value stored under key
+ * @param map tree map instance
+ * @param key string key to copy
+ * @param value value pointer to store
+ * @return 0 on success, -1 on failure
+ */
 int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value)
 {
     if (!map || !key) {
@@ -670,6 +853,12 @@ int cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value)
     return 0;
 }
 
+/**
+ * @brief look up value stored under key
+ * @param map tree map instance
+ * @param key string key to search
+ * @return value pointer, or NULL when absent
+ */
 void *cobalt_treemap_get(const cobalt_treemap_t *map, const char *key)
 {
     if (!map || !key) {
@@ -679,6 +868,12 @@ void *cobalt_treemap_get(const cobalt_treemap_t *map, const char *key)
     return node ? node->value : NULL;
 }
 
+/**
+ * @brief remove entry stored under key
+ * @param map tree map instance
+ * @param key string key to remove
+ * @return 0 on success, -1 when key absent
+ */
 int cobalt_treemap_remove(cobalt_treemap_t *map, const char *key)
 {
     if (!map || !key) {
@@ -692,6 +887,11 @@ int cobalt_treemap_remove(cobalt_treemap_t *map, const char *key)
     return 0;
 }
 
+/**
+ * @brief fetch smallest key in sorted order
+ * @param map tree map instance
+ * @return smallest key, or NULL when map is empty
+ */
 const char *cobalt_treemap_min_key(cobalt_treemap_t *map)
 {
     if (!map || !map->impl.root) {
@@ -701,6 +901,11 @@ const char *cobalt_treemap_min_key(cobalt_treemap_t *map)
     return node ? node->key : NULL;
 }
 
+/**
+ * @brief fetch largest key in sorted order
+ * @param map tree map instance
+ * @return largest key, or NULL when map is empty
+ */
 const char *cobalt_treemap_max_key(cobalt_treemap_t *map)
 {
     if (!map || !map->impl.root) {
@@ -710,6 +915,11 @@ const char *cobalt_treemap_max_key(cobalt_treemap_t *map)
     return node ? node->key : NULL;
 }
 
+/**
+ * @brief report number of entries in map
+ * @param map tree map instance
+ * @return entry count, zero for NULL map
+ */
 size_t cobalt_treemap_size(const cobalt_treemap_t *map)
 {
     return map ? map->impl.size : 0;
