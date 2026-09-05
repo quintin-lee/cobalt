@@ -85,6 +85,7 @@ void cobalt_stable_sort(void *base, size_t nmemb, size_t size, compare_func_t co
  * @param nmemb Number of elements
  * @param size Element size in bytes
  * @param pivot Value to partition around
+ * @param compar Comparison function
  * @return Index of the first element in the "greater-or-equal" partition
  * @note After partitioning, all elements < pivot are before the returned index,
  *       and all elements >= pivot are at or after it. Order within partitions is undefined.

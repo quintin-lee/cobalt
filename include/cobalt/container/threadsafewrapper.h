@@ -14,7 +14,6 @@
  *       use a higher-level coordination strategy.
  *
  * @defgroup ThreadSafeContainers Thread-Safe Containers
- * @ingroup Containers
  * @{
  */
 

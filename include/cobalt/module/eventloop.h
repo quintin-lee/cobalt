@@ -48,6 +48,11 @@ typedef struct cobalt_eventloop cobalt_eventloop_t;
  * @return Returns a pointer to the event loop object on success, NULL on failure
  */
 cobalt_eventloop_t *cobalt_eventloop_create(void);
+/**
+ * @brief Create a new event loop with a custom allocator
+ * @param alloc Allocator used for the loop and all internal structures
+ * @return Returns a pointer to the event loop object on success, NULL on failure
+ */
 cobalt_eventloop_t *cobalt_eventloop_create_with_allocator(cobalt_allocator_t *alloc);
 
 /**
