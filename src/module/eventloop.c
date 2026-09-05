@@ -24,6 +24,8 @@
 #include <sys/event.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#elif defined(_WIN32)
+/* MinGW does not provide poll.h; Windows backend is not supported. */
 #else
 #include <poll.h>
 #include <sys/socket.h>
