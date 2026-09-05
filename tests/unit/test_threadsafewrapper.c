@@ -297,6 +297,268 @@ void test_threadsafewrapper_list_stress(void)
     printf("  Thread-safe list stress: OK\n");
 }
 
+/* ======================================================================== */
+/* Concurrency helpers                                                       */
+/* ======================================================================== */
+
+typedef struct {
+    cobalt_tsdeque_t *dq;
+    int               tid;
+} ts_deque_ctx_t;
+
+static void *ts_deque_stress(void *arg)
+{
+    ts_deque_ctx_t *ctx = (ts_deque_ctx_t *)arg;
+    cobalt_tsdeque_t *dq = ctx->dq;
+    int tid = ctx->tid;
+    free(ctx);
+    for (int i = 0; i < TS_ITERATIONS; i++) {
+        int *val = (int *)malloc(sizeof(int));
+        if (!val) break;
+        *val = i + tid * TS_ITERATIONS;
+        if (i % 3 == 0) {
+            cobalt_tsdeque_push_front(dq, val);
+        } else {
+            cobalt_tsdeque_push_back(dq, val);
+        }
+        if (cobalt_tsdeque_size(dq) > TS_ITERATIONS) {
+            int *p = (int *)cobalt_tsdeque_pop_front(dq);
+            if (p) free(p);
+            p = (int *)cobalt_tsdeque_pop_back(dq);
+            if (p) free(p);
+        }
+    }
+    return NULL;
+}
+
+void test_threadsafewrapper_deque_stress(void)
+{
+    printf("Testing thread-safe deque stress (%d threads x %d iters)...\n",
+           TS_THREAD_COUNT, TS_ITERATIONS);
+    cobalt_tsdeque_t *dq = cobalt_tsdeque_create();
+    TEST_ASSERT(dq != NULL);
+
+    pthread_t threads[TS_THREAD_COUNT];
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        ts_deque_ctx_t *ctx = (ts_deque_ctx_t *)malloc(sizeof(ts_deque_ctx_t));
+        TEST_ASSERT(ctx != NULL);
+        ctx->dq = dq;
+        ctx->tid = i + 1;
+        TEST_ASSERT(pthread_create(&threads[i], NULL, ts_deque_stress, ctx) == 0);
+    }
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    size_t sz = cobalt_tsdeque_size(dq);
+    TEST_ASSERT(sz <= (size_t)TS_THREAD_COUNT * TS_ITERATIONS);
+    while (cobalt_tsdeque_size(dq) > 0) {
+        int *p = (int *)cobalt_tsdeque_pop_front(dq);
+        if (p) free(p);
+    }
+    cobalt_tsdeque_destroy(dq);
+    printf("  Thread-safe deque stress: OK\n");
+}
+
+typedef struct {
+    cobalt_tsqueue_t *q;
+    int               tid;
+} ts_queue_ctx_t;
+
+static void *ts_queue_stress(void *arg)
+{
+    ts_queue_ctx_t *ctx = (ts_queue_ctx_t *)arg;
+    cobalt_tsqueue_t *q = ctx->q;
+    int tid = ctx->tid;
+    free(ctx);
+    for (int i = 0; i < TS_ITERATIONS; i++) {
+        int *val = (int *)malloc(sizeof(int));
+        if (!val) break;
+        *val = i + tid * TS_ITERATIONS;
+        cobalt_tsqueue_enqueue(q, val);
+        if (cobalt_tsqueue_size(q) > TS_ITERATIONS / 2) {
+            int *p = (int *)cobalt_tsqueue_dequeue(q);
+            if (p) free(p);
+        }
+    }
+    return NULL;
+}
+
+void test_threadsafewrapper_queue_stress(void)
+{
+    printf("Testing thread-safe queue stress (%d threads x %d iters)...\n",
+           TS_THREAD_COUNT, TS_ITERATIONS);
+    cobalt_tsqueue_t *q = cobalt_tsqueue_create();
+    TEST_ASSERT(q != NULL);
+
+    pthread_t threads[TS_THREAD_COUNT];
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        ts_queue_ctx_t *ctx = (ts_queue_ctx_t *)malloc(sizeof(ts_queue_ctx_t));
+        TEST_ASSERT(ctx != NULL);
+        ctx->q = q;
+        ctx->tid = i + 1;
+        TEST_ASSERT(pthread_create(&threads[i], NULL, ts_queue_stress, ctx) == 0);
+    }
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    while (cobalt_tsqueue_size(q) > 0) {
+        int *p = (int *)cobalt_tsqueue_dequeue(q);
+        if (p) free(p);
+    }
+    cobalt_tsqueue_destroy(q);
+    printf("  Thread-safe queue stress: OK\n");
+}
+
+typedef struct {
+    cobalt_tsstack_t *stk;
+    int               tid;
+} ts_stack_ctx_t;
+
+static void *ts_stack_stress(void *arg)
+{
+    ts_stack_ctx_t *ctx = (ts_stack_ctx_t *)arg;
+    cobalt_tsstack_t *stk = ctx->stk;
+    int tid = ctx->tid;
+    free(ctx);
+    for (int i = 0; i < TS_ITERATIONS; i++) {
+        int *val = (int *)malloc(sizeof(int));
+        if (!val) break;
+        *val = i + tid * TS_ITERATIONS;
+        cobalt_tsstack_push(stk, val);
+        if (cobalt_tsstack_size(stk) > TS_ITERATIONS) {
+            int *p = (int *)cobalt_tsstack_pop(stk);
+            if (p) free(p);
+        }
+    }
+    return NULL;
+}
+
+void test_threadsafewrapper_stack_stress(void)
+{
+    printf("Testing thread-safe stack stress (%d threads x %d iters)...\n",
+           TS_THREAD_COUNT, TS_ITERATIONS);
+    cobalt_tsstack_t *stk = cobalt_tsstack_create();
+    TEST_ASSERT(stk != NULL);
+
+    pthread_t threads[TS_THREAD_COUNT];
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        ts_stack_ctx_t *ctx = (ts_stack_ctx_t *)malloc(sizeof(ts_stack_ctx_t));
+        TEST_ASSERT(ctx != NULL);
+        ctx->stk = stk;
+        ctx->tid = i + 1;
+        TEST_ASSERT(pthread_create(&threads[i], NULL, ts_stack_stress, ctx) == 0);
+    }
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    while (cobalt_tsstack_size(stk) > 0) {
+        int *p = (int *)cobalt_tsstack_pop(stk);
+        if (p) free(p);
+    }
+    cobalt_tsstack_destroy(stk);
+    printf("  Thread-safe stack stress: OK\n");
+}
+
+typedef struct {
+    cobalt_tstreemap_t *tm;
+    int                 tid;
+} ts_treemap_ctx_t;
+
+static void *ts_treemap_stress(void *arg)
+{
+    ts_treemap_ctx_t   *ctx = (ts_treemap_ctx_t *)arg;
+    cobalt_tstreemap_t *tm  = ctx->tm;
+    int                 tid = ctx->tid;
+    free(ctx);
+    for (int i = 0; i < TS_ITERATIONS; i++) {
+        char key[64];
+        snprintf(key, sizeof(key), "tmkey_%d_%d", tid, i);
+        int *val = (int *)malloc(sizeof(int));
+        if (!val) break;
+        *val = i;
+        cobalt_tstreemap_put(tm, key, val);
+        cobalt_tstreemap_get(tm, key);
+        if (i % 7 == 0) {
+            cobalt_tstreemap_remove(tm, key);
+        }
+    }
+    return NULL;
+}
+
+void test_threadsafewrapper_treemap_stress(void)
+{
+    printf("Testing thread-safe treemap stress (%d threads x %d iters)...\n",
+           TS_THREAD_COUNT, TS_ITERATIONS);
+    cobalt_tstreemap_t *tm = cobalt_tstreemap_create();
+    TEST_ASSERT(tm != NULL);
+
+    pthread_t threads[TS_THREAD_COUNT];
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        ts_treemap_ctx_t *ctx = (ts_treemap_ctx_t *)malloc(sizeof(ts_treemap_ctx_t));
+        TEST_ASSERT(ctx != NULL);
+        ctx->tm = tm;
+        ctx->tid = i + 1;
+        TEST_ASSERT(pthread_create(&threads[i], NULL, ts_treemap_stress, ctx) == 0);
+    }
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    TEST_ASSERT(cobalt_tstreemap_size(tm) > 0);
+    cobalt_tstreemap_destroy(tm);
+    printf("  Thread-safe treemap stress: OK\n");
+}
+
+typedef struct {
+    cobalt_tsset_t *ss;
+    int             tid;
+} ts_set_ctx_t;
+
+static void *ts_set_stress(void *arg)
+{
+    ts_set_ctx_t *ctx = (ts_set_ctx_t *)arg;
+    cobalt_tsset_t *ss = ctx->ss;
+    int tid = ctx->tid;
+    free(ctx);
+    for (int i = 0; i < TS_ITERATIONS; i++) {
+        char item[64];
+        snprintf(item, sizeof(item), "item_%d_%d", tid, i);
+        cobalt_tsset_insert(ss, item);
+        cobalt_tsset_contains(ss, item);
+        if (i % 5 == 0) {
+            cobalt_tsset_remove(ss, item);
+        }
+    }
+    return NULL;
+}
+
+void test_threadsafewrapper_set_stress(void)
+{
+    printf("Testing thread-safe set stress (%d threads x %d iters)...\n",
+           TS_THREAD_COUNT, TS_ITERATIONS);
+    cobalt_tsset_t *ss = cobalt_tsset_create(64);
+    TEST_ASSERT(ss != NULL);
+
+    pthread_t threads[TS_THREAD_COUNT];
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        ts_set_ctx_t *ctx = (ts_set_ctx_t *)malloc(sizeof(ts_set_ctx_t));
+        TEST_ASSERT(ctx != NULL);
+        ctx->ss = ss;
+        ctx->tid = i + 1;
+        TEST_ASSERT(pthread_create(&threads[i], NULL, ts_set_stress, ctx) == 0);
+    }
+    for (int i = 0; i < TS_THREAD_COUNT; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    TEST_ASSERT(cobalt_tsset_size(ss) > 0);
+    cobalt_tsset_destroy(ss);
+    printf("  Thread-safe set stress: OK\n");
+}
+
 void test_threadsafewrapper(void)
 {
     printf("Testing thread-safe wrappers...\n");
@@ -307,6 +569,11 @@ void test_threadsafewrapper(void)
     test_threadsafewrapper_hashmap_null();
     test_threadsafewrapper_list_basic();
     test_threadsafewrapper_list_null();
+    test_threadsafewrapper_deque_stress();
+    test_threadsafewrapper_queue_stress();
+    test_threadsafewrapper_stack_stress();
+    test_threadsafewrapper_treemap_stress();
+    test_threadsafewrapper_set_stress();
     test_threadsafewrapper_vector_stress();
     test_threadsafewrapper_hashmap_stress();
     test_threadsafewrapper_list_stress();
