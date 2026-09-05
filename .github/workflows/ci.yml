@@ -249,6 +249,8 @@ jobs:
         with:
           name: abi-snapshot
           path: .abi-current.txt
+
+  valgrind:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
