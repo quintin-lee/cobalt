@@ -212,6 +212,10 @@ void json_destroy_with_alloc(json_node_t *node, cobalt_allocator_t *alloc)
     cobalt_allocator_free(alloc, node);
 }
 
+/**
+ * @brief Destroy a JSON node tree allocated with the system allocator
+ * @param node JSON node to destroy (see json_destroy_with_alloc)
+ */
 void json_destroy(json_node_t *node)
 {
     json_destroy_with_alloc(node, NULL);

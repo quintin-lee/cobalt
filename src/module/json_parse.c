@@ -28,16 +28,19 @@ typedef struct {
     cobalt_allocator_t *alloc; /**< Resolved allocator (never NULL after entry) */
 } json_parse_ctx_t;
 
+/** @brief Allocate parser memory via the context's resolved allocator. */
 static void *jalloc(json_parse_ctx_t *ctx, size_t size)
 {
     return cobalt_allocator_alloc(ctx->alloc, size);
 }
 
+/** @brief Release parser memory via the context's resolved allocator. */
 static void jfree(json_parse_ctx_t *ctx, void *ptr)
 {
     cobalt_allocator_free(ctx->alloc, ptr);
 }
 
+/** @brief Resize parser memory via the context's resolved allocator. */
 static void *jrealloc(json_parse_ctx_t *ctx, void *ptr, size_t new_size)
 {
     return cobalt_allocator_realloc(ctx->alloc, ptr, new_size);
@@ -55,6 +58,12 @@ static void json_skip_whitespace(json_parse_ctx_t *ctx)
     }
 }
 
+/**
+ * @brief Create a zero-initialized node of the given type
+ * @param ctx Parse context supplying the allocator
+ * @param type Node type to create
+ * @return New node on success, NULL on allocation failure
+ */
 static json_node_t *json_node_create(json_parse_ctx_t *ctx, json_type_t type)
 {
     json_node_t *node = jalloc(ctx, sizeof(json_node_t));
@@ -406,6 +415,11 @@ json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc)
     return json_parse_value(&ctx);
 }
 
+/**
+ * @brief Parse a JSON string with the system allocator
+ * @param text Null-terminated JSON formatted text
+ * @return Root node on success, NULL on failure (see json_parse_with_alloc)
+ */
 json_node_t *json_parse(const char *text)
 {
     return json_parse_with_alloc(text, NULL);

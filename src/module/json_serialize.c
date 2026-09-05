@@ -17,6 +17,10 @@ struct json_node {
 #include <stdlib.h>
 #include <string.h>
 
+/**
+ * @brief Grow the output buffer so it holds at least @p need bytes
+ * @return 0 on success (or when already large enough), -1 on allocation failure
+ */
 static int ensure_capacity(char **buf, size_t *cap, size_t need, cobalt_allocator_t *alloc)
 {
     if (need > *cap) {
@@ -31,6 +35,10 @@ static int ensure_capacity(char **buf, size_t *cap, size_t need, cobalt_allocato
     return 0;
 }
 
+/**
+ * @brief Append printf-formatted output to the buffer, growing it as needed
+ * @return 0 on success, -1 on format or allocation failure
+ */
 static int
 json_append(char **buf, size_t *cap, size_t *len, cobalt_allocator_t *alloc, const char *fmt, ...)
 {
@@ -62,6 +70,7 @@ json_append(char **buf, size_t *cap, size_t *len, cobalt_allocator_t *alloc, con
     return 0;
 }
 
+/** @brief Duplicate a string with the given allocator; NULL on failure. */
 static char *jstrdup(cobalt_allocator_t *alloc, const char *s)
 {
     size_t len = strlen(s) + 1;
@@ -72,6 +81,13 @@ static char *jstrdup(cobalt_allocator_t *alloc, const char *s)
     return dup;
 }
 
+/**
+ * @brief Escape a raw string into its JSON representation
+ * @param s Raw bytes to escape (may contain quotes, backslashes, controls)
+ * @param len Number of bytes to read from @p s
+ * @param alloc Allocator for the escaped output; NULL on allocation failure
+ * @return Newly allocated escaped string, NULL on allocation failure
+ */
 static char *json_escape(const char *s, size_t len, cobalt_allocator_t *alloc)
 {
     size_t out = 0;
@@ -131,6 +147,12 @@ static char *json_escape(const char *s, size_t len, cobalt_allocator_t *alloc)
     return result;
 }
 
+/**
+ * @brief Shared serialization worker used by both public entry points
+ * @param node Subtree to serialize (NULL yields "null")
+ * @param alloc Resolved allocator, never NULL (callers resolve NULL to system)
+ * @return Newly allocated JSON string; "{}" fallback when the buffer itself fails
+ */
 static char *json_serialize_impl(json_node_t *node, cobalt_allocator_t *alloc)
 {
     if (!node) {
@@ -235,6 +257,11 @@ char *json_serialize_with_alloc(json_node_t *node, cobalt_allocator_t *alloc)
     return json_serialize_impl(node, alloc);
 }
 
+/**
+ * @brief Serialize a JSON node tree with the system allocator
+ * @param node Root node of the JSON node tree
+ * @return Dynamically allocated JSON string (see json_serialize_with_alloc)
+ */
 char *json_serialize(json_node_t *node)
 {
     return json_serialize_with_alloc(node, NULL);
