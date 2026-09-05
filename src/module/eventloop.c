@@ -796,6 +796,15 @@ int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
     if (!loop || fd < 0 || !callback) {
         return -1;
     }
+    {
+        const fd_entry_t *entry = loop->fd_head;
+        while (entry) {
+            if (entry->fd == fd) {
+                return -1;
+            }
+            entry = entry->next;
+        }
+    }
     if (platform_add_fd(loop, (int)fd, (short)events) < 0) {
         return -1;
     }
