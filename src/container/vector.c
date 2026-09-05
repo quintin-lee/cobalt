@@ -94,10 +94,17 @@ static int vector_push_internal(cobalt_vector_impl_t *vec, void *item)
     return 0;
 }
 
+/**
+ * @brief Add an element to the sequence (Sequence interface implementation)
+ * @param self Sequence base class pointer
+ * @param item Pointer to the element to be added
+ *
+ * Thin wrapper over vector_push_internal. The Sequence interface slot is
+ * void-returning (ABI), so failures are signaled via cobalt_error_set and
+ * are observable through the vector size (see cobalt_sequence_add).
+ */
 static void vector_add_seq(cobalt_sequence_t *self, void *item)
 {
-    /* Sequence interface is void-returning (ABI); errors are signaled
-     * via cobalt_error_set and observable through vector size. */
     (void)vector_push_internal((cobalt_vector_impl_t *)self, item);
 }
 

@@ -632,6 +632,16 @@ void *cobalt_hashmap_get_ext(const cobalt_hashmap_t *map, const void *key, size_
     return NULL;
 }
 
+/**
+ * @brief Remove a binary-key entry from the hash map
+ * @param map Hash map pointer
+ * @param key Pointer to the binary key bytes
+ * @param key_len Length of the key in bytes
+ * @return 0 on success, -1 on invalid arguments or when the key is not found
+ *
+ * The bucket index uses a bitmask over the node hash; bucket_count is always
+ * a power of two, so this stays consistent with put/get lookups.
+ */
 int cobalt_hashmap_remove_ext(cobalt_hashmap_t *map, const void *key, size_t key_len)
 {
     if (!map || !key || map->impl.bucket_count == 0) {
