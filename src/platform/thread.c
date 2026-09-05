@@ -186,7 +186,7 @@ void cobalt_cond_destroy(cobalt_cond_t *c)
     }
 #ifdef _WIN32
     if (c->event) {
-        CloseEvent(c->event);
+        CloseHandle(c->event);
     }
 #else
     pthread_cond_destroy(&c->c);

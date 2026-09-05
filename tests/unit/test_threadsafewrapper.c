@@ -482,6 +482,10 @@ static void *ts_treemap_stress(void *arg)
         cobalt_tstreemap_put(tm, key, val);
         cobalt_tstreemap_get(tm, key);
         if (i % 7 == 0) {
+            void *removed = cobalt_tstreemap_get(tm, key);
+            if (removed) {
+                free(removed);
+            }
             cobalt_tstreemap_remove(tm, key);
         }
     }
