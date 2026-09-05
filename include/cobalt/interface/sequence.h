@@ -118,6 +118,9 @@ int cobalt_sequence_is_empty(cobalt_sequence_t *seq);
  * @note Backend failure is detected by comparing size before/after the call
  *       (same technique as cobalt_sequence_remove), since the backend `add`
  *       slot returns void for ABI stability.
+ * @note Not thread-safe: the size comparison races if another thread mutates
+ *       the sequence concurrently. For concurrent use, guard externally or use
+ *       the thread-safe wrappers (cobalt_tsvector_t, cobalt_tslist_t).
  */
 int cobalt_sequence_add(cobalt_sequence_t *seq, void *item);
 
