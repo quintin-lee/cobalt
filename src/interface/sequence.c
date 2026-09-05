@@ -41,14 +41,19 @@ int cobalt_sequence_is_empty(cobalt_sequence_t *seq)
 /// @param seq Sequence instance
 /// @param item Element to add
 /// @return 0 on success, -1 on failure
+/// @note The backend `add` slot returns void (stable ABI), so failure is
+/// detected the same way as cobalt_sequence_remove(): by comparing size
+/// before and after. Backends MUST leave size unchanged when add fails.
 
 int cobalt_sequence_add(cobalt_sequence_t *seq, void *item)
 {
     if (!seq || !seq->add) {
         return -1;
     }
+    size_t before = seq->size(seq);
     seq->add(seq, item);
-    return 0;
+    size_t after = seq->size(seq);
+    return (after > before) ? 0 : -1;
 }
 
 /// @brief Remove an element by pointer equality (convenience wrapper)

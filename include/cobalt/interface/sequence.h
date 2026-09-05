@@ -52,6 +52,10 @@ struct cobalt_sequence {
      * @brief Add an element to the sequence
      * @param self Sequence instance pointer
      * @param item Pointer to the element to add
+     * @note Kept as void (*)(...) for stable ABI. Failure is reported by the
+     *       cobalt_sequence_add() wrapper via size comparison, so backends
+     *       MUST leave size unchanged when the add fails (allocation errors
+     *       remain visible through cobalt_error_set()).
      */
     void (*add)(cobalt_sequence_t *self, void *item);
 
@@ -111,6 +115,9 @@ int cobalt_sequence_is_empty(cobalt_sequence_t *seq);
  * @param seq Sequence instance
  * @param item Element to add
  * @return 0 on success, -1 on failure
+ * @note Backend failure is detected by comparing size before/after the call
+ *       (same technique as cobalt_sequence_remove), since the backend `add`
+ *       slot returns void for ABI stability.
  */
 int cobalt_sequence_add(cobalt_sequence_t *seq, void *item);
 
