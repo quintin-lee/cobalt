@@ -10,9 +10,12 @@
 #include <string.h>
 
 /**
- * @brief String duplication implementation
+ * @brief Duplicate a string with heap-allocated storage.
  * @details Calculates the length of the original string, allocates the corresponding memory, and
  * safely copies the contents into the new memory.
+ *
+ * @param s Source string to duplicate; may be NULL.
+ * @return Newly allocated copy, or NULL on NULL input or allocation failure.
  */
 char *cobalt_strdup(const char *s)
 {
@@ -34,6 +37,13 @@ char *cobalt_strdup(const char *s)
     return dup;
 }
 
+/**
+ * @brief Test whether a string begins with a given prefix.
+ *
+ * @param str String to test; NULL yields false.
+ * @param prefix Prefix to look for; NULL yields false.
+ * @return Nonzero when str starts with prefix, zero otherwise.
+ */
 int cobalt_starts_with(const char *str, const char *prefix)
 {
     if (!str || !prefix) {
@@ -46,6 +56,13 @@ int cobalt_starts_with(const char *str, const char *prefix)
     return strncmp(str, prefix, prefix_len) == 0;
 }
 
+/**
+ * @brief Test whether a string ends with a given suffix.
+ *
+ * @param str String to test; NULL yields false.
+ * @param suffix Suffix to look for; NULL yields false.
+ * @return Nonzero when str ends with suffix, zero otherwise.
+ */
 int cobalt_ends_with(const char *str, const char *suffix)
 {
     if (!str || !suffix) {
@@ -59,6 +76,13 @@ int cobalt_ends_with(const char *str, const char *suffix)
     return strcmp(str + (str_len - suffix_len), suffix) == 0;
 }
 
+/**
+ * @brief Test whether a string contains a given substring.
+ *
+ * @param str String to search; NULL yields false.
+ * @param sub Substring to look for; NULL yields false.
+ * @return Nonzero when str contains sub, zero otherwise.
+ */
 int cobalt_contains(const char *str, const char *sub)
 {
     if (!str || !sub) {
@@ -67,6 +91,14 @@ int cobalt_contains(const char *str, const char *sub)
     return strstr(str, sub) != NULL;
 }
 
+/**
+ * @brief Format into a heap-allocated string using a va_list.
+ *
+ * @param out Receives the allocated string on success, NULL otherwise.
+ * @param fmt Printf-style format string.
+ * @param ap Argument list for the format string.
+ * @return Characters written on success, -1 on invalid arguments or failure.
+ */
 int cobalt_vformat(char **out, const char *fmt, va_list ap)
 {
     if (!out || !fmt) {
@@ -103,6 +135,13 @@ int cobalt_vformat(char **out, const char *fmt, va_list ap)
     return written;
 }
 
+/**
+ * @brief Format into a heap-allocated string using variadic arguments.
+ *
+ * @param out Receives the allocated string on success, NULL otherwise.
+ * @param fmt Printf-style format string.
+ * @return Characters written on success, -1 on invalid arguments or failure.
+ */
 int cobalt_snprintf(char **out, const char *fmt, ...)
 {
     if (!out || !fmt) {
@@ -115,6 +154,16 @@ int cobalt_snprintf(char **out, const char *fmt, ...)
     return result;
 }
 
+/**
+ * @brief Split a string on a delimiter into a NULL-terminated array.
+ *
+ * @param str String to split; NULL yields NULL with count set to zero.
+ * @param delim Delimiter character separating parts.
+ * @param count Receives the number of parts; may be NULL.
+ * @return NULL-terminated array of heap-allocated parts, or NULL on failure.
+ *
+ * @note Free each part and then the array itself with free.
+ */
 char **cobalt_split(const char *str, char delim, int *count)
 {
     if (!str) {
@@ -174,6 +223,13 @@ char **cobalt_split(const char *str, char delim, int *count)
     return parts;
 }
 
+/**
+ * @brief Join a NULL-terminated string array with a delimiter.
+ *
+ * @param parts NULL-terminated array of strings; NULL yields NULL.
+ * @param delim Delimiter character inserted between parts.
+ * @return Newly allocated joined string, or NULL on NULL input or failure.
+ */
 char *cobalt_join(const char **parts, char delim)
 {
     if (!parts) {
@@ -209,6 +265,12 @@ char *cobalt_join(const char **parts, char delim)
     return result;
 }
 
+/**
+ * @brief Copy a string with leading and trailing whitespace removed.
+ *
+ * @param str String to strip; NULL yields NULL.
+ * @return Newly allocated stripped copy, or NULL on NULL input or failure.
+ */
 char *cobalt_strip(const char *str)
 {
     if (!str) {

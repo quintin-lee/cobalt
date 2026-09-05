@@ -9,6 +9,11 @@
 #include <stdlib.h>
 #include <time.h>
 
+/**
+ * @brief Sample the monotonic clock in milliseconds.
+ *
+ * @return Current monotonic time in milliseconds.
+ */
 static double current_time_ms(void)
 {
     struct timespec ts;
@@ -16,6 +21,15 @@ static double current_time_ms(void)
     return (double)ts.tv_sec * 1000.0 + (double)ts.tv_nsec / 1000000.0;
 }
 
+/**
+ * @brief Time a callback over many iterations and summarize the results.
+ *
+ * @param name Benchmark label stored into the result.
+ * @param iters Iteration count; zero returns 0.0 without measuring.
+ * @param block Callback invoked once per iteration after a warmup run.
+ * @param result Receives mean, stddev, min, max and iterations; may be NULL.
+ * @return Mean iteration time in milliseconds, or 0.0 on invalid arguments.
+ */
 double
 cobalt_bench_run(const char *name, size_t iters, void (*block)(void), cobalt_bench_result_t *result)
 {
@@ -76,6 +90,12 @@ cobalt_bench_run(const char *name, size_t iters, void (*block)(void), cobalt_ben
     return mean;
 }
 
+/**
+ * @brief Write NULL-terminated benchmark results as a JSON document.
+ *
+ * @param results Array terminated by a NULL name entry; NULL is ignored.
+ * @param fp Stream receiving the JSON document; NULL is ignored.
+ */
 void cobalt_bench_output_json(const cobalt_bench_result_t *results, FILE *fp)
 {
     if (!results || !fp) {
@@ -104,6 +124,11 @@ void cobalt_bench_output_json(const cobalt_bench_result_t *results, FILE *fp)
     fprintf(fp, "}\n");
 }
 
+/**
+ * @brief Print NULL-terminated benchmark results as an aligned table.
+ *
+ * @param results Array terminated by a NULL name entry; NULL is ignored.
+ */
 void cobalt_bench_print_results(const cobalt_bench_result_t *results)
 {
     if (!results) {

@@ -46,11 +46,22 @@ static void *jrealloc(json_parse_ctx_t *ctx, void *ptr, size_t new_size)
     return cobalt_allocator_realloc(ctx->alloc, ptr, new_size);
 }
 
+/**
+ * @brief Test whether a character is JSON whitespace.
+ *
+ * @param c Character to test.
+ * @return Nonzero for space, tab, newline or carriage return; zero otherwise.
+ */
 static inline int is_space(int c)
 {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
 }
 
+/**
+ * @brief Advance the parser cursor past any JSON whitespace.
+ *
+ * @param ctx Parser context holding the cursor.
+ */
 static void json_skip_whitespace(json_parse_ctx_t *ctx)
 {
     while (ctx->pos < ctx->len && is_space((unsigned char)ctx->str[ctx->pos])) {
@@ -76,6 +87,12 @@ static json_node_t *json_node_create(json_parse_ctx_t *ctx, json_type_t type)
     return node;
 }
 
+/**
+ * @brief Parse a JSON string literal into a heap-allocated C string.
+ *
+ * @param ctx Parser context positioned at the opening quote.
+ * @return Unescaped string, or NULL on malformed input or allocation failure.
+ */
 static char *json_parse_string(json_parse_ctx_t *ctx)
 {
     if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '"') {
@@ -201,6 +218,12 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
 
 static json_node_t *json_parse_value(json_parse_ctx_t *ctx);
 
+/**
+ * @brief Parse a JSON object into alternating key/value nodes.
+ *
+ * @param ctx Parser context positioned at the opening brace.
+ * @return Object node heading the member chain, or NULL on malformed input or OOM.
+ */
 static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
 {
     json_skip_whitespace(ctx);
@@ -276,6 +299,12 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
     return root;
 }
 
+/**
+ * @brief Parse a JSON array into a chain of element nodes.
+ *
+ * @param ctx Parser context positioned at the opening bracket.
+ * @return Array node heading the element chain, or NULL on malformed input or OOM.
+ */
 static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
 {
     json_skip_whitespace(ctx);
