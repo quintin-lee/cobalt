@@ -15,6 +15,9 @@ void test_json_parse_null(void);
 void test_json_parse_extended(void);
 void test_json_fuzz(void);
 void test_json_allocator(void);
+void test_json_malformed_paths(void);
+void test_json_long_escapes(void);
+void test_json_oom(void);
 
 /* Counting allocator: delegates to libc, counts live blocks.
  * realloc is counted as free(old)+alloc(new) on success, so a full
@@ -489,6 +492,188 @@ void test_json_allocator(void)
     printf("  Custom allocator routing + balance: OK\n");
 }
 
+void test_json_malformed_paths(void)
+{
+    printf("Testing JSON malformed error paths...\n");
+
+    /* Truncated escape: backslash is the last char before end of input */
+    TEST_ASSERT(json_parse("\"a\\") == NULL);
+
+    /* Short \u escape: fewer than 4 hex digits available */
+    TEST_ASSERT(json_parse("\"\\u12\"") == NULL);
+
+    /* Missing colon: key buffer must be freed, partial object returned */
+    json_node_t *obj = json_parse("{\"a\"}");
+    TEST_ASSERT(obj != NULL);
+    TEST_ASSERT(json_tree_get_child(obj, "a") == NULL);
+    json_destroy(obj);
+
+    printf("  Malformed error paths: OK\n");
+}
+
+void test_json_long_escapes(void)
+{
+    printf("Testing JSON long escape growth...\n");
+
+    counting_allocator_t counter = {
+        .base = {.alloc = counting_alloc, .free = counting_free, .realloc = counting_realloc},
+        .alloc_count = 0,
+        .free_count  = 0,
+    };
+    cobalt_allocator_t *alloc = (cobalt_allocator_t *)&counter;
+
+    /* 200 escapes force the jrealloc growth branch inside escape handling */
+    char body[420];
+    for (int i = 0; i < 200; i++) {
+        body[2 * i]     = '\\';
+        body[2 * i + 1] = 'n';
+    }
+    body[400] = '\0';
+    char doc[412];
+    snprintf(doc, sizeof(doc), "\"%s\"", body);
+
+    json_node_t *root = json_parse_with_alloc(doc, alloc);
+    TEST_ASSERT(root != NULL);
+
+    char *ser = json_serialize_with_alloc(root, alloc);
+    TEST_ASSERT(ser != NULL);
+    cobalt_allocator_free(alloc, ser);
+
+    json_destroy_with_alloc(root, alloc);
+    TEST_ASSERT(counter.alloc_count == counter.free_count);
+
+    printf("  Long escape growth + balance: OK\n");
+}
+
+/* Countdown allocator: the next `budget` alloc/realloc calls succeed (via libc),
+ * afterwards they fail with NULL. Frees always pass through. Lets OOM paths be
+ * probed deterministically: every partial allocation must be released again. */
+typedef struct {
+    cobalt_allocator_t base;
+    size_t             budget;
+    size_t             alloc_count;
+    size_t             free_count;
+} countdown_allocator_t;
+
+static void *countdown_alloc(cobalt_allocator_t *self, size_t size)
+{
+    countdown_allocator_t *c = (countdown_allocator_t *)self;
+    if (c->budget == 0) {
+        return NULL;
+    }
+    c->budget--;
+    c->alloc_count++;
+    return malloc(size);
+}
+
+static void countdown_free(cobalt_allocator_t *self, void *ptr)
+{
+    countdown_allocator_t *c = (countdown_allocator_t *)self;
+    if (ptr) {
+        c->free_count++;
+    }
+    free(ptr);
+}
+
+static void *countdown_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+{
+    countdown_allocator_t *c = (countdown_allocator_t *)self;
+    if (c->budget == 0) {
+        return NULL;
+    }
+    c->budget--;
+    void *p = realloc(ptr, new_size);
+    if (p) {
+        if (ptr) {
+            c->free_count++;
+        }
+        c->alloc_count++;
+    }
+    return p;
+}
+
+void test_json_oom(void)
+{
+    printf("Testing JSON OOM paths...\n");
+
+    char big[304];
+    memset(big, 'x', 300);
+    big[300] = '\0';
+    char str_doc[420];
+    snprintf(str_doc, sizeof(str_doc), "{\"name\": \"%s\", \"tags\": [1, 2, 3]}", big);
+
+    char esc_body[420];
+    for (int i = 0; i < 200; i++) {
+        esc_body[2 * i]     = '\\';
+        esc_body[2 * i + 1] = 'n';
+    }
+    esc_body[400] = '\0';
+    char esc_doc[412];
+    snprintf(esc_doc, sizeof(esc_doc), "\"%s\"", esc_body);
+
+    const char *parse_inputs[] = {
+        str_doc,
+        esc_doc,
+        "123.456",
+        "{\"a\": 1, \"b\": [true, null]}",
+        "[1, 2, 3]",
+    };
+    const size_t budgets[] = {0, 1, 2, 3, 5, 10};
+
+    for (size_t b = 0; b < sizeof(budgets) / sizeof(budgets[0]); b++) {
+        for (size_t i = 0; i < sizeof(parse_inputs) / sizeof(parse_inputs[0]); i++) {
+            countdown_allocator_t cd = {
+                .base        = {.alloc   = countdown_alloc,
+                                .free    = countdown_free,
+                                .realloc = countdown_realloc},
+                .budget      = budgets[b],
+                .alloc_count = 0,
+                .free_count  = 0,
+            };
+            cobalt_allocator_t *alloc = (cobalt_allocator_t *)&cd;
+            size_t              a0    = cd.alloc_count;
+            size_t              f0    = cd.free_count;
+
+            json_node_t *root = json_parse_with_alloc(parse_inputs[i], alloc);
+            if (root) {
+                char *ser = json_serialize_with_alloc(root, alloc);
+                if (ser) {
+                    countdown_free(alloc, ser);
+                }
+                json_destroy_with_alloc(root, alloc);
+            }
+            TEST_ASSERT(cd.alloc_count - a0 == cd.free_count - f0);
+        }
+    }
+
+    /* Serialize a healthy tree under a starving allocator: must not crash,
+     * result is NULL or a valid string, and everything stays balanced. */
+    json_node_t *healthy = json_parse(str_doc);
+    TEST_ASSERT(healthy != NULL);
+    for (size_t b = 0; b < sizeof(budgets) / sizeof(budgets[0]); b++) {
+        countdown_allocator_t cd = {
+            .base        = {.alloc   = countdown_alloc,
+                            .free    = countdown_free,
+                            .realloc = countdown_realloc},
+            .budget      = budgets[b],
+            .alloc_count = 0,
+            .free_count  = 0,
+        };
+        cobalt_allocator_t *alloc = (cobalt_allocator_t *)&cd;
+        size_t              a0    = cd.alloc_count;
+        size_t              f0    = cd.free_count;
+
+        char *ser = json_serialize_with_alloc(healthy, alloc);
+        if (ser) {
+            countdown_free(alloc, ser);
+        }
+        TEST_ASSERT(cd.alloc_count - a0 == cd.free_count - f0);
+    }
+    json_destroy(healthy);
+
+    printf("  OOM paths balanced, no crash: OK\n");
+}
+
 void test_json(void)
 {
     printf("Testing json...\n");
@@ -505,6 +690,9 @@ void test_json(void)
     test_json_destroy();
     test_json_fuzz();
     test_json_allocator();
+    test_json_malformed_paths();
+    test_json_long_escapes();
+    test_json_oom();
     printf("  JSON tests completed\n");
 }
 

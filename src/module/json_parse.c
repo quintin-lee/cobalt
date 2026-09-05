@@ -234,6 +234,7 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
         json_node_t *kv = json_node_create(ctx, JSON_OBJECT);
         if (!kv) {
             jfree(ctx, key);
+            json_destroy_with_alloc(value, ctx->alloc);
             break;
         }
         kv->key  = key;
