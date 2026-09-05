@@ -223,7 +223,7 @@ size_t cobalt_partition_with_alloc(void               *base,
  */
 size_t cobalt_unique(void *base, size_t *nmemb, size_t size, compare_func_t compar)
 {
-    if (!base || !nmemb || nmemb == NULL || *nmemb <= 1 || !compar) {
+    if (!base || !nmemb || *nmemb <= 1 || !compar) {
         return nmemb ? *nmemb : 0;
     }
     size_t count = *nmemb;
