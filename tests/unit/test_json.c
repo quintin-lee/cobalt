@@ -3,6 +3,7 @@
  * @brief Unit test for JSON parsing and serialization.
  */
 
+#include "cobalt/memory/allocator.h"
 #include "cobalt/module/json.h"
 #include "test_framework.h"
 #include <math.h>
@@ -13,6 +14,45 @@
 void test_json_parse_null(void);
 void test_json_parse_extended(void);
 void test_json_fuzz(void);
+void test_json_allocator(void);
+
+/* Counting allocator: delegates to libc, counts live blocks.
+ * realloc is counted as free(old)+alloc(new) on success, so a full
+ * parse -> serialize -> destroy cycle must end with alloc == free. */
+typedef struct {
+    cobalt_allocator_t base;
+    size_t             alloc_count;
+    size_t             free_count;
+} counting_allocator_t;
+
+static void *counting_alloc(cobalt_allocator_t *self, size_t size)
+{
+    counting_allocator_t *c = (counting_allocator_t *)self;
+    c->alloc_count++;
+    return malloc(size);
+}
+
+static void counting_free(cobalt_allocator_t *self, void *ptr)
+{
+    counting_allocator_t *c = (counting_allocator_t *)self;
+    if (ptr) {
+        c->free_count++;
+    }
+    free(ptr);
+}
+
+static void *counting_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+{
+    counting_allocator_t *c = (counting_allocator_t *)self;
+    void                 *p = realloc(ptr, new_size);
+    if (p) {
+        if (ptr) {
+            c->free_count++;
+        }
+        c->alloc_count++;
+    }
+    return p;
+}
 
 void test_json_parse_null(void)
 {
@@ -400,6 +440,55 @@ void test_json_destroy(void)
     printf("  Destroy object node: OK\n");
 }
 
+void test_json_allocator(void)
+{
+    printf("Testing JSON custom allocator...\n");
+
+    counting_allocator_t counter = {
+        .base = {.alloc = counting_alloc, .free = counting_free, .realloc = counting_realloc},
+        .alloc_count = 0,
+        .free_count  = 0,
+    };
+    cobalt_allocator_t *alloc = (cobalt_allocator_t *)&counter;
+
+    /* 300-char string forces the realloc growth paths in both parser and serializer */
+    char big[304];
+    memset(big, 'x', 300);
+    big[300] = '\0';
+    char doc[420];
+    snprintf(doc, sizeof(doc), "{\"name\": \"%s\", \"tags\": [1, 2, 3]}", big);
+
+    json_node_t *root = json_parse_with_alloc(doc, alloc);
+    TEST_ASSERT(root != NULL);
+    TEST_ASSERT(counter.alloc_count > 0);
+
+    char *ser = json_serialize_with_alloc(root, alloc);
+    TEST_ASSERT(ser != NULL && strstr(ser, "\"tags\":[3,2,1]") != NULL);
+    cobalt_allocator_free(alloc, ser);
+
+    json_destroy_with_alloc(root, alloc);
+    TEST_ASSERT(counter.alloc_count == counter.free_count);
+
+    /* NULL allocator falls back to the system allocator */
+    json_node_t *sys = json_parse_with_alloc("{\"a\": 1}", NULL);
+    TEST_ASSERT(sys != NULL);
+    char *sys_ser = json_serialize_with_alloc(sys, NULL);
+    TEST_ASSERT(sys_ser != NULL);
+    free(sys_ser);
+    json_destroy_with_alloc(sys, NULL);
+
+    /* Malformed input must stay balanced too */
+    size_t       alloc_before = counter.alloc_count;
+    size_t       free_before  = counter.free_count;
+    json_node_t *bad          = json_parse_with_alloc("{\"a\": ", alloc);
+    if (bad) {
+        json_destroy_with_alloc(bad, alloc);
+    }
+    TEST_ASSERT(counter.alloc_count - alloc_before == counter.free_count - free_before);
+
+    printf("  Custom allocator routing + balance: OK\n");
+}
+
 void test_json(void)
 {
     printf("Testing json...\n");
@@ -415,6 +504,7 @@ void test_json(void)
     test_json_accessors();
     test_json_destroy();
     test_json_fuzz();
+    test_json_allocator();
     printf("  JSON tests completed\n");
 }
 
@@ -614,4 +704,3 @@ void test_json_parse_extended(void)
 
     printf("  Extended parsing tests completed\n");
 }
-

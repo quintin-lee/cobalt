@@ -14,6 +14,7 @@
  */
 
 #include "cobalt/module/json.h"
+#include "cobalt/memory/allocator.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -160,10 +161,13 @@ json_node_t *json_tree_get_child(json_node_t *parent, const char *key)
  *          This function is safe to call with NULL. After destruction, all pointers
  *          into the freed tree become dangling — callers should discard them.
  */
-void json_destroy(json_node_t *node)
+void json_destroy_with_alloc(json_node_t *node, cobalt_allocator_t *alloc)
 {
     if (!node) {
         return;
+    }
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
     }
 
     if (node->type == JSON_OBJECT || node->type == JSON_ARRAY) {
@@ -173,35 +177,42 @@ void json_destroy(json_node_t *node)
             json_node_t *next_kv = value ? value->next : NULL;
 
             if (value && value->type == JSON_STRING && value->value.string) {
-                free(value->value.string);
+                cobalt_allocator_free(alloc, value->value.string);
                 value->value.string = NULL;
             }
-            free(value);
+            if (value) {
+                cobalt_allocator_free(alloc, value);
+            }
             value = NULL;
 
             if (child && child->type == JSON_STRING && child->value.string) {
-                free(child->value.string);
+                cobalt_allocator_free(alloc, child->value.string);
                 child->value.string = NULL;
             }
 
             if (child->key) {
-                free(child->key);
+                cobalt_allocator_free(alloc, child->key);
                 child->key = NULL;
             }
-            free(child);
+            cobalt_allocator_free(alloc, child);
             child = next_kv;
         }
         node->next = NULL;
     }
 
     if (node->type == JSON_STRING && node->value.string) {
-        free(node->value.string);
+        cobalt_allocator_free(alloc, node->value.string);
         node->value.string = NULL;
     }
     if (node->key) {
-        free(node->key);
+        cobalt_allocator_free(alloc, node->key);
         node->key = NULL;
     }
 
-    free(node);
+    cobalt_allocator_free(alloc, node);
+}
+
+void json_destroy(json_node_t *node)
+{
+    json_destroy_with_alloc(node, NULL);
 }

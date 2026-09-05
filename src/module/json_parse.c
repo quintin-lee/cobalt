@@ -3,6 +3,7 @@
  * @brief Implementation of the JSON parser
  * @note This file is typically included and compiled by json.c, not exposed separately.
  */
+#include "cobalt/memory/allocator.h"
 #include "cobalt/module/json.h"
 
 /* Opaque node structure — definition kept private to JSON module */
@@ -21,10 +22,26 @@ struct json_node {
  * Stores the string currently being parsed, position, and total length.
  */
 typedef struct {
-    const char *str; /**< The JSON string to be parsed */
-    size_t      pos; /**< The current character position being parsed */
-    size_t      len; /**< Total length of the string */
+    const char         *str;   /**< The JSON string to be parsed */
+    size_t              pos;   /**< The current character position being parsed */
+    size_t              len;   /**< Total length of the string */
+    cobalt_allocator_t *alloc; /**< Resolved allocator (never NULL after entry) */
 } json_parse_ctx_t;
+
+static void *jalloc(json_parse_ctx_t *ctx, size_t size)
+{
+    return cobalt_allocator_alloc(ctx->alloc, size);
+}
+
+static void jfree(json_parse_ctx_t *ctx, void *ptr)
+{
+    cobalt_allocator_free(ctx->alloc, ptr);
+}
+
+static void *jrealloc(json_parse_ctx_t *ctx, void *ptr, size_t new_size)
+{
+    return cobalt_allocator_realloc(ctx->alloc, ptr, new_size);
+}
 
 static inline int is_space(int c)
 {
@@ -38,9 +55,9 @@ static void json_skip_whitespace(json_parse_ctx_t *ctx)
     }
 }
 
-static json_node_t *json_node_create(json_type_t type)
+static json_node_t *json_node_create(json_parse_ctx_t *ctx, json_type_t type)
 {
-    json_node_t *node = malloc(sizeof(json_node_t));
+    json_node_t *node = jalloc(ctx, sizeof(json_node_t));
     if (node) {
         node->type = type;
         memset(&node->value, 0, sizeof(node->value));
@@ -59,7 +76,7 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
 
     size_t capacity = 64;
     size_t len      = 0;
-    char  *result   = malloc(capacity);
+    char  *result   = jalloc(ctx, capacity);
     if (!result) {
         return NULL;
     }
@@ -68,7 +85,7 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
         if (ctx->str[ctx->pos] == '\\') {
             ctx->pos++;
             if (ctx->pos >= ctx->len) {
-                free(result);
+                jfree(ctx, result);
                 return NULL;
             }
             char   c          = ctx->str[ctx->pos];
@@ -110,7 +127,7 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
                 break;
             case 'u': {
                 if (ctx->pos + 4 >= ctx->len) {
-                    free(result);
+                    jfree(ctx, result);
                     return NULL;
                 }
                 char hex[5] = {0};
@@ -140,9 +157,9 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
 
             if (len + elen + 1 > capacity) {
                 capacity  = (len + elen + 1) * 2;
-                char *tmp = realloc(result, capacity);
+                char *tmp = jrealloc(ctx, result, capacity);
                 if (!tmp) {
-                    free(result);
+                    jfree(ctx, result);
                     return NULL;
                 }
                 result = tmp;
@@ -153,9 +170,9 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
         } else {
             if (len + 2 > capacity) {
                 capacity *= 2;
-                char *tmp = realloc(result, capacity);
+                char *tmp = jrealloc(ctx, result, capacity);
                 if (!tmp) {
-                    free(result);
+                    jfree(ctx, result);
                     return NULL;
                 }
                 result = tmp;
@@ -165,7 +182,7 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
     }
 
     if (ctx->pos >= ctx->len) {
-        free(result);
+        jfree(ctx, result);
         return NULL;
     }
     ctx->pos++;
@@ -183,7 +200,7 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
     }
     ctx->pos++;
 
-    json_node_t *root = json_node_create(JSON_OBJECT);
+    json_node_t *root = json_node_create(ctx, JSON_OBJECT);
     json_skip_whitespace(ctx);
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
         ctx->pos++;
@@ -203,20 +220,24 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
 
         json_skip_whitespace(ctx);
         if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != ':') {
-            free(key);
+            jfree(ctx, key);
             break;
         }
         ctx->pos++;
 
         json_node_t *value = json_parse_value(ctx);
         if (!value) {
-            free(key);
+            jfree(ctx, key);
             break;
         }
 
-        json_node_t *kv = json_node_create(JSON_OBJECT);
-        kv->key         = key;
-        kv->next        = value;
+        json_node_t *kv = json_node_create(ctx, JSON_OBJECT);
+        if (!kv) {
+            jfree(ctx, key);
+            break;
+        }
+        kv->key  = key;
+        kv->next = value;
         if (!root->next) {
             root->next = kv;
         } else {
@@ -253,7 +274,7 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
     }
     ctx->pos++;
 
-    json_node_t *root = json_node_create(JSON_ARRAY);
+    json_node_t *root = json_node_create(ctx, JSON_ARRAY);
     json_skip_whitespace(ctx);
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
         ctx->pos++;
@@ -309,7 +330,11 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
         if (!s) {
             return NULL;
         }
-        json_node_t *node  = json_node_create(JSON_STRING);
+        json_node_t *node = json_node_create(ctx, JSON_STRING);
+        if (!node) {
+            jfree(ctx, s);
+            return NULL;
+        }
         node->value.string = s;
         return node;
     }
@@ -322,31 +347,34 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
             ctx->pos++;
         }
         size_t num_len = ctx->pos - start;
-        char  *num_str = malloc(num_len + 1);
+        char  *num_str = jalloc(ctx, num_len + 1);
         if (!num_str) {
             return NULL;
         }
         strncpy(num_str, ctx->str + start, num_len);
         num_str[num_len] = '\0';
         double val       = strtod(num_str, NULL);
-        free(num_str);
+        jfree(ctx, num_str);
 
-        json_node_t *node  = json_node_create(JSON_NUMBER);
+        json_node_t *node = json_node_create(ctx, JSON_NUMBER);
+        if (!node) {
+            return NULL;
+        }
         node->value.number = val;
         return node;
     }
 
     if (strncmp(ctx->str + ctx->pos, "true", 4) == 0) {
         ctx->pos += 4;
-        return json_node_create(JSON_TRUE);
+        return json_node_create(ctx, JSON_TRUE);
     }
     if (strncmp(ctx->str + ctx->pos, "false", 5) == 0) {
         ctx->pos += 5;
-        return json_node_create(JSON_FALSE);
+        return json_node_create(ctx, JSON_FALSE);
     }
     if (strncmp(ctx->str + ctx->pos, "null", 4) == 0) {
         ctx->pos += 4;
-        return json_node_create(JSON_NULL);
+        return json_node_create(ctx, JSON_NULL);
     }
 
     return NULL;
@@ -357,7 +385,7 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
  *
  * Wraps the text, initializes the parsing context, and calls json_parse_value.
  */
-json_node_t *json_parse(const char *text)
+json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc)
 {
     if (!text) {
         return NULL;
@@ -367,11 +395,17 @@ json_node_t *json_parse(const char *text)
         return NULL;
     }
 
-    json_parse_ctx_t ctx = {.str = text, .pos = 0, .len = len};
+    json_parse_ctx_t ctx = {
+        .str = text, .pos = 0, .len = len, .alloc = alloc ? alloc : cobalt_allocator_get_system()};
     json_skip_whitespace(&ctx);
     if (ctx.pos >= ctx.len) {
         return NULL;
     }
 
     return json_parse_value(&ctx);
+}
+
+json_node_t *json_parse(const char *text)
+{
+    return json_parse_with_alloc(text, NULL);
 }

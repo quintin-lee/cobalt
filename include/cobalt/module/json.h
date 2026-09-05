@@ -8,6 +8,7 @@
  * string), and serialization (to string) capabilities.
  */
 
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -65,6 +66,37 @@ char *json_serialize(json_node_t *node);
  * @param node JSON node to destroy
  */
 void json_destroy(json_node_t *node);
+
+/* -----------------------------------------------------------------------------
+ *  Allocator-aware variants
+ * -------------------------------------------------------------------------- */
+
+/**
+ * @brief Parse a JSON string using a custom allocator
+ * @param text Null-terminated JSON formatted text
+ * @param alloc Allocator for all node and string memory; NULL selects the system allocator
+ * @return Returns the root node of the parsed JSON node tree on success, NULL on failure
+ * @note A tree built with @p alloc MUST be released with json_destroy_with_alloc
+ *       using the same allocator. Mixing allocators is undefined behavior.
+ */
+json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc);
+
+/**
+ * @brief Serialize a JSON node tree to a string using a custom allocator
+ * @param node Root node of the JSON node tree
+ * @param alloc Allocator for the output string; NULL selects the system allocator
+ * @return Returns a dynamically allocated JSON string on success (release with
+ *         cobalt_allocator_free using the same allocator), NULL or string of
+ *         empty object on failure
+ */
+char *json_serialize_with_alloc(json_node_t *node, cobalt_allocator_t *alloc);
+
+/**
+ * @brief Destroy a JSON node tree using a custom allocator
+ * @param node JSON node to destroy
+ * @param alloc Allocator the tree was built with; NULL selects the system allocator
+ */
+void json_destroy_with_alloc(json_node_t *node, cobalt_allocator_t *alloc);
 
 /* -----------------------------------------------------------------------------
  *  JSON Query Helper Functions
