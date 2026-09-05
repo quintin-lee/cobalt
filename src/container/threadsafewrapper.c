@@ -5,6 +5,11 @@
  */
 
 #include "cobalt/container/threadsafewrapper.h"
+#include "cobalt/container/deque.h"
+#include "cobalt/container/queue.h"
+#include "cobalt/container/set.h"
+#include "cobalt/container/stack.h"
+#include "cobalt/container/treemap.h"
 #include "cobalt/runtime/error.h"
 #include <stdlib.h>
 #include <string.h>
@@ -18,8 +23,9 @@
  * @details Serializes every operation through the embedded mutex.
  */
 struct cobalt_tsvector {
-    cobalt_mutex_t  *mutex;
-    cobalt_vector_t *vec;
+    cobalt_mutex_t     *mutex;
+    cobalt_vector_t    *vec;
+    cobalt_allocator_t *alloc;
 };
 
 /**
@@ -60,6 +66,7 @@ cobalt_tsvector_t *cobalt_tsvector_create_with_allocator(size_t              ini
         return NULL;
     }
     ts->mutex = mutex;
+    ts->alloc = alloc;
     return ts;
 }
 
@@ -74,8 +81,7 @@ void cobalt_tsvector_destroy(cobalt_tsvector_t *vec)
     }
     cobalt_vector_destroy(vec->vec);
     cobalt_mutex_destroy(vec->mutex);
-    cobalt_allocator_t *alloc = cobalt_allocator_get_system();
-    alloc->free(alloc, vec);
+    vec->alloc->free(vec->alloc, vec);
 }
 
 /**
@@ -236,8 +242,9 @@ int cobalt_tsvector_shrink_to_fit(cobalt_tsvector_t *vec)
  * @details Serializes every operation through the embedded mutex.
  */
 struct cobalt_tshashmap {
-    cobalt_mutex_t   *mutex;
-    cobalt_hashmap_t *map;
+    cobalt_mutex_t     *mutex;
+    cobalt_hashmap_t   *map;
+    cobalt_allocator_t *alloc;
 };
 
 /**
@@ -278,6 +285,7 @@ cobalt_tshashmap_t *cobalt_tshashmap_create_with_allocator(size_t              i
         return NULL;
     }
     ts->mutex = mutex;
+    ts->alloc = alloc;
     return ts;
 }
 
@@ -292,8 +300,7 @@ void cobalt_tshashmap_destroy(cobalt_tshashmap_t *map)
     }
     cobalt_hashmap_destroy(map->map);
     cobalt_mutex_destroy(map->mutex);
-    cobalt_allocator_t *alloc = cobalt_allocator_get_system();
-    alloc->free(alloc, map);
+    map->alloc->free(map->alloc, map);
 }
 
 /**
@@ -407,8 +414,9 @@ size_t cobalt_tshashmap_capacity(const cobalt_tshashmap_t *map)
  * @details Serializes every operation through the embedded mutex.
  */
 struct cobalt_tslist {
-    cobalt_mutex_t *mutex;
-    cobalt_list_t  *list;
+    cobalt_mutex_t     *mutex;
+    cobalt_list_t      *list;
+    cobalt_allocator_t *alloc;
 };
 
 /**
@@ -446,6 +454,7 @@ cobalt_tslist_t *cobalt_tslist_create_with_allocator(cobalt_allocator_t *alloc)
         return NULL;
     }
     ts->mutex = mutex;
+    ts->alloc = alloc;
     return ts;
 }
 
@@ -460,8 +469,7 @@ void cobalt_tslist_destroy(cobalt_tslist_t *list)
     }
     cobalt_list_destroy(list->list);
     cobalt_mutex_destroy(list->mutex);
-    cobalt_allocator_t *alloc = cobalt_allocator_get_system();
-    alloc->free(alloc, list);
+    list->alloc->free(list->alloc, list);
 }
 
 /**
@@ -593,5 +601,614 @@ int cobalt_tslist_is_empty(const cobalt_tslist_t *list)
     cobalt_mutex_lock(list->mutex);
     int empty = cobalt_list_is_empty(list->list);
     cobalt_mutex_unlock(list->mutex);
+    return empty;
+}
+
+/* ======================================================================== */
+/* Thread-Safe Deque                                                         */
+/* ========================================================================= */
+
+struct cobalt_tsdeque {
+    cobalt_mutex_t     *mutex;
+    cobalt_deque_t     *d;
+    cobalt_allocator_t *alloc;
+};
+
+cobalt_tsdeque_t *cobalt_tsdeque_create(void)
+{
+    return cobalt_tsdeque_create_with_allocator(cobalt_allocator_get_system());
+}
+
+cobalt_tsdeque_t *cobalt_tsdeque_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_mutex_t *mutex = cobalt_mutex_create();
+    if (!mutex) {
+        return NULL;
+    }
+    cobalt_tsdeque_t *ts = (cobalt_tsdeque_t *)alloc->alloc(alloc, sizeof(cobalt_tsdeque_t));
+    if (!ts) {
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->d = cobalt_deque_create_with_allocator(alloc);
+    if (!ts->d) {
+        alloc->free(alloc, ts);
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->mutex = mutex;
+    ts->alloc = alloc;
+    return ts;
+}
+
+void cobalt_tsdeque_destroy(cobalt_tsdeque_t *d)
+{
+    if (!d) {
+        return;
+    }
+    cobalt_deque_destroy(d->d);
+    cobalt_mutex_destroy(d->mutex);
+    d->alloc->free(d->alloc, d);
+}
+
+int cobalt_tsdeque_push_front(cobalt_tsdeque_t *d, void *item)
+{
+    if (!d) {
+        return -1;
+    }
+    cobalt_mutex_lock(d->mutex);
+    int ret = cobalt_deque_push_front(d->d, item);
+    cobalt_mutex_unlock(d->mutex);
+    return ret;
+}
+
+int cobalt_tsdeque_push_back(cobalt_tsdeque_t *d, void *item)
+{
+    if (!d) {
+        return -1;
+    }
+    cobalt_mutex_lock(d->mutex);
+    int ret = cobalt_deque_push_back(d->d, item);
+    cobalt_mutex_unlock(d->mutex);
+    return ret;
+}
+
+void *cobalt_tsdeque_pop_front(cobalt_tsdeque_t *d)
+{
+    if (!d) {
+        return NULL;
+    }
+    cobalt_mutex_lock(d->mutex);
+    void *item = cobalt_deque_pop_front(d->d);
+    cobalt_mutex_unlock(d->mutex);
+    return item;
+}
+
+void *cobalt_tsdeque_pop_back(cobalt_tsdeque_t *d)
+{
+    if (!d) {
+        return NULL;
+    }
+    cobalt_mutex_lock(d->mutex);
+    void *item = cobalt_deque_pop_back(d->d);
+    cobalt_mutex_unlock(d->mutex);
+    return item;
+}
+
+void *cobalt_tsdeque_peek_front(const cobalt_tsdeque_t *d)
+{
+    if (!d) {
+        return NULL;
+    }
+    cobalt_mutex_lock(d->mutex);
+    void *item = cobalt_deque_peek_front(d->d);
+    cobalt_mutex_unlock(d->mutex);
+    return item;
+}
+
+void *cobalt_tsdeque_peek_back(const cobalt_tsdeque_t *d)
+{
+    if (!d) {
+        return NULL;
+    }
+    cobalt_mutex_lock(d->mutex);
+    void *item = cobalt_deque_peek_back(d->d);
+    cobalt_mutex_unlock(d->mutex);
+    return item;
+}
+
+size_t cobalt_tsdeque_size(const cobalt_tsdeque_t *d)
+{
+    if (!d) {
+        return 0;
+    }
+    cobalt_mutex_lock(d->mutex);
+    size_t sz = cobalt_deque_size(d->d);
+    cobalt_mutex_unlock(d->mutex);
+    return sz;
+}
+
+int cobalt_tsdeque_is_empty(const cobalt_tsdeque_t *d)
+{
+    if (!d) {
+        return 1;
+    }
+    cobalt_mutex_lock(d->mutex);
+    int empty = cobalt_deque_is_empty(d->d);
+    cobalt_mutex_unlock(d->mutex);
+    return empty;
+}
+
+/* ======================================================================== */
+/* Thread-Safe Queue                                                         */
+/* ========================================================================= */
+
+struct cobalt_tsqueue {
+    cobalt_mutex_t     *mutex;
+    cobalt_queue_t     *q;
+    cobalt_allocator_t *alloc;
+};
+
+cobalt_tsqueue_t *cobalt_tsqueue_create(void)
+{
+    return cobalt_tsqueue_create_with_allocator(cobalt_allocator_get_system());
+}
+
+cobalt_tsqueue_t *cobalt_tsqueue_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_mutex_t *mutex = cobalt_mutex_create();
+    if (!mutex) {
+        return NULL;
+    }
+    cobalt_tsqueue_t *ts = (cobalt_tsqueue_t *)alloc->alloc(alloc, sizeof(cobalt_tsqueue_t));
+    if (!ts) {
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->q = cobalt_queue_create_with_allocator(alloc);
+    if (!ts->q) {
+        alloc->free(alloc, ts);
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->mutex = mutex;
+    ts->alloc = alloc;
+    return ts;
+}
+
+void cobalt_tsqueue_destroy(cobalt_tsqueue_t *q)
+{
+    if (!q) {
+        return;
+    }
+    cobalt_queue_destroy(q->q);
+    cobalt_mutex_destroy(q->mutex);
+    q->alloc->free(q->alloc, q);
+}
+
+int cobalt_tsqueue_enqueue(cobalt_tsqueue_t *q, void *item)
+{
+    if (!q) {
+        return -1;
+    }
+    cobalt_mutex_lock(q->mutex);
+    int ret = cobalt_queue_enqueue(q->q, item);
+    cobalt_mutex_unlock(q->mutex);
+    return ret;
+}
+
+void *cobalt_tsqueue_dequeue(cobalt_tsqueue_t *q)
+{
+    if (!q) {
+        return NULL;
+    }
+    cobalt_mutex_lock(q->mutex);
+    void *item = cobalt_queue_dequeue(q->q);
+    cobalt_mutex_unlock(q->mutex);
+    return item;
+}
+
+void *cobalt_tsqueue_peek(const cobalt_tsqueue_t *q)
+{
+    if (!q) {
+        return NULL;
+    }
+    cobalt_mutex_lock(q->mutex);
+    void *item = cobalt_queue_peek(q->q);
+    cobalt_mutex_unlock(q->mutex);
+    return item;
+}
+
+size_t cobalt_tsqueue_size(const cobalt_tsqueue_t *q)
+{
+    if (!q) {
+        return 0;
+    }
+    cobalt_mutex_lock(q->mutex);
+    size_t sz = cobalt_queue_size(q->q);
+    cobalt_mutex_unlock(q->mutex);
+    return sz;
+}
+
+int cobalt_tsqueue_is_empty(const cobalt_tsqueue_t *q)
+{
+    if (!q) {
+        return 1;
+    }
+    cobalt_mutex_lock(q->mutex);
+    int empty = cobalt_queue_is_empty(q->q);
+    cobalt_mutex_unlock(q->mutex);
+    return empty;
+}
+
+/* ======================================================================== */
+/* Thread-Safe Stack                                                         */
+/* ========================================================================= */
+
+struct cobalt_tsstack {
+    cobalt_mutex_t     *mutex;
+    cobalt_stack_t     *s;
+    cobalt_allocator_t *alloc;
+};
+
+cobalt_tsstack_t *cobalt_tsstack_create(void)
+{
+    return cobalt_tsstack_create_with_allocator(cobalt_allocator_get_system());
+}
+
+cobalt_tsstack_t *cobalt_tsstack_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_mutex_t *mutex = cobalt_mutex_create();
+    if (!mutex) {
+        return NULL;
+    }
+    cobalt_tsstack_t *ts = (cobalt_tsstack_t *)alloc->alloc(alloc, sizeof(cobalt_tsstack_t));
+    if (!ts) {
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->s = cobalt_stack_create_with_allocator(alloc);
+    if (!ts->s) {
+        alloc->free(alloc, ts);
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->mutex = mutex;
+    ts->alloc = alloc;
+    return ts;
+}
+
+void cobalt_tsstack_destroy(cobalt_tsstack_t *s)
+{
+    if (!s) {
+        return;
+    }
+    cobalt_stack_destroy(s->s);
+    cobalt_mutex_destroy(s->mutex);
+    s->alloc->free(s->alloc, s);
+}
+
+int cobalt_tsstack_push(cobalt_tsstack_t *s, void *item)
+{
+    if (!s) {
+        return -1;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int ret = cobalt_stack_push(s->s, item);
+    cobalt_mutex_unlock(s->mutex);
+    return ret;
+}
+
+void *cobalt_tsstack_pop(cobalt_tsstack_t *s)
+{
+    if (!s) {
+        return NULL;
+    }
+    cobalt_mutex_lock(s->mutex);
+    void *item = cobalt_stack_pop(s->s);
+    cobalt_mutex_unlock(s->mutex);
+    return item;
+}
+
+void *cobalt_tsstack_peek(const cobalt_tsstack_t *s)
+{
+    if (!s) {
+        return NULL;
+    }
+    cobalt_mutex_lock(s->mutex);
+    void *item = cobalt_stack_peek(s->s);
+    cobalt_mutex_unlock(s->mutex);
+    return item;
+}
+
+size_t cobalt_tsstack_size(const cobalt_tsstack_t *s)
+{
+    if (!s) {
+        return 0;
+    }
+    cobalt_mutex_lock(s->mutex);
+    size_t sz = cobalt_stack_size(s->s);
+    cobalt_mutex_unlock(s->mutex);
+    return sz;
+}
+
+int cobalt_tsstack_is_empty(const cobalt_tsstack_t *s)
+{
+    if (!s) {
+        return 1;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int empty = cobalt_stack_is_empty(s->s);
+    cobalt_mutex_unlock(s->mutex);
+    return empty;
+}
+
+/* ======================================================================== */
+/* Thread-Safe TreeMap                                                       */
+/* ========================================================================= */
+
+struct cobalt_tstreemap {
+    cobalt_mutex_t     *mutex;
+    cobalt_treemap_t   *m;
+    cobalt_allocator_t *alloc;
+};
+
+cobalt_tstreemap_t *cobalt_tstreemap_create(void)
+{
+    return cobalt_tstreemap_create_with_allocator(cobalt_allocator_get_system());
+}
+
+cobalt_tstreemap_t *cobalt_tstreemap_create_ext(cobalt_compare_func_t compare_func)
+{
+    (void)compare_func;
+    return cobalt_tstreemap_create();
+}
+
+cobalt_tstreemap_t *cobalt_tstreemap_create_with_allocator(cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_mutex_t *mutex = cobalt_mutex_create();
+    if (!mutex) {
+        return NULL;
+    }
+    cobalt_tstreemap_t *ts = (cobalt_tstreemap_t *)alloc->alloc(alloc, sizeof(cobalt_tstreemap_t));
+    if (!ts) {
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->m = cobalt_treemap_create_with_allocator(alloc);
+    if (!ts->m) {
+        alloc->free(alloc, ts);
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->mutex = mutex;
+    ts->alloc = alloc;
+    return ts;
+}
+
+void cobalt_tstreemap_destroy(cobalt_tstreemap_t *m)
+{
+    if (!m) {
+        return;
+    }
+    cobalt_treemap_destroy(m->m);
+    cobalt_mutex_destroy(m->mutex);
+    m->alloc->free(m->alloc, m);
+}
+
+int cobalt_tstreemap_put(cobalt_tstreemap_t *m, const char *key, void *value)
+{
+    if (!m || !key) {
+        return -1;
+    }
+    cobalt_mutex_lock(m->mutex);
+    int ret = cobalt_treemap_put(m->m, key, value);
+    cobalt_mutex_unlock(m->mutex);
+    return ret;
+}
+
+void *cobalt_tstreemap_get(const cobalt_tstreemap_t *m, const char *key)
+{
+    if (!m || !key) {
+        return NULL;
+    }
+    cobalt_mutex_lock(m->mutex);
+    void *val = cobalt_treemap_get(m->m, key);
+    cobalt_mutex_unlock(m->mutex);
+    return val;
+}
+
+int cobalt_tstreemap_remove(cobalt_tstreemap_t *m, const char *key)
+{
+    if (!m || !key) {
+        return -1;
+    }
+    cobalt_mutex_lock(m->mutex);
+    int ret = cobalt_treemap_remove(m->m, key);
+    cobalt_mutex_unlock(m->mutex);
+    return ret;
+}
+
+const char *cobalt_tstreemap_min_key(const cobalt_tstreemap_t *m)
+{
+    if (!m) {
+        return NULL;
+    }
+    cobalt_mutex_lock(m->mutex);
+    const char *k = cobalt_treemap_min_key(m->m);
+    cobalt_mutex_unlock(m->mutex);
+    return k;
+}
+
+const char *cobalt_tstreemap_max_key(const cobalt_tstreemap_t *m)
+{
+    if (!m) {
+        return NULL;
+    }
+    cobalt_mutex_lock(m->mutex);
+    const char *k = cobalt_treemap_max_key(m->m);
+    cobalt_mutex_unlock(m->mutex);
+    return k;
+}
+
+size_t cobalt_tstreemap_size(const cobalt_tstreemap_t *m)
+{
+    if (!m) {
+        return 0;
+    }
+    cobalt_mutex_lock(m->mutex);
+    size_t sz = cobalt_treemap_size(m->m);
+    cobalt_mutex_unlock(m->mutex);
+    return sz;
+}
+
+/* ======================================================================== */
+/* Thread-Safe Set                                                           */
+/* ========================================================================= */
+
+struct cobalt_tsset {
+    cobalt_mutex_t     *mutex;
+    cobalt_set_t       *s;
+    cobalt_allocator_t *alloc;
+};
+
+cobalt_tsset_t *cobalt_tsset_create(size_t initial_capacity)
+{
+    return cobalt_tsset_create_with_allocator(initial_capacity, cobalt_allocator_get_system());
+}
+
+cobalt_tsset_t *cobalt_tsset_create_with_allocator(size_t              initial_capacity,
+                                                   cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        return NULL;
+    }
+    cobalt_mutex_t *mutex = cobalt_mutex_create();
+    if (!mutex) {
+        return NULL;
+    }
+    cobalt_tsset_t *ts = (cobalt_tsset_t *)alloc->alloc(alloc, sizeof(cobalt_tsset_t));
+    if (!ts) {
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->s = cobalt_set_create_with_allocator(initial_capacity, alloc);
+    if (!ts->s) {
+        alloc->free(alloc, ts);
+        cobalt_mutex_destroy(mutex);
+        return NULL;
+    }
+    ts->mutex = mutex;
+    ts->alloc = alloc;
+    return ts;
+}
+
+void cobalt_tsset_destroy(cobalt_tsset_t *s)
+{
+    if (!s) {
+        return;
+    }
+    cobalt_set_destroy(s->s);
+    cobalt_mutex_destroy(s->mutex);
+    s->alloc->free(s->alloc, s);
+}
+
+int cobalt_tsset_insert(cobalt_tsset_t *s, void *item)
+{
+    if (!s) {
+        return -1;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int ret = cobalt_set_insert(s->s, item);
+    cobalt_mutex_unlock(s->mutex);
+    return ret;
+}
+
+int cobalt_tsset_insert_ext(cobalt_tsset_t *s, const void *item, size_t item_len)
+{
+    if (!s) {
+        return -1;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int ret = cobalt_set_insert_ext(s->s, item, item_len);
+    cobalt_mutex_unlock(s->mutex);
+    return ret;
+}
+
+int cobalt_tsset_remove(cobalt_tsset_t *s, void *item)
+{
+    if (!s) {
+        return -1;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int ret = cobalt_set_remove(s->s, item);
+    cobalt_mutex_unlock(s->mutex);
+    return ret;
+}
+
+int cobalt_tsset_remove_ext(cobalt_tsset_t *s, const void *item, size_t item_len)
+{
+    if (!s) {
+        return -1;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int ret = cobalt_set_remove_ext(s->s, item, item_len);
+    cobalt_mutex_unlock(s->mutex);
+    return ret;
+}
+
+int cobalt_tsset_contains(cobalt_tsset_t *s, void *item)
+{
+    if (!s) {
+        return 0;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int found = cobalt_set_contains(s->s, item);
+    cobalt_mutex_unlock(s->mutex);
+    return found;
+}
+
+int cobalt_tsset_contains_ext(cobalt_tsset_t *s, const void *item, size_t item_len)
+{
+    if (!s) {
+        return 0;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int found = cobalt_set_contains_ext(s->s, item, item_len);
+    cobalt_mutex_unlock(s->mutex);
+    return found;
+}
+
+size_t cobalt_tsset_size(const cobalt_tsset_t *s)
+{
+    if (!s) {
+        return 0;
+    }
+    cobalt_mutex_lock(s->mutex);
+    size_t sz = cobalt_set_size(s->s);
+    cobalt_mutex_unlock(s->mutex);
+    return sz;
+}
+
+int cobalt_tsset_is_empty(const cobalt_tsset_t *s)
+{
+    if (!s) {
+        return 1;
+    }
+    cobalt_mutex_lock(s->mutex);
+    int empty = cobalt_set_is_empty(s->s);
+    cobalt_mutex_unlock(s->mutex);
     return empty;
 }

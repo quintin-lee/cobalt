@@ -48,6 +48,13 @@ cobalt_treemap_t *cobalt_treemap_create(void);
 cobalt_treemap_t *cobalt_treemap_create_ext(cobalt_compare_func_t compare_func);
 
 /**
+ * @brief Create a new TreeMap with a custom allocator
+ * @param alloc Custom allocator (must not be NULL)
+ * @return Returns the newly created map pointer on success, NULL on failure
+ */
+cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc);
+
+/**
  * @brief Destroy the TreeMap and free memory
  * @param map Pointer to the map to be destroyed
  */

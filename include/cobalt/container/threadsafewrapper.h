@@ -17,8 +17,13 @@
  * @{
  */
 
+#include "cobalt/container/deque.h"
 #include "cobalt/container/hashmap.h"
 #include "cobalt/container/list.h"
+#include "cobalt/container/queue.h"
+#include "cobalt/container/set.h"
+#include "cobalt/container/stack.h"
+#include "cobalt/container/treemap.h"
 #include "cobalt/container/vector.h"
 #include "cobalt/memory/allocator.h"
 #include "cobalt/platform/thread.h"
@@ -238,5 +243,132 @@ size_t cobalt_tslist_size(const cobalt_tslist_t *list);
 int cobalt_tslist_is_empty(const cobalt_tslist_t *list);
 
 /** @} */
+
+/* ======================================================================== */
+/* Thread-Safe Deque                                                         */
+/* ======================================================================== */
+
+typedef struct cobalt_tsdeque cobalt_tsdeque_t;
+
+cobalt_tsdeque_t *cobalt_tsdeque_create(void);
+
+cobalt_tsdeque_t *cobalt_tsdeque_create_with_allocator(cobalt_allocator_t *alloc);
+
+void cobalt_tsdeque_destroy(cobalt_tsdeque_t *d);
+
+int cobalt_tsdeque_push_front(cobalt_tsdeque_t *d, void *item);
+
+int cobalt_tsdeque_push_back(cobalt_tsdeque_t *d, void *item);
+
+void *cobalt_tsdeque_pop_front(cobalt_tsdeque_t *d);
+
+void *cobalt_tsdeque_pop_back(cobalt_tsdeque_t *d);
+
+void *cobalt_tsdeque_peek_front(const cobalt_tsdeque_t *d);
+
+void *cobalt_tsdeque_peek_back(const cobalt_tsdeque_t *d);
+
+size_t cobalt_tsdeque_size(const cobalt_tsdeque_t *d);
+
+int cobalt_tsdeque_is_empty(const cobalt_tsdeque_t *d);
+
+/* ======================================================================== */
+/* Thread-Safe Queue                                                         */
+/* ======================================================================== */
+
+typedef struct cobalt_tsqueue cobalt_tsqueue_t;
+
+cobalt_tsqueue_t *cobalt_tsqueue_create(void);
+
+cobalt_tsqueue_t *cobalt_tsqueue_create_with_allocator(cobalt_allocator_t *alloc);
+
+void cobalt_tsqueue_destroy(cobalt_tsqueue_t *q);
+
+int cobalt_tsqueue_enqueue(cobalt_tsqueue_t *q, void *item);
+
+void *cobalt_tsqueue_dequeue(cobalt_tsqueue_t *q);
+
+void *cobalt_tsqueue_peek(const cobalt_tsqueue_t *q);
+
+size_t cobalt_tsqueue_size(const cobalt_tsqueue_t *q);
+
+int cobalt_tsqueue_is_empty(const cobalt_tsqueue_t *q);
+
+/* ======================================================================== */
+/* Thread-Safe Stack                                                         */
+/* ======================================================================== */
+
+typedef struct cobalt_tsstack cobalt_tsstack_t;
+
+cobalt_tsstack_t *cobalt_tsstack_create(void);
+
+cobalt_tsstack_t *cobalt_tsstack_create_with_allocator(cobalt_allocator_t *alloc);
+
+void cobalt_tsstack_destroy(cobalt_tsstack_t *s);
+
+int cobalt_tsstack_push(cobalt_tsstack_t *s, void *item);
+
+void *cobalt_tsstack_pop(cobalt_tsstack_t *s);
+
+void *cobalt_tsstack_peek(const cobalt_tsstack_t *s);
+
+size_t cobalt_tsstack_size(const cobalt_tsstack_t *s);
+
+int cobalt_tsstack_is_empty(const cobalt_tsstack_t *s);
+
+/* ======================================================================== */
+/* Thread-Safe TreeMap                                                       */
+/* ======================================================================== */
+
+typedef struct cobalt_tstreemap cobalt_tstreemap_t;
+
+cobalt_tstreemap_t *cobalt_tstreemap_create(void);
+
+cobalt_tstreemap_t *cobalt_tstreemap_create_ext(cobalt_compare_func_t compare_func);
+
+cobalt_tstreemap_t *cobalt_tstreemap_create_with_allocator(cobalt_allocator_t *alloc);
+
+void cobalt_tstreemap_destroy(cobalt_tstreemap_t *m);
+
+int cobalt_tstreemap_put(cobalt_tstreemap_t *m, const char *key, void *value);
+
+void *cobalt_tstreemap_get(const cobalt_tstreemap_t *m, const char *key);
+
+int cobalt_tstreemap_remove(cobalt_tstreemap_t *m, const char *key);
+
+const char *cobalt_tstreemap_min_key(const cobalt_tstreemap_t *m);
+
+const char *cobalt_tstreemap_max_key(const cobalt_tstreemap_t *m);
+
+size_t cobalt_tstreemap_size(const cobalt_tstreemap_t *m);
+
+/* ======================================================================== */
+/* Thread-Safe Set                                                           */
+/* ======================================================================== */
+
+typedef struct cobalt_tsset cobalt_tsset_t;
+
+cobalt_tsset_t *cobalt_tsset_create(size_t initial_capacity);
+
+cobalt_tsset_t *cobalt_tsset_create_with_allocator(size_t              initial_capacity,
+                                                   cobalt_allocator_t *alloc);
+
+void cobalt_tsset_destroy(cobalt_tsset_t *s);
+
+int cobalt_tsset_insert(cobalt_tsset_t *s, void *item);
+
+int cobalt_tsset_insert_ext(cobalt_tsset_t *s, const void *item, size_t item_len);
+
+int cobalt_tsset_remove(cobalt_tsset_t *s, void *item);
+
+int cobalt_tsset_remove_ext(cobalt_tsset_t *s, const void *item, size_t item_len);
+
+int cobalt_tsset_contains(cobalt_tsset_t *s, void *item);
+
+int cobalt_tsset_contains_ext(cobalt_tsset_t *s, const void *item, size_t item_len);
+
+size_t cobalt_tsset_size(const cobalt_tsset_t *s);
+
+int cobalt_tsset_is_empty(const cobalt_tsset_t *s);
 
 #endif /* THREADSAFE_WRAPPER_H */
