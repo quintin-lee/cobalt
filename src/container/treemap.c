@@ -15,23 +15,33 @@
 #define RB_RED 0
 #define RB_BLACK 1
 
+/**
+ * @brief Red-black tree node holding one key-value entry
+ */
 typedef struct treemap_node {
-    void                *key;
-    void                *value;
-    struct treemap_node *left;
-    struct treemap_node *right;
-    struct treemap_node *parent;
-    int                  color;
-    int                  key_owned;
+    void                *key;       /**< Key pointer (owned copy when key_owned) */
+    void                *value;     /**< Value pointer stored */
+    struct treemap_node *left;      /**< Left child */
+    struct treemap_node *right;     /**< Right child */
+    struct treemap_node *parent;    /**< Parent node (NULL for root) */
+    int                  color;     /**< RB_RED or RB_BLACK */
+    int                  key_owned; /**< Non-zero when key memory is owned */
 } treemap_node_t;
 
+/**
+ * @brief Internal treemap state shared by all operations
+ */
 typedef struct {
-    treemap_node_t       *root;
-    size_t                size;
+    treemap_node_t       *root; /**< Root of the red-black tree */
+    size_t                size; /**< Number of entries stored */
     cobalt_allocator_t   *alloc;
-    cobalt_compare_func_t compare_func;
+    cobalt_compare_func_t compare_func; /**< Key ordering function */
 } treemap_impl_t;
 
+/**
+ * @brief Opaque treemap structure
+ * @details Embeds cobalt_map_t as first member for map polymorphism.
+ */
 struct cobalt_treemap {
     cobalt_map_t   base; /**< Map interface (polymorphic base) */
     treemap_impl_t impl;
@@ -486,12 +496,15 @@ static treemap_node_t *rb_find_max(treemap_node_t *node)
 /* In-order iterator (sorted by key)                                         */
 /* ========================================================================= */
 
+/**
+ * @brief Iterator state for in-order key-sorted traversal
+ */
 typedef struct {
-    treemap_impl_t     *impl;
-    treemap_node_t    **stack;
-    size_t              stack_top;
-    size_t              stack_cap;
-    int                 finished;
+    treemap_impl_t     *impl;      /**< Backing tree state */
+    treemap_node_t    **stack;     /**< Ancestor stack for traversal */
+    size_t              stack_top; /**< Depth of the traversal stack */
+    size_t              stack_cap; /**< Allocated stack capacity */
+    int                 finished;  /**< Non-zero once traversal is exhausted */
     cobalt_allocator_t *alloc;
 } treemap_map_iter_t;
 

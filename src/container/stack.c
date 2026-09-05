@@ -14,9 +14,9 @@
  * @brief Stack node structure, forming a singly linked list
  */
 typedef struct stack_node {
-    void *data; /* Data pointer stored */
+    void *data; /**< Data pointer stored */
     struct stack_node
-        *next; /* Pointer to the next node, i.e., the element further down in the stack */
+        *next; /**< Pointer to the next node, i.e. the element further down in the stack */
 } stack_node_t;
 
 /**
@@ -24,8 +24,8 @@ typedef struct stack_node {
  */
 struct cobalt_stack {
     cobalt_allocator_t *alloc;
-    stack_node_t       *top;  /* Pointer to the top node of the stack */
-    size_t              size; /* Total number of elements in the stack */
+    stack_node_t       *top;  /**< Pointer to the top node of the stack */
+    size_t              size; /**< Total number of elements in the stack */
 };
 
 /**

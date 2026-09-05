@@ -64,23 +64,33 @@ static unsigned int hash_string(const char *str)
 /* Internal node and impl structures                                         */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief Hash chain node holding one key-value entry
+ */
 typedef struct hashmap_node {
-    void                *key;
-    void                *value;
-    struct hashmap_node *next;
-    size_t               key_len;
-    int                  key_owned;
+    void                *key;       /**< Key pointer (owned copy when key_owned) */
+    void                *value;     /**< Value pointer stored */
+    struct hashmap_node *next;      /**< Next node in the bucket chain */
+    size_t               key_len;   /**< Key length in bytes */
+    int                  key_owned; /**< Non-zero when key memory is owned */
 } hashmap_node_t;
 
+/**
+ * @brief Internal hashmap state shared by all operations
+ */
 typedef struct {
-    hashmap_node_t    **buckets;
-    size_t              bucket_count;
-    size_t              size;
-    cobalt_hash_func_t  hash_func;
-    cobalt_equal_func_t equal_func;
-    cobalt_allocator_t *alloc; /* Allocator used for all internal allocations */
+    hashmap_node_t    **buckets;      /**< Bucket array (always power-of-two sized) */
+    size_t              bucket_count; /**< Number of buckets */
+    size_t              size;         /**< Number of entries stored */
+    cobalt_hash_func_t  hash_func;    /**< Hash function (NULL selects default) */
+    cobalt_equal_func_t equal_func;   /**< Equality function (NULL selects default) */
+    cobalt_allocator_t *alloc;        /**< Allocator used for all internal allocations */
 } hashmap_impl_t;
 
+/**
+ * @brief Opaque hashmap structure
+ * @details Embeds cobalt_map_t as first member for map polymorphism.
+ */
 struct cobalt_hashmap {
     cobalt_map_t   base;
     hashmap_impl_t impl;
@@ -90,10 +100,13 @@ struct cobalt_hashmap {
 /* Map iterator (hashmap-specific)                                           */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief Iterator state scanning buckets in index order
+ */
 typedef struct {
-    hashmap_impl_t     *impl;
-    hashmap_node_t     *node;
-    size_t              bucket_idx;
+    hashmap_impl_t     *impl;       /**< Backing map state */
+    hashmap_node_t     *node;       /**< Current chain node (NULL between buckets) */
+    size_t              bucket_idx; /**< Index of the bucket being scanned */
     cobalt_allocator_t *alloc;
 } hashmap_map_iter_t;
 

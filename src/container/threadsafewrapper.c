@@ -11,8 +11,12 @@
 
 /* ======================================================================== */
 /* Thread-Safe Vector                                                        */
-/* ======================================================================== */
+/* ========================================================================= */
 
+/**
+ * @brief Opaque thread-safe vector wrapper
+ * @details Serializes every operation through the embedded mutex.
+ */
 struct cobalt_tsvector {
     cobalt_mutex_t  *mutex;
     cobalt_vector_t *vec;
@@ -225,8 +229,12 @@ int cobalt_tsvector_shrink_to_fit(cobalt_tsvector_t *vec)
 
 /* ======================================================================== */
 /* Thread-Safe HashMap                                                       */
-/* ======================================================================== */
+/* ========================================================================= */
 
+/**
+ * @brief Opaque thread-safe hashmap wrapper
+ * @details Serializes every operation through the embedded mutex.
+ */
 struct cobalt_tshashmap {
     cobalt_mutex_t   *mutex;
     cobalt_hashmap_t *map;
@@ -392,8 +400,12 @@ size_t cobalt_tshashmap_capacity(const cobalt_tshashmap_t *map)
 
 /* ======================================================================== */
 /* Thread-Safe List                                                          */
-/* ======================================================================== */
+/* ========================================================================= */
 
+/**
+ * @brief Opaque thread-safe list wrapper
+ * @details Serializes every operation through the embedded mutex.
+ */
 struct cobalt_tslist {
     cobalt_mutex_t *mutex;
     cobalt_list_t  *list;

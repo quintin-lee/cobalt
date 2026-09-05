@@ -20,6 +20,11 @@ static const int set_sentinel = 1;
 /* Opaque type definition (must be before any function that dereferences it)  */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @brief Opaque set structure
+ * @details Backed by a hashmap holding a sentinel value per member.
+ *          Embeds cobalt_map_t as first member for map polymorphism.
+ */
 struct cobalt_set {
     cobalt_map_t        base;
     cobalt_hashmap_t   *map;
