@@ -245,7 +245,7 @@ jobs:
           fi
 
       - name: Upload current snapshot
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: abi-snapshot
           path: .abi-current.txt
@@ -349,7 +349,7 @@ jobs:
           fi
 
       - name: Upload benchmark baseline
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-baseline
           path: .benchmarks/result.json
@@ -389,7 +389,7 @@ jobs:
         run: cmake --build build-cov --target coverage-check
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: build-cov/coverage_report/
