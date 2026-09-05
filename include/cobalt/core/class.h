@@ -11,6 +11,7 @@
  * @{
  */
 
+#include "cobalt/memory/allocator.h"
 #include "object.h"
 #include <stddef.h>
 
@@ -32,6 +33,7 @@ typedef struct cobalt_class {
     cobalt_property_t  **properties;     /**< Property table array pointer */
     struct cobalt_class *base_class;     /**< Pointer to the base class, used for inheritance */
     int                  abstract;       /**< Flag indicating if it is an abstract class */
+    cobalt_allocator_t  *alloc;          /**< Allocator for class-owned memory */
 } cobalt_class_t;
 
 /**
@@ -84,6 +86,21 @@ struct cobalt_property {
  * @return Newly created class pointer. Returns NULL on failure.
  */
 cobalt_class_t *cobalt_class_create(const char *name, cobalt_class_t *base_class);
+
+/**
+ * @brief Create a new class with a custom allocator
+ * @details All class-owned memory (struct, name, method/property tables) is allocated from
+ *          @p alloc and released by cobalt_class_destroy() through the same allocator. Objects
+ *          created from the class inherit this allocator. The class must outlive its objects.
+ *
+ * @param name Name of the class
+ * @param base_class Optional base class pointer. If NULL, there is no base class.
+ * @param alloc Custom allocator, or NULL to fall back to the system allocator
+ * @return Newly created class pointer. Returns NULL on failure.
+ */
+cobalt_class_t *cobalt_class_create_with_allocator(const char         *name,
+                                                   cobalt_class_t     *base_class,
+                                                   cobalt_allocator_t *alloc);
 
 /**
  * @brief Add a new method to the specified class

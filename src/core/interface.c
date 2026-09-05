@@ -5,6 +5,7 @@
  * interface.h.
  */
 #include "cobalt/core/interface.h"
+#include "cobalt/memory/allocator.h"
 #include <stdlib.h>
 
 /**
@@ -15,8 +16,24 @@
  */
 cobalt_interface_t *cobalt_interface_new(cobalt_interface_vtable_t *vtable)
 {
+    return cobalt_interface_new_with_allocator(vtable, cobalt_allocator_get_system());
+}
+
+/**
+ * @brief Create and initialize a new interface instance with a custom allocator
+ *
+ * @param vtable Pointer to the interface's virtual function table
+ * @param alloc Custom allocator, or NULL to fall back to the system allocator
+ * @return cobalt_interface_t* Newly allocated interface instance, returns NULL if out of memory
+ */
+cobalt_interface_t *cobalt_interface_new_with_allocator(cobalt_interface_vtable_t *vtable,
+                                                        cobalt_allocator_t        *alloc)
+{
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
     /* Allocate memory space for the interface */
-    cobalt_interface_t *iface = malloc(sizeof(cobalt_interface_t));
+    cobalt_interface_t *iface = alloc->alloc(alloc, sizeof(cobalt_interface_t));
     if (iface) {
         /* Set the virtual function table of the interface */
         iface->vtable = vtable;
@@ -31,8 +48,22 @@ cobalt_interface_t *cobalt_interface_new(cobalt_interface_vtable_t *vtable)
  */
 void cobalt_interface_destroy(cobalt_interface_t *iface)
 {
+    cobalt_interface_destroy_with_allocator(iface, cobalt_allocator_get_system());
+}
+
+/**
+ * @brief Destroy the interface instance and free memory with a custom allocator
+ *
+ * @param iface Pointer to the interface instance to be destroyed
+ * @param alloc The allocator used at creation, or NULL for the system allocator
+ */
+void cobalt_interface_destroy_with_allocator(cobalt_interface_t *iface, cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
     if (iface) {
-        free(iface);
+        alloc->free(alloc, iface);
     }
 }
 

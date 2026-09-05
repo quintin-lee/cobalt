@@ -5,9 +5,23 @@
  * destruction functions defined in class.h.
  */
 #include "cobalt/core/class.h"
+#include "cobalt/memory/allocator.h"
 #include "cobalt/utils/string.h"
 #include <stdlib.h>
 #include <string.h>
+
+static char *class_strdup(cobalt_allocator_t *alloc, const char *s)
+{
+    if (!s) {
+        return NULL;
+    }
+    size_t len = strlen(s) + 1;
+    char  *dup = alloc->alloc(alloc, len);
+    if (dup) {
+        memcpy(dup, s, len);
+    }
+    return dup;
+}
 
 /**
  * @brief Create a new runtime class
@@ -18,20 +32,39 @@
  */
 cobalt_class_t *cobalt_class_create(const char *name, cobalt_class_t *base_class)
 {
+    return cobalt_class_create_with_allocator(name, base_class, cobalt_allocator_get_system());
+}
+
+/**
+ * @brief Create a new runtime class with a custom allocator
+ *
+ * @param name Name of the class
+ * @param base_class Base class pointer, can be NULL
+ * @param alloc Custom allocator, or NULL to fall back to the system allocator
+ * @return cobalt_class_t* Created class object pointer, returns NULL on failure
+ */
+cobalt_class_t *cobalt_class_create_with_allocator(const char         *name,
+                                                   cobalt_class_t     *base_class,
+                                                   cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
     /* Allocate memory for the class structure */
-    cobalt_class_t *cls = malloc(sizeof(cobalt_class_t));
+    cobalt_class_t *cls = alloc->alloc(alloc, sizeof(cobalt_class_t));
     if (!cls) {
         return NULL;
     }
 
     /* Initialize all fields of the class, copy the class name */
-    cls->name           = cobalt_strdup(name);
+    cls->name           = class_strdup(alloc, name);
     cls->method_count   = 0;
     cls->methods        = NULL;
     cls->property_count = 0;
     cls->properties     = NULL;
     cls->base_class     = base_class;
     cls->abstract       = 0;
+    cls->alloc          = alloc;
 
     return cls;
 }
@@ -52,18 +85,19 @@ int cobalt_class_add_method(cobalt_class_t *cls,
         return -1;
     }
 
-    cobalt_method_t **new_methods =
-        realloc(cls->methods, sizeof(cobalt_method_t *) * (cls->method_count + 1));
+    cobalt_allocator_t *alloc = cls->alloc;
+    cobalt_method_t   **new_methods =
+        alloc->realloc(alloc, cls->methods, sizeof(cobalt_method_t *) * (cls->method_count + 1));
     if (!new_methods) {
         return -1;
     }
     cls->methods = new_methods;
 
-    cls->methods[cls->method_count] = malloc(sizeof(cobalt_method_t));
+    cls->methods[cls->method_count] = alloc->alloc(alloc, sizeof(cobalt_method_t));
     if (!cls->methods[cls->method_count]) {
         return -1;
     }
-    cls->methods[cls->method_count]->name   = cobalt_strdup(name);
+    cls->methods[cls->method_count]->name   = class_strdup(alloc, name);
     cls->methods[cls->method_count]->invoke = invoke;
     cls->method_count++;
 
@@ -88,18 +122,19 @@ int cobalt_class_add_property(cobalt_class_t *cls,
         return -1;
     }
 
-    cobalt_property_t **new_properties =
-        realloc(cls->properties, sizeof(cobalt_property_t *) * (cls->property_count + 1));
+    cobalt_allocator_t *alloc          = cls->alloc;
+    cobalt_property_t **new_properties = alloc->realloc(
+        alloc, cls->properties, sizeof(cobalt_property_t *) * (cls->property_count + 1));
     if (!new_properties) {
         return -1;
     }
     cls->properties = new_properties;
 
-    cls->properties[cls->property_count] = malloc(sizeof(cobalt_property_t));
+    cls->properties[cls->property_count] = alloc->alloc(alloc, sizeof(cobalt_property_t));
     if (!cls->properties[cls->property_count]) {
         return -1;
     }
-    cls->properties[cls->property_count]->name = cobalt_strdup(name);
+    cls->properties[cls->property_count]->name = class_strdup(alloc, name);
     cls->properties[cls->property_count]->get  = get;
     cls->properties[cls->property_count]->set  = set;
     cls->property_count++;
@@ -129,25 +164,26 @@ int cobalt_class_is_abstract(cobalt_class_t *cls)
 void cobalt_class_destroy(cobalt_class_t *cls)
 {
     if (cls) {
+        cobalt_allocator_t *alloc = cls->alloc;
         /* Free method names and method structures */
         if (cls->methods) {
             for (size_t i = 0; i < cls->method_count; i++) {
-                free((void *)cls->methods[i]->name);
-                free(cls->methods[i]);
+                alloc->free(alloc, (void *)cls->methods[i]->name);
+                alloc->free(alloc, cls->methods[i]);
             }
-            free(cls->methods);
+            alloc->free(alloc, cls->methods);
         }
 
         /* Free property names and property structures */
         if (cls->properties) {
             for (size_t i = 0; i < cls->property_count; i++) {
-                free((void *)cls->properties[i]->name);
-                free(cls->properties[i]);
+                alloc->free(alloc, (void *)cls->properties[i]->name);
+                alloc->free(alloc, cls->properties[i]);
             }
-            free(cls->properties);
+            alloc->free(alloc, cls->properties);
         }
 
-        free((void *)cls->name);
-        free(cls);
+        alloc->free(alloc, (void *)cls->name);
+        alloc->free(alloc, cls);
     }
 }

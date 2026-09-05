@@ -9,6 +9,7 @@
  * collections (such as sequences, maps, etc.).
  */
 
+#include "cobalt/memory/allocator.h"
 #include "sequence.h"
 #include <stddef.h>
 
@@ -65,6 +66,18 @@ struct cobalt_iterator {
  * @note The returned iterator needs to be freed using cobalt_iterator_destroy()
  */
 cobalt_iterator_t *cobalt_iterator_new(cobalt_sequence_t *seq);
+
+/**
+ * @brief Create a new iterator for a sequence with a custom allocator
+ * @details cobalt_iterator_destroy() releases the iterator through the same allocator
+ *          automatically; no separate destroy variant is needed.
+ * @param seq Pointer to the sequence to be traversed
+ * @param alloc Custom allocator, or NULL to fall back to the system allocator
+ * @return Returns a pointer to the newly created iterator on success, or NULL on failure
+ * @note The returned iterator needs to be freed using cobalt_iterator_destroy()
+ */
+cobalt_iterator_t *cobalt_iterator_new_with_allocator(cobalt_sequence_t  *seq,
+                                                      cobalt_allocator_t *alloc);
 
 /**
  * @brief Check if the iterator has a next element

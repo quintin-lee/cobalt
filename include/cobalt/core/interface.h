@@ -11,6 +11,7 @@
  * @{
  */
 
+#include "cobalt/memory/allocator.h"
 #include "object.h"
 #include <stddef.h>
 
@@ -54,11 +55,31 @@ struct cobalt_interface {
 cobalt_interface_t *cobalt_interface_new(cobalt_interface_vtable_t *vtable);
 
 /**
+ * @brief Create a new interface instance with a custom allocator
+ * @details The instance must be released with cobalt_interface_destroy_with_allocator() using the
+ *          same allocator.
+ *
+ * @param vtable The virtual function table pointer corresponding to this interface
+ * @param alloc Custom allocator, or NULL to fall back to the system allocator
+ * @return Successfully created interface pointer, returns NULL on allocation failure
+ */
+cobalt_interface_t *cobalt_interface_new_with_allocator(cobalt_interface_vtable_t *vtable,
+                                                        cobalt_allocator_t        *alloc);
+
+/**
  * @brief Destroy the specified interface instance
  *
  * @param iface The interface pointer to be destroyed. No operation if NULL.
  */
 void cobalt_interface_destroy(cobalt_interface_t *iface);
+
+/**
+ * @brief Destroy an interface instance created with a custom allocator
+ *
+ * @param iface The interface pointer to be destroyed. No operation if NULL.
+ * @param alloc The allocator used at creation, or NULL for the system allocator
+ */
+void cobalt_interface_destroy_with_allocator(cobalt_interface_t *iface, cobalt_allocator_t *alloc);
 
 /**
  * @brief Check whether an object implements the specified interface

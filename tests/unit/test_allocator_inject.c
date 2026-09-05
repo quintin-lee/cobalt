@@ -11,10 +11,16 @@
 #include "cobalt/container/stack.h"
 #include "cobalt/container/treemap.h"
 #include "cobalt/container/vector.h"
+#include "cobalt/core/class.h"
+#include "cobalt/core/interface.h"
+#include "cobalt/core/object.h"
+#include "cobalt/interface/iterator.h"
+#include "cobalt/interface/sequence.h"
 #include "cobalt/memory/allocator.h"
 #include "cobalt/memory/pool.h"
 #include "cobalt/memory/slab.h"
 #include "test_framework.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -288,6 +294,106 @@ void test_allocator_inject_slab(void)
     printf("  Slab with injected allocator: OK\n");
 }
 
+static void *core_alloc_invoke(cobalt_object_t *self, void **args, size_t arg_count)
+{
+    (void)self;
+    (void)args;
+    (void)arg_count;
+    return NULL;
+}
+
+static void *core_alloc_get(cobalt_object_t *self)
+{
+    (void)self;
+    return NULL;
+}
+
+static void core_alloc_set(cobalt_object_t *self, void *value)
+{
+    (void)self;
+    (void)value;
+}
+
+static void core_alloc_reset(void)
+{
+    mock_alloc_count   = 0;
+    mock_free_count    = 0;
+    mock_offset        = 0;
+    mock_tracked_count = 0;
+}
+
+void test_allocator_inject_core_class(void)
+{
+    printf("Testing class with injected allocator...\n");
+    core_alloc_reset();
+
+    cobalt_class_t *cls = cobalt_class_create_with_allocator("T", NULL, &mock_allocator);
+    TEST_ASSERT(cls != NULL);
+    TEST_ASSERT(cobalt_class_add_method(cls, "m", core_alloc_invoke) == 0);
+    TEST_ASSERT(cobalt_class_add_property(cls, "p", core_alloc_get, core_alloc_set) == 0);
+
+    /* Objects inherit the allocator from their class */
+    cobalt_object_t *obj = cobalt_object_new(cls, 0);
+    TEST_ASSERT(obj != NULL);
+    cobalt_object_unref(obj);
+
+    cobalt_class_destroy(cls);
+    mock_free_all();
+    TEST_ASSERT(mock_alloc_count == mock_free_count);
+    printf("  Class with injected allocator: OK\n");
+}
+
+void test_allocator_inject_core_interface(void)
+{
+    printf("Testing interface with injected allocator...\n");
+    core_alloc_reset();
+
+    cobalt_interface_t *iface = cobalt_interface_new_with_allocator(NULL, &mock_allocator);
+    TEST_ASSERT(iface != NULL);
+    cobalt_interface_destroy_with_allocator(iface, &mock_allocator);
+
+    mock_free_all();
+    TEST_ASSERT(mock_alloc_count == mock_free_count);
+    printf("  Interface with injected allocator: OK\n");
+}
+
+static size_t fake_seq_size(cobalt_sequence_t *seq)
+{
+    (void)seq;
+    return 3;
+}
+
+static void *fake_seq_get_at_index(cobalt_sequence_t *seq, size_t index)
+{
+    (void)seq;
+    return (void *)(uintptr_t)(index + 1);
+}
+
+void test_allocator_inject_iterator(void)
+{
+    printf("Testing iterator with injected allocator...\n");
+    core_alloc_reset();
+
+    /* Minimal fake sequence: iterator only needs size + get_at_index */
+    static cobalt_sequence_t fake_seq;
+    fake_seq.size         = fake_seq_size;
+    fake_seq.get_at_index = fake_seq_get_at_index;
+
+    cobalt_iterator_t *it = cobalt_iterator_new_with_allocator(&fake_seq, &mock_allocator);
+    TEST_ASSERT(it != NULL);
+    int seen = 0;
+    while (cobalt_iterator_has_next(it)) {
+        TEST_ASSERT(cobalt_iterator_next(it) != NULL);
+        seen++;
+    }
+    TEST_ASSERT(seen == 3);
+    cobalt_iterator_destroy(it);
+
+    mock_free_all();
+    TEST_ASSERT(mock_alloc_count == mock_free_count);
+    printf("  Iterator with injected allocator: OK\n");
+}
+
 void test_allocator_inject(void)
 {
     printf("Testing allocator injection...\n");
@@ -300,7 +406,9 @@ void test_allocator_inject(void)
     test_allocator_inject_deque();
     test_allocator_inject_pool();
     test_allocator_inject_slab();
+    test_allocator_inject_core_class();
+    test_allocator_inject_core_interface();
+    test_allocator_inject_iterator();
     test_allocator_alloc_failure();
     printf("  Allocator injection tests completed\n");
 }
-

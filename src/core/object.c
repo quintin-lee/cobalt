@@ -5,8 +5,18 @@
  * in object.h.
  */
 #include "cobalt/core/object.h"
+#include "cobalt/core/class.h"
+#include "cobalt/memory/allocator.h"
 #include <stdatomic.h>
 #include <stdlib.h>
+
+static cobalt_allocator_t *object_alloc_for(cobalt_class_t *cls)
+{
+    if (cls && cls->alloc) {
+        return cls->alloc;
+    }
+    return cobalt_allocator_get_system();
+}
 
 /**
  * @brief Increase the reference count of an object
@@ -31,7 +41,8 @@ void cobalt_object_unref(cobalt_object_t *obj)
 {
     /* fetch_sub returns the OLD value; we free when it was 1 (going to 0) */
     if (obj && atomic_fetch_sub_explicit(&obj->ref_count, 1, memory_order_acq_rel) == 1) {
-        free(obj);
+        cobalt_allocator_t *alloc = object_alloc_for(obj->class);
+        alloc->free(alloc, obj);
     }
 }
 
@@ -45,8 +56,9 @@ void cobalt_object_unref(cobalt_object_t *obj)
 cobalt_object_t *cobalt_object_new(cobalt_class_t *cls, size_t extra_size)
 {
     /* Calculate the total required memory size: base object header + extra data space */
-    size_t           total_size = sizeof(cobalt_object_t) + extra_size;
-    cobalt_object_t *obj        = malloc(total_size);
+    size_t              total_size = sizeof(cobalt_object_t) + extra_size;
+    cobalt_allocator_t *alloc      = object_alloc_for(cls);
+    cobalt_object_t    *obj        = alloc->alloc(alloc, total_size);
     if (obj) {
         /* Initialize reference count to 1 */
         atomic_store_explicit(&obj->ref_count, 1, memory_order_relaxed);

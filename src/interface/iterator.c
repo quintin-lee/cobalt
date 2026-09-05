@@ -8,6 +8,7 @@
 
 #include "cobalt/interface/iterator.h"
 #include "cobalt/interface/sequence.h"
+#include "cobalt/memory/allocator.h"
 #include <stdlib.h>
 
 /**
@@ -15,9 +16,10 @@
  * @details Maintains state information when traversing a sequence
  */
 typedef struct {
-    cobalt_sequence_t *seq;   /**< Sequence instance being traversed */
-    size_t             index; /**< Currently traversed index */
-    size_t             total; /**< Total number of elements in the sequence */
+    cobalt_sequence_t  *seq;   /**< Sequence instance being traversed */
+    size_t              index; /**< Currently traversed index */
+    size_t              total; /**< Total number of elements in the sequence */
+    cobalt_allocator_t *alloc; /**< Allocator that owns this context and the shell */
 } cobalt_iterator_impl_t;
 
 /* --- Generic iterator virtual function table implementation --- */
@@ -56,7 +58,9 @@ static void *generic_next(void *ctx)
 static void generic_destroy(void *ctx)
 {
     if (ctx) {
-        free(ctx);
+        cobalt_iterator_impl_t *impl  = (cobalt_iterator_impl_t *)ctx;
+        cobalt_allocator_t     *alloc = impl->alloc ? impl->alloc : cobalt_allocator_get_system();
+        alloc->free(alloc, ctx);
     }
 }
 
@@ -75,20 +79,37 @@ static const cobalt_iterator_vtable_t generic_vtable = {
  */
 cobalt_iterator_t *cobalt_iterator_new(cobalt_sequence_t *seq)
 {
+    return cobalt_iterator_new_with_allocator(seq, cobalt_allocator_get_system());
+}
+
+/**
+ * @brief Create a generic iterator for the specified sequence with a custom allocator
+ * @details The allocator is stored in the internal context; cobalt_iterator_destroy() releases
+ *          both the context and the shell through it automatically.
+ * @param seq Target sequence
+ * @param alloc Custom allocator, or NULL to fall back to the system allocator
+ * @return The created iterator instance, or NULL if memory allocation fails
+ */
+cobalt_iterator_t *cobalt_iterator_new_with_allocator(cobalt_sequence_t  *seq,
+                                                      cobalt_allocator_t *alloc)
+{
     if (!seq) {
         return NULL; /* Defensive check: sequence cannot be null */
     }
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
 
     // Allocate iterator shell structure
-    cobalt_iterator_t *iter = malloc(sizeof(cobalt_iterator_t));
+    cobalt_iterator_t *iter = alloc->alloc(alloc, sizeof(cobalt_iterator_t));
     if (!iter) {
         return NULL;
     }
 
     // Allocate iterator internal state implementation
-    cobalt_iterator_impl_t *impl = malloc(sizeof(cobalt_iterator_impl_t));
+    cobalt_iterator_impl_t *impl = alloc->alloc(alloc, sizeof(cobalt_iterator_impl_t));
     if (!impl) {
-        free(iter);
+        alloc->free(alloc, iter);
         return NULL;
     }
 
@@ -96,6 +117,7 @@ cobalt_iterator_t *cobalt_iterator_new(cobalt_sequence_t *seq)
     impl->seq   = seq;
     impl->index = 0;
     impl->total = seq->size(seq);
+    impl->alloc = alloc;
 
     // Bind virtual function table and data
     iter->vtable = &generic_vtable;
@@ -137,10 +159,19 @@ void cobalt_iterator_destroy(cobalt_iterator_t *iter)
     if (!iter) {
         return;
     }
+    /* Route the shell through the creating allocator for generic iterators; foreign vtables
+       own an opaque context we must not interpret, so keep the legacy path for them. */
+    cobalt_allocator_t *alloc = cobalt_allocator_get_system();
+    if (iter->vtable == &generic_vtable && iter->data) {
+        cobalt_iterator_impl_t *impl = (cobalt_iterator_impl_t *)iter->data;
+        if (impl->alloc) {
+            alloc = impl->alloc;
+        }
+    }
     // Destroy internal implementation data
     if (iter->vtable && iter->vtable->destroy) {
         iter->vtable->destroy(iter->data);
     }
     // Free the iterator itself
-    free(iter);
+    alloc->free(alloc, iter);
 }
