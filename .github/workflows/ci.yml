@@ -216,7 +216,7 @@ jobs:
         run: nm build/libcobalt.a | grep " T cobalt_" | sort > .abi-current.txt
 
       - name: Download previous ABI snapshot
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: abi-snapshot
           path: .github/
@@ -315,7 +315,7 @@ jobs:
           build/tests/bench_runner --json > .benchmarks/result.json
 
       - name: Download previous baseline
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: benchmark-baseline
           path: .benchmarks/
