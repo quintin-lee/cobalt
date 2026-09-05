@@ -6,7 +6,7 @@ import os
 
 class CobaltConan(ConanFile):
     name = "cobalt"
-    version = "2.0.0"
+    version = "2.4.0"
     description = "A lightweight, zero-dependency C11 framework providing object-oriented capabilities"
     license = "MIT"
     homepage = "https://github.com/quintin-lee/cobalt"
