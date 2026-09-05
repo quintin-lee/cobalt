@@ -187,7 +187,7 @@ Available via popular package managers:
 | Manager | Command |
 |---------|---------|
 | vcpkg | `vcpkg install cobalt` |
-| Conan | `conan install --requires=cobalt/2.0.0` |
+| Conan | `conan install --requires=cobalt/2.4.0` |
 | pkg-config | `pkg-config --cflags --libs cobalt` |
 
 ## Performance
