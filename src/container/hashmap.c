@@ -329,7 +329,7 @@ static void hashmap_free_node(hashmap_impl_t *impl, hashmap_node_t *node)
         return;
     }
     if (node->key_owned && node->key) {
-        free(node->key);
+        impl->alloc->free(impl->alloc, node->key);
     }
     impl->alloc->free(impl->alloc, node);
 }
@@ -599,7 +599,7 @@ int cobalt_hashmap_put(cobalt_hashmap_t *map, const char *key, void *value)
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;
     }
-    new_node->key       = cobalt_strdup(key);
+    new_node->key       = cobalt_strdup_with_alloc(key, impl->alloc);
     new_node->key_len   = key_len;
     new_node->key_owned = 1;
     new_node->value     = value;

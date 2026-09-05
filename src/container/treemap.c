@@ -92,7 +92,7 @@ rb_node_create_ext(treemap_impl_t *impl, const void *key, void *value, int owned
         return NULL;
     }
     if (owned) {
-        node->key = cobalt_strdup((const char *)key);
+        node->key = cobalt_strdup_with_alloc((const char *)key, impl->alloc);
         if (!node->key) {
             cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
             impl->alloc->free(impl->alloc, node);
