@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Tag: ${TAG}, Version: ${VERSION}"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          python3 - <<'PY'
+          import re, sys
+          text = open('CHANGELOG.md').read()
+          m = re.search(r'^##\s+Unreleased\s*[^\n]*\n((?:[^#]|^(?!##))*)', text, re.MULTILINE)
+          if m:
+              print(m.group(1).strip())
+          else:
+              print("See CHANGELOG.md for details.")
+          PY
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          python3 - <<'PY' >> $GITHUB_OUTPUT
+          import re
+          text = open('CHANGELOG.md').read()
+          m = re.search(r'^##\s+Unreleased\s*[^\n]*\n((?:[^#]|^(?!##))*)', text, re.MULTILINE)
+          print(m.group(1).strip() if m else "See CHANGELOG.md for details.")
+          PY
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake
+
+      - name: Build static library
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --parallel
+          ls -lh build/libcobalt.a
+
+      - name: Create source tarball
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          git archive --prefix="cobalt-${VERSION}/" -z | gzip -9 > cobalt-${VERSION}.tar.gz
+          ls -lh cobalt-${VERSION}.tar.gz
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Cobalt v${{ steps.version.outputs.version }}"
+          body: |
+            ## Changes in ${{ steps.version.outputs.version }}
+
+            ${{ steps.changelog.outputs.content }}
+
+            ---
+            Full changelog: https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md
+          files: |
+            cobalt-*.tar.gz
+            build/libcobalt.a
+          draft: false
+          prerelease: false
