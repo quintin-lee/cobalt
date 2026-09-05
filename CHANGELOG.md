@@ -1,5 +1,19 @@
 # Cobalt Change Log
 
+## Unreleased
+
+### Added
+- **JSON injectable allocator**: `cobalt_json_parse_with_alloc()`, `cobalt_json_serialize_with_alloc()`, and `cobalt_json_destroy_with_alloc()` for arena/custom-allocator support; `NULL` falls back to the system allocator and destroy must pair with the same allocator used at creation
+
+### Fixed
+- **OOM invisible in `cobalt_vector_push()`**: push now propagates allocation failure as `-1` per the header contract instead of always returning `0`
+- **HashMap `remove_ext()` bucket index**: unified to the `& (bucket_count - 1)` bitmask used by put/get/remove
+- **Sequence `add()` failure detection**: `cobalt_sequence_add()` now detects append failure via size diff without breaking the `void`-slot ABI
+
+### Changed
+- Wired two orphaned HashMap ext tests (`ext_int_keys`, `ext_null_callbacks`) into the test runner as regression coverage
+- Untracked test and coverage artifacts (`Testing/`, `coverage.info`, `coverage_report/`) and added ignore rules
+
 ## v2.3.0 (2026-08-08) — Security Fixes & Advanced APIs Release
 
 ### Added
