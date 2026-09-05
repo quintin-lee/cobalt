@@ -8,6 +8,7 @@
  * array-based quicksort and insertion sort, as well as linked list-based merge sort.
  */
 
+#include "cobalt/memory/allocator.h"
 #include <stddef.h>
 
 /**
@@ -51,6 +52,18 @@ void cobalt_qsort(void *base, size_t nmemb, size_t size, compare_func_t compar);
  */
 void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t compar);
 
+/**
+ * @brief Insertion sort with custom allocator
+ * @param base Pointer to the first array element
+ * @param nmemb Number of elements in the array
+ * @param size Size of each element in bytes
+ * @param compar Comparator establishing the sort order
+ * @param alloc Custom allocator (NULL falls back to system)
+ * @note Same behavior as cobalt_insertion_sort but with injectable allocator
+ */
+void cobalt_insertion_sort_with_alloc(
+    void *base, size_t nmemb, size_t size, compare_func_t compar, cobalt_allocator_t *alloc);
+
 /* -----------------------------------------------------------------------------
  *  Linked list-based sorting
  * -------------------------------------------------------------------------- */
@@ -80,6 +93,18 @@ void cobalt_list_sort(void **head, size_t *count, compare_func_t compar);
 void cobalt_stable_sort(void *base, size_t nmemb, size_t size, compare_func_t compar);
 
 /**
+ * @brief Stable sort with custom allocator
+ * @param base Pointer to the first array element
+ * @param nmemb Number of elements in the array
+ * @param size Size of each element in bytes
+ * @param compar Comparison function
+ * @param alloc Custom allocator (NULL falls back to system)
+ * @note Same behavior as cobalt_stable_sort but with injectable allocator
+ */
+void cobalt_stable_sort_with_alloc(
+    void *base, size_t nmemb, size_t size, compare_func_t compar, cobalt_allocator_t *alloc);
+
+/**
  * @brief Partition array around a pivot value
  * @param base Pointer to the first element
  * @param nmemb Number of elements
@@ -92,6 +117,24 @@ void cobalt_stable_sort(void *base, size_t nmemb, size_t size, compare_func_t co
  */
 size_t
 cobalt_partition(void *base, size_t nmemb, size_t size, const void *pivot, compare_func_t compar);
+
+/**
+ * @brief Partition array around a pivot using a custom allocator
+ * @param base Pointer to the first element
+ * @param nmemb Number of elements
+ * @param size Element size in bytes
+ * @param pivot Value to partition around
+ * @param compar Comparison function
+ * @param alloc Custom allocator (NULL falls back to system)
+ * @return Index of the first element in the "greater-or-equal" partition
+ * @note Same behavior as cobalt_partition but with injectable allocator
+ */
+size_t cobalt_partition_with_alloc(void               *base,
+                                   size_t              nmemb,
+                                   size_t              size,
+                                   const void         *pivot,
+                                   compare_func_t      compar,
+                                   cobalt_allocator_t *alloc);
 
 /**
  * @brief Remove consecutive duplicate elements from a sorted range

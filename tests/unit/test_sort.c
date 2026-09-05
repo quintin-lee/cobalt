@@ -5,6 +5,7 @@
 
 #include "cobalt/algorithm/functional.h"
 #include "cobalt/algorithm/sort.h"
+#include "cobalt/memory/allocator.h"
 #include "test_framework.h"
 #include <stdio.h>
 #include <string.h>
@@ -298,6 +299,7 @@ void test_fold(void)
 void test_sort_stable(void);
 void test_sort_partition(void);
 void test_sort_unique(void);
+void test_sort_with_alloc(void);
 
 void test_predicate_helpers(void)
 {
@@ -327,6 +329,7 @@ void test_sort(void)
     test_sort_stable();
     test_sort_partition();
     test_sort_unique();
+    test_sort_with_alloc();
     test_bsearch_found();
     test_bsearch_not_found();
     test_bsearch_empty();
@@ -396,3 +399,102 @@ void test_sort_unique(void)
     printf("  unique: OK\n");
 }
 
+/* -------------------------------------------------------------------------- */
+/* cobalt _with_alloc balance tests                                           */
+/* -------------------------------------------------------------------------- */
+
+static char   mock_sort_buf[4096];
+static size_t mock_sort_off         = 0;
+static int    mock_sort_alloc_count = 0;
+static int    mock_sort_free_count  = 0;
+
+static void *mock_sort_alloc(cobalt_allocator_t *self, size_t size)
+{
+    (void)self;
+    mock_sort_alloc_count++;
+    if (mock_sort_off + size > sizeof(mock_sort_buf)) {
+        return NULL;
+    }
+    void *ptr = &mock_sort_buf[mock_sort_off];
+    mock_sort_off += size;
+    return ptr;
+}
+
+static void mock_sort_free(cobalt_allocator_t *self, void *ptr)
+{
+    (void)self;
+    (void)ptr;
+    mock_sort_free_count++;
+}
+
+static void *mock_sort_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+{
+    (void)self;
+    (void)ptr;
+    (void)new_size;
+    return NULL;
+}
+
+static cobalt_allocator_t mock_sort_alloc_inst = {
+    .alloc   = mock_sort_alloc,
+    .free    = mock_sort_free,
+    .realloc = mock_sort_realloc,
+};
+
+static void mock_sort_reset(void)
+{
+    mock_sort_off         = 0;
+    mock_sort_alloc_count = 0;
+    mock_sort_free_count  = 0;
+}
+
+void test_sort_with_alloc(void)
+{
+    printf("Testing sort _with_alloc APIs...\n");
+    cobalt_allocator_t *a = &mock_sort_alloc_inst;
+
+    /* insertion_sort_with_alloc */
+    mock_sort_reset();
+    int arr1[] = {5, 3, 8, 1, 9};
+    cobalt_insertion_sort_with_alloc(arr1, 5, sizeof(int), cmp_int, a);
+    TEST_ASSERT(arr1[0] == 1);
+    TEST_ASSERT(arr1[1] == 3);
+    TEST_ASSERT(arr1[2] == 5);
+    TEST_ASSERT(arr1[3] == 8);
+    TEST_ASSERT(arr1[4] == 9);
+    TEST_ASSERT(mock_sort_alloc_count > 0);
+    TEST_ASSERT(mock_sort_free_count > 0);
+
+    /* stable_sort_with_alloc */
+    mock_sort_reset();
+    int arr2[] = {5, 3, 8, 1, 3, 2};
+    cobalt_stable_sort_with_alloc(arr2, 6, sizeof(int), cmp_int, a);
+    TEST_ASSERT(arr2[0] == 1);
+    TEST_ASSERT(arr2[1] == 2);
+    TEST_ASSERT(arr2[2] == 3);
+    TEST_ASSERT(arr2[3] == 3);
+    TEST_ASSERT(arr2[4] == 5);
+    TEST_ASSERT(arr2[5] == 8);
+
+    /* partition_with_alloc */
+    mock_sort_reset();
+    int    arr3[] = {9, 3, 7, 1, 5, 4, 8, 2};
+    int    pivot  = 5;
+    size_t idx    = cobalt_partition_with_alloc(arr3, 8, sizeof(int), &pivot, cmp_int, a);
+    TEST_ASSERT(idx > 0 && idx <= 8);
+    for (size_t i = 0; i < idx; i++) {
+        TEST_ASSERT(arr3[i] < pivot);
+    }
+    for (size_t i = idx; i < 8; i++) {
+        TEST_ASSERT(arr3[i] >= pivot);
+    }
+
+    /* NULL allocator falls back to system */
+    int arr4[] = {3, 1, 2};
+    cobalt_insertion_sort_with_alloc(arr4, 3, sizeof(int), cmp_int, NULL);
+    TEST_ASSERT(arr4[0] == 1);
+    TEST_ASSERT(arr4[1] == 2);
+    TEST_ASSERT(arr4[2] == 3);
+
+    printf("  _with_alloc balance: OK\n");
+}

@@ -4,109 +4,36 @@
  */
 
 #include "cobalt/utils/string.h"
+#include "cobalt/memory/allocator.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/**
- * @brief Duplicate a string with heap-allocated storage.
- * @details Calculates the length of the original string, allocates the corresponding memory, and
- * safely copies the contents into the new memory.
- *
- * @param s Source string to duplicate; may be NULL.
- * @return Newly allocated copy, or NULL on NULL input or allocation failure.
- */
-char *cobalt_strdup(const char *s)
+/* -------------------------------------------------------------------------- */
+/* Internal helpers                                                           */
+/* -------------------------------------------------------------------------- */
+
+static char *strdup_impl(const char *s, cobalt_allocator_t *alloc)
 {
-    // Return NULL safely if the input is null
     if (!s) {
         return NULL;
     }
-
-    // Calculate required length (including the terminating '\0')
     size_t len = strlen(s) + 1;
-
-    // Allocate new memory
-    char *dup = malloc(len);
+    char  *dup = (char *)alloc->alloc(alloc, len);
     if (dup) {
-        // Copy all contents if allocation is successful
         memcpy(dup, s, len);
     }
-
     return dup;
 }
 
-/**
- * @brief Test whether a string begins with a given prefix.
- *
- * @param str String to test; NULL yields false.
- * @param prefix Prefix to look for; NULL yields false.
- * @return Nonzero when str starts with prefix, zero otherwise.
- */
-int cobalt_starts_with(const char *str, const char *prefix)
-{
-    if (!str || !prefix) {
-        return 0;
-    }
-    size_t prefix_len = strlen(prefix);
-    if (prefix_len > strlen(str)) {
-        return 0;
-    }
-    return strncmp(str, prefix, prefix_len) == 0;
-}
-
-/**
- * @brief Test whether a string ends with a given suffix.
- *
- * @param str String to test; NULL yields false.
- * @param suffix Suffix to look for; NULL yields false.
- * @return Nonzero when str ends with suffix, zero otherwise.
- */
-int cobalt_ends_with(const char *str, const char *suffix)
-{
-    if (!str || !suffix) {
-        return 0;
-    }
-    size_t str_len    = strlen(str);
-    size_t suffix_len = strlen(suffix);
-    if (suffix_len > str_len) {
-        return 0;
-    }
-    return strcmp(str + (str_len - suffix_len), suffix) == 0;
-}
-
-/**
- * @brief Test whether a string contains a given substring.
- *
- * @param str String to search; NULL yields false.
- * @param sub Substring to look for; NULL yields false.
- * @return Nonzero when str contains sub, zero otherwise.
- */
-int cobalt_contains(const char *str, const char *sub)
-{
-    if (!str || !sub) {
-        return 0;
-    }
-    return strstr(str, sub) != NULL;
-}
-
-/**
- * @brief Format into a heap-allocated string using a va_list.
- *
- * @param out Receives the allocated string on success, NULL otherwise.
- * @param fmt Printf-style format string.
- * @param ap Argument list for the format string.
- * @return Characters written on success, -1 on invalid arguments or failure.
- */
-int cobalt_vformat(char **out, const char *fmt, va_list ap)
+static int vformat_impl(char **out, const char *fmt, va_list ap, cobalt_allocator_t *alloc)
 {
     if (!out || !fmt) {
         return -1;
     }
     *out = NULL;
 
-    /* First pass: determine required buffer size */
     va_list ap_copy;
     va_copy(ap_copy, ap);
     int n = vsnprintf(NULL, 0, fmt, ap_copy);
@@ -115,19 +42,17 @@ int cobalt_vformat(char **out, const char *fmt, va_list ap)
         return -1;
     }
 
-    /* Allocate buffer (n chars + null terminator) */
-    char *buf = (char *)malloc((size_t)n + 1U);
+    char *buf = (char *)alloc->alloc(alloc, (size_t)n + 1U);
     if (!buf) {
         return -1;
     }
 
-    /* Second pass: write into buffer */
     va_list ap_copy2;
     va_copy(ap_copy2, ap);
     int written = vsnprintf(buf, (size_t)n + 1U, fmt, ap_copy2);
     va_end(ap_copy2);
     if (written < 0) {
-        free(buf);
+        alloc->free(alloc, buf);
         return -1;
     }
 
@@ -135,36 +60,7 @@ int cobalt_vformat(char **out, const char *fmt, va_list ap)
     return written;
 }
 
-/**
- * @brief Format into a heap-allocated string using variadic arguments.
- *
- * @param out Receives the allocated string on success, NULL otherwise.
- * @param fmt Printf-style format string.
- * @return Characters written on success, -1 on invalid arguments or failure.
- */
-int cobalt_snprintf(char **out, const char *fmt, ...)
-{
-    if (!out || !fmt) {
-        return -1;
-    }
-    va_list ap;
-    va_start(ap, fmt);
-    int result = cobalt_vformat(out, fmt, ap);
-    va_end(ap);
-    return result;
-}
-
-/**
- * @brief Split a string on a delimiter into a NULL-terminated array.
- *
- * @param str String to split; NULL yields NULL with count set to zero.
- * @param delim Delimiter character separating parts.
- * @param count Receives the number of parts; may be NULL.
- * @return NULL-terminated array of heap-allocated parts, or NULL on failure.
- *
- * @note Free each part and then the array itself with free.
- */
-char **cobalt_split(const char *str, char delim, int *count)
+static char **split_impl(const char *str, char delim, int *count, cobalt_allocator_t *alloc)
 {
     if (!str) {
         if (count) {
@@ -173,7 +69,6 @@ char **cobalt_split(const char *str, char delim, int *count)
         return NULL;
     }
 
-    /* Count delimiters to determine number of parts */
     int cnt = 1;
     for (const char *p = str; *p; p++) {
         if (*p == delim) {
@@ -181,7 +76,7 @@ char **cobalt_split(const char *str, char delim, int *count)
         }
     }
 
-    char **parts = (char **)malloc(sizeof(char *) * ((size_t)cnt + 1U));
+    char **parts = (char **)alloc->alloc(alloc, sizeof(char *) * ((size_t)cnt + 1U));
     if (!parts) {
         if (count) {
             *count = 0;
@@ -194,13 +89,12 @@ char **cobalt_split(const char *str, char delim, int *count)
     for (const char *p = str;; p++) {
         if (*p == delim || *p == '\0') {
             size_t len = (size_t)(p - start);
-            parts[idx] = (char *)malloc(len + 1U);
+            parts[idx] = (char *)alloc->alloc(alloc, len + 1U);
             if (!parts[idx]) {
-                /* Free already allocated parts on error */
                 for (int i = 0; i < idx; i++) {
-                    free(parts[i]);
+                    alloc->free(alloc, parts[i]);
                 }
-                free(parts);
+                alloc->free(alloc, parts);
                 if (count) {
                     *count = 0;
                 }
@@ -215,28 +109,19 @@ char **cobalt_split(const char *str, char delim, int *count)
             start = p + 1;
         }
     }
-    parts[idx] = NULL; /* NULL-terminated for iteration convenience */
-
+    parts[idx] = NULL;
     if (count) {
         *count = idx;
     }
     return parts;
 }
 
-/**
- * @brief Join a NULL-terminated string array with a delimiter.
- *
- * @param parts NULL-terminated array of strings; NULL yields NULL.
- * @param delim Delimiter character inserted between parts.
- * @return Newly allocated joined string, or NULL on NULL input or failure.
- */
-char *cobalt_join(const char **parts, char delim)
+static char *join_impl(const char **parts, char delim, cobalt_allocator_t *alloc)
 {
     if (!parts) {
         return NULL;
     }
 
-    /* First pass: compute total length */
     size_t total = 0;
     int    n     = 0;
     while (parts[n]) {
@@ -244,10 +129,10 @@ char *cobalt_join(const char **parts, char delim)
         n++;
     }
     if (n > 0) {
-        total += (size_t)(n - 1) * sizeof(char); /* delimiters */
+        total += (size_t)(n - 1) * sizeof(char);
     }
 
-    char *result = (char *)malloc(total + 1U);
+    char *result = (char *)alloc->alloc(alloc, total + 1U);
     if (!result) {
         return NULL;
     }
@@ -265,13 +150,7 @@ char *cobalt_join(const char **parts, char delim)
     return result;
 }
 
-/**
- * @brief Copy a string with leading and trailing whitespace removed.
- *
- * @param str String to strip; NULL yields NULL.
- * @return Newly allocated stripped copy, or NULL on NULL input or failure.
- */
-char *cobalt_strip(const char *str)
+static char *strip_impl(const char *str, cobalt_allocator_t *alloc)
 {
     if (!str) {
         return NULL;
@@ -286,19 +165,150 @@ char *cobalt_strip(const char *str)
     while (*end) {
         end++;
     }
-    /* end now points to '\0' */
-    /* Move end back past trailing whitespace */
     while (end > start &&
            (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\n' || end[-1] == '\r')) {
         end--;
     }
 
     size_t len    = (size_t)(end - start);
-    char  *result = (char *)malloc(len + 1U);
+    char  *result = (char *)alloc->alloc(alloc, len + 1U);
     if (!result) {
         return NULL;
     }
     memcpy(result, start, len);
     result[len] = '\0';
     return result;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Public API                                                                 */
+/* -------------------------------------------------------------------------- */
+
+char *cobalt_strdup(const char *s)
+{
+    return strdup_impl(s, cobalt_allocator_get_system());
+}
+
+int cobalt_starts_with(const char *str, const char *prefix)
+{
+    if (!str || !prefix) {
+        return 0;
+    }
+    size_t prefix_len = strlen(prefix);
+    if (prefix_len > strlen(str)) {
+        return 0;
+    }
+    return strncmp(str, prefix, prefix_len) == 0;
+}
+
+int cobalt_ends_with(const char *str, const char *suffix)
+{
+    if (!str || !suffix) {
+        return 0;
+    }
+    size_t str_len    = strlen(str);
+    size_t suffix_len = strlen(suffix);
+    if (suffix_len > str_len) {
+        return 0;
+    }
+    return strcmp(str + (str_len - suffix_len), suffix) == 0;
+}
+
+int cobalt_contains(const char *str, const char *sub)
+{
+    if (!str || !sub) {
+        return 0;
+    }
+    return strstr(str, sub) != NULL;
+}
+
+int cobalt_vformat(char **out, const char *fmt, va_list ap)
+{
+    return vformat_impl(out, fmt, ap, cobalt_allocator_get_system());
+}
+
+int cobalt_snprintf(char **out, const char *fmt, ...)
+{
+    if (!out || !fmt) {
+        return -1;
+    }
+    va_list ap;
+    va_start(ap, fmt);
+    int result = vformat_impl(out, fmt, ap, cobalt_allocator_get_system());
+    va_end(ap);
+    return result;
+}
+
+char **cobalt_split(const char *str, char delim, int *count)
+{
+    return split_impl(str, delim, count, cobalt_allocator_get_system());
+}
+
+char *cobalt_join(const char **parts, char delim)
+{
+    return join_impl(parts, delim, cobalt_allocator_get_system());
+}
+
+char *cobalt_strip(const char *str)
+{
+    return strip_impl(str, cobalt_allocator_get_system());
+}
+
+/* -------------------------------------------------------------------------- */
+/* _with_alloc variants                                                       */
+/* -------------------------------------------------------------------------- */
+
+char *cobalt_strdup_with_alloc(const char *s, cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
+    return strdup_impl(s, alloc);
+}
+
+int cobalt_vformat_with_alloc(char **out, const char *fmt, va_list ap, cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
+    return vformat_impl(out, fmt, ap, alloc);
+}
+
+int cobalt_snprintf_with_alloc(char **out, const char *fmt, cobalt_allocator_t *alloc, ...)
+{
+    if (!out || !fmt) {
+        return -1;
+    }
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
+    va_list ap;
+    va_start(ap, alloc);
+    int result = vformat_impl(out, fmt, ap, alloc);
+    va_end(ap);
+    return result;
+}
+
+char **cobalt_split_with_alloc(const char *str, char delim, int *count, cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
+    return split_impl(str, delim, count, alloc);
+}
+
+char *cobalt_join_with_alloc(const char **parts, char delim, cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
+    return join_impl(parts, delim, alloc);
+}
+
+char *cobalt_strip_with_alloc(const char *str, cobalt_allocator_t *alloc)
+{
+    if (!alloc) {
+        alloc = cobalt_allocator_get_system();
+    }
+    return strip_impl(str, alloc);
 }
