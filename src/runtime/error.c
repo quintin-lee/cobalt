@@ -5,7 +5,6 @@
  * retrieval and thread-local error state maintenance.
  */
 #include "cobalt/runtime/error.h"
-#include <threads.h>
 
 /* Use C11 thread-local storage to record the last occurred error, ensuring thread safety */
 static _Thread_local cobalt_error_t last_error = COBALT_SUCCESS;
