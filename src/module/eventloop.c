@@ -399,7 +399,9 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
     EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
 #elif defined(_WIN32)
-    (void)loop; (void)fd; (void)events;
+    (void)loop;
+    (void)fd;
+    (void)events;
     return -1;
 #else
     int idx = fd;
@@ -443,7 +445,9 @@ static int platform_mod_fd(cobalt_eventloop_t *loop, int fd, short events)
     EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
 #elif defined(_WIN32)
-    (void)loop; (void)fd; (void)events;
+    (void)loop;
+    (void)fd;
+    (void)events;
     return -1;
 #else
     if (fd < 0 || fd >= loop->pollfds_capacity) {
@@ -470,7 +474,8 @@ static int platform_del_fd(cobalt_eventloop_t *loop, int fd)
     EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
 #elif defined(_WIN32)
-    (void)loop; (void)fd;
+    (void)loop;
+    (void)fd;
     return 0;
 #else
     if (fd < 0 || fd >= loop->pollfds_capacity) {
@@ -505,7 +510,8 @@ platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out
     *event_count_out = kevent(loop->kq, NULL, 0, events, COBALT_EVENTLOOP_DEFAULT_CAPACITY, &ts);
     *entries_out     = events;
 #elif defined(_WIN32)
-    (void)loop; (void)max_events;
+    (void)loop;
+    (void)max_events;
     *event_count_out = 0;
     *entries_out     = NULL;
 #else
@@ -695,6 +701,8 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
     if (loop->kq >= 0) {
         close(loop->kq);
     }
+#elif defined(_WIN32)
+    /* Nothing to free for unsupported Windows port */
 #else
     loop->alloc->free(loop->alloc, loop->pollfds);
 #endif
@@ -757,8 +765,9 @@ int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop,
     g_signal_table[slot].signum    = signum;
     g_signal_table[slot].callback  = callback;
     g_signal_table[slot].user_data = user_data;
-    g_signal_table[slot].active    = 1;
 
+#ifndef _WIN32
+    g_signal_table[slot].active    = 1;
     struct sigaction sa = {};
     sa.sa_handler       = cobalt_signal_handler;
     sigemptyset(&sa.sa_mask);
@@ -767,6 +776,13 @@ int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop,
         g_signal_table[slot].active = 0;
         return -1;
     }
+#else
+    (void)signum;
+    (void)callback;
+    (void)user_data;
+    g_signal_table[slot].active = 0;
+    return -1;
+#endif
     return 0;
 }
 
