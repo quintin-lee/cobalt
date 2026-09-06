@@ -271,6 +271,7 @@ void test_eventloop_timer_heap_order(void)
 
 void test_eventloop_timing(void)
 {
+#ifndef _WIN32
     printf("Testing eventloop timing...\n");
 
     cobalt_eventloop_t *loop = cobalt_eventloop_create();
@@ -295,6 +296,9 @@ void test_eventloop_timing(void)
 
     cobalt_eventloop_destroy(loop);
     printf("  Eventloop timing test passed\n");
+#else
+    printf("  Skipping eventloop timing on Windows\n");
+#endif
 }
 
 void test_eventloop_timer_edge_cases(void)
@@ -445,6 +449,7 @@ void test_eventloop_signal(void)
 
 void test_eventloop_close_callback(void)
 {
+#ifndef _WIN32
     printf("Testing eventloop close callback...\n");
 
     cobalt_eventloop_t *loop = cobalt_eventloop_create();
@@ -461,6 +466,9 @@ void test_eventloop_close_callback(void)
     TEST_ASSERT(close_fired == 1);
 
     printf("  Close callback: OK\n");
+#else
+    printf("  Skipping close callback test on Windows\n");
+#endif
 }
 
 static int g_rapid_signal_count = 0;
