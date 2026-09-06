@@ -32,8 +32,6 @@ L2  Module         → JSON parser/serializer, Event loop
 L1  Application    → Example applications
 ```
 
-## Building
-
 ```bash
 # Configure and build
 mkdir build && cd build
@@ -45,6 +43,15 @@ ctest --output-on-failure
 
 # Install (optional)
 make install DESTDIR=/tmp/stage
+```
+
+### Strict warnings
+
+The default CMake configuration enables `-Wall -Wextra -Werror` to keep the codebase clean and portable.
+
+```bash
+# Disable strict warnings if needed for a specific local build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCOBALT_STRICT_WARNINGS=OFF
 ```
 
 ## Quick Start

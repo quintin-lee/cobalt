@@ -70,27 +70,19 @@ cobalt_error_t cobalt_platform_get_id(void);
 cobalt_class_t *cobalt_class_create(const char *name, cobalt_class_t *base_class);
 ```
 
-## 2. Build System Usage
+### 2.2 Strict Warning Policy
 
-### 2.1 Configuration Options
-
-CMake provides several configuration options:
+The project enables `-Wall -Wextra -Werror` by default through `CMakeLists.txt`.
 
 ```bash
-# Debug build with assertions and full debug info
-cmake .. -DCMAKE_BUILD_TYPE=Debug
-
-# Release build optimized for size
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCOBALT_OPTIMIZE_SIZE=ON
-
-# Enable unit tests (default ON)
-cmake .. -DBUILD_TESTING=ON
-
-# Install prefix
-cmake .. -DCMAKE_INSTALL_PREFIX=/usr/local
+# Default CMake configuration now enforces strict warnings.
+# Disable locally only if absolutely necessary:
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCOBALT_STRICT_WARNINGS=OFF
 ```
 
-### 2.2 Building and Testing
+Contributions should compile cleanly without warnings on Linux, macOS, and Windows CI.
+
+### 2.3 Building and Testing
 
 ```bash
 mkdir build && cd build
@@ -101,7 +93,7 @@ make install    # installs to prefix (optional)
 make clean      # cleans build artifacts
 ```
 
-### 2.3 Generating Compile Commands
+### 2.4 Generating Compile Commands
 
 For IDE integration, ensure compile_commands.json is generated:
 
@@ -164,15 +156,8 @@ Follow [gitmoji](https://gitmoji.dev/) convention:
 
 Example: `feat(core): ✨ implement arena allocator for cobalt_arena_create()`
 
-### 3.4 Pull Request Requirements
+4. No compiler warnings should be introduced; CI enforces strict `-Werror` checks
 
-Before submitting PR:
-
-1. All new code must follow the coding standards documented herein
-2. New functionality must include corresponding tests (see Testing section)
-3. Documentation must be updated if API surface changes
-4. No linting/warning errors should be introduced (ensure `-Werror` passes)
-5. All existing tests must continue to pass
 
 PR title should match commit message format above. PR description should summarize changes and link any related issues/RFCs.
 
