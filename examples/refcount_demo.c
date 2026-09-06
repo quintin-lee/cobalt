@@ -33,8 +33,8 @@ int main(void)
     cobalt_info("Initial counter value: %d\n", cobalt_atomic_get(&shared_counter));
 
     /* Spawn multiple threads */
-    const int NUM_THREADS           = 5;
-    const int ITERATIONS_PER_THREAD = 1000;
+    #define NUM_THREADS 5
+    #define ITERATIONS_PER_THREAD 1000
 
     pthread_t threads[NUM_THREADS];
     int       args[NUM_THREADS];

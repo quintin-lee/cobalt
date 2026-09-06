@@ -5,6 +5,7 @@
 
 #include "cobalt/cobalt.h"
 #include <stdio.h>
+#include <inttypes.h>
 
 /* Forward declaration */
 static cobalt_class_t *ShapeClass  = NULL;
@@ -49,7 +50,7 @@ int main(void)
 
     /* Reference counting */
     cobalt_object_ref(circle);
-    printf("Ref count: %lu\n", circle->ref_count);
+    printf("Ref count: %" PRIu64 "\n", circle->ref_count);
 
     cobalt_object_unref(circle);
     printf("After unref, object freed\n");

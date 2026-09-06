@@ -129,6 +129,7 @@ struct cobalt_eventloop {
  *
  * @note Async-signal-safe: only touches sig_atomic_t state, never calls back directly.
  */
+#ifndef _WIN32
 static void cobalt_signal_handler(int signum)
 {
     /* Ring-buffer write is async-signal-safe (no malloc, no stdio) */
@@ -139,6 +140,7 @@ static void cobalt_signal_handler(int signum)
         g_signal_count++;
     }
 }
+#endif
 
 /**
  * @brief Dispatch all signals pending in the ring buffer to registered handlers.
@@ -361,6 +363,7 @@ static void process_expired_timers(cobalt_eventloop_t *loop, const struct timesp
  * @param now Current time, or NULL to use the default timeout.
  * @return Milliseconds to wait; never negative.
  */
+#ifndef _WIN32
 static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct timespec *now)
 {
     int                  timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
@@ -375,6 +378,7 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
     }
     return timeout_ms;
 }
+#endif
 
 /* -------------------------------------------------------------------------- */
 /* Platform-specific FD management                                            */
