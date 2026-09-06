@@ -5,16 +5,19 @@
 
 #include "cobalt/module/eventloop.h"
 #include "test_framework.h"
+#ifndef _WIN32
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
+#else
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#endif
 
 static int  timer_called  = 0;
 static int  fd_called     = 0;
@@ -79,6 +82,7 @@ void test_eventloop_create_destroy(void)
 
 void test_eventloop_fd(void)
 {
+#ifndef _WIN32
     printf("Testing eventloop FD handling...\n");
 
     cobalt_eventloop_t *loop = cobalt_eventloop_create();
@@ -122,6 +126,9 @@ void test_eventloop_fd(void)
     }
 
     cobalt_eventloop_destroy(loop);
+#else
+    printf("  Skipping FD test on Windows (POSIX-only)\n");
+#endif
 }
 
 void test_eventloop_timer(void)
@@ -400,6 +407,7 @@ static void test_close_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
 
 void test_eventloop_signal(void)
 {
+#ifndef _WIN32
     printf("Testing eventloop signal handling...\n");
 
     cobalt_eventloop_t *loop = cobalt_eventloop_create();
@@ -429,6 +437,9 @@ void test_eventloop_signal(void)
 
     printf("  Signal test completed\n");
     cobalt_eventloop_destroy(loop);
+#else
+    printf("  Skipping signal test on Windows (POSIX-only)\n");
+#endif
 }
 
 void test_eventloop_close_callback(void)
@@ -462,6 +473,7 @@ static void rapid_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *u
 
 void test_eventloop_rapid_signals(void)
 {
+#ifndef _WIN32
     printf("Testing eventloop rapid signals...\n");
 
     cobalt_eventloop_t *loop = cobalt_eventloop_create();
@@ -484,6 +496,9 @@ void test_eventloop_rapid_signals(void)
 
     cobalt_eventloop_destroy(loop);
     printf("  Rapid signals test completed\n");
+#else
+    printf("  Skipping rapid signals test on Windows (POSIX-only)\n");
+#endif
 }
 
 void test_eventloop(void)
@@ -554,6 +569,7 @@ static void unix_server_cb(cobalt_fd_t fd, cobalt_events_t events, void *ud)
 
 void test_eventloop_unix_socket(void)
 {
+#ifndef _WIN32
     printf("Testing eventloop UNIX domain socket...\n");
 
     const char *sock_path = "/tmp/cobalt_unix_test.sock";
@@ -598,4 +614,8 @@ void test_eventloop_unix_socket(void)
     unlink(sock_path);
 
     printf("  UNIX socket test passed\n");
+#else
+    printf("  Skipping UNIX socket test on Windows (POSIX-only)\n");
+#endif
 }
+

@@ -151,6 +151,7 @@ target_link_libraries(examples_memory_management cobalt)
 add_executable(examples_containers_demo examples/containers_demo.c)
 target_link_libraries(examples_containers_demo cobalt)
 
+if(NOT WIN32)
 add_executable(examples_advanced_usage examples/advanced_usage.c)
 target_link_libraries(examples_advanced_usage cobalt)
 if(UNIX)
@@ -192,6 +193,7 @@ target_link_libraries(examples_error_stack_demo cobalt)
 add_executable(examples_concurrent_demo examples/concurrent_demo.c)
 target_link_libraries(examples_concurrent_demo cobalt pthread)
 target_link_libraries(examples_simple_server cobalt)
+endif()
 
 # ============================================================
 # clang-tidy & clang-format integration
