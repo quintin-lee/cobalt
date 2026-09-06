@@ -62,9 +62,28 @@ static void on_fd(int fd, short events, void *user_data)
 /* Forward declarations for new tests */
 void test_eventloop_timer_edge_cases(void);
 void test_eventloop_fd_edge_cases(void);
-void test_eventloop_unix_socket(void);
 void test_eventloop_timer_periodic(void);
 void test_eventloop_rapid_signals(void);
+#ifndef _WIN32
+void test_eventloop_unix_socket(void);
+
+typedef struct {
+    int accept_count;
+} unix_test_ctx_t;
+
+static void unix_server_cb(cobalt_fd_t fd, cobalt_events_t events, void *ud)
+{
+    (void)events;
+    unix_test_ctx_t   *ctx     = (unix_test_ctx_t *)ud;
+    struct sockaddr_un addr    = {};
+    socklen_t          addrlen = sizeof(addr);
+    cobalt_fd_t        cfd     = accept(fd, (struct sockaddr *)&addr, &addrlen);
+    if (cfd >= 0) {
+        ctx->accept_count++;
+        close(cfd);
+    }
+}
+#endif
 
 void test_eventloop_create_destroy(void)
 {
@@ -566,28 +585,14 @@ void test_eventloop_timer_periodic(void)
 #endif
 }
 
-/* Server callback for UNIX socket test — file-scope to avoid nested functions */
-typedef struct {
-    int accept_count;
-} unix_test_ctx_t;
-
-static void unix_server_cb(cobalt_fd_t fd, cobalt_events_t events, void *ud)
-{
-    (void)events;
-    unix_test_ctx_t   *ctx     = (unix_test_ctx_t *)ud;
-    struct sockaddr_un addr    = {};
-    socklen_t          addrlen = sizeof(addr);
-    cobalt_fd_t        cfd     = accept(fd, (struct sockaddr *)&addr, &addrlen);
-    if (cfd >= 0) {
-        ctx->accept_count++;
-        close(cfd);
-    }
-}
-
 void test_eventloop_unix_socket(void)
 {
 #ifndef _WIN32
     printf("Testing eventloop UNIX domain socket...\n");
+
+    typedef struct {
+        int accept_count;
+    } unix_test_ctx_t;
 
     const char *sock_path = "/tmp/cobalt_unix_test.sock";
     unlink(sock_path);
