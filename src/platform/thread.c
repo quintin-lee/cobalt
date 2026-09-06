@@ -317,6 +317,7 @@ static unsigned __stdcall thread_proxy(void *arg)
  */
 int cobalt_thread_create(cobalt_thread_fn_t fn, void *arg, cobalt_thread_t *out_handle)
 {
+    (void)arg;
     if (!fn) {
         return -1;
     }
