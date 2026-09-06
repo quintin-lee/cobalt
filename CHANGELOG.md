@@ -1,5 +1,22 @@
 # Cobalt Change Log
 
+## Unreleased
+
+### Added
+- Strict warning policy: CMake now enables `-Wall -Wextra -Werror` by default
+- Documentation updates: README and developer guide now describe strict warning policy
+
+### Fixed
+- Windows CI: fixed `test_thread` mutex trylock behavior and eventloop compilation/test guards
+- macOS/Linux CI: fixed eventloop UNIX socket test callback placement and POSIX test guards
+- Memory checks: fixed ASan/Valgrind issues in `test_threadsafewrapper` and allocator-inject tests
+- Compiler warnings: removed unused functions/variables and fixed format/parameter warnings across tests and `eventloop.c`
+- clang-tidy: removed redundant `cobalt_treemap_create_with_allocator` declaration in `treemap.c`
+
+### Changed
+- Improved cross-platform test coverage with conditional compilation guards for Windows and POSIX-specific tests
+
+
 ## v2.4.0 (2026-09-05) — Allocator Support, OOM Fixes & Test Cleanup Release
 
 ### Added
