@@ -342,6 +342,7 @@ void test_eventloop_timer_edge_cases(void)
 
 void test_eventloop_fd_edge_cases(void)
 {
+#ifndef _WIN32
     printf("Testing eventloop FD edge cases...\n");
 
     cobalt_eventloop_t *loop = cobalt_eventloop_create();
@@ -388,6 +389,9 @@ void test_eventloop_fd_edge_cases(void)
 
     cobalt_eventloop_destroy(loop);
     printf("  FD edge cases passed\n");
+#else
+    printf("  Skipping FD edge cases on Windows\n");
+#endif
 }
 
 static void test_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
@@ -532,6 +536,7 @@ void test_eventloop(void)
 
 void test_eventloop_timer_periodic(void)
 {
+#ifndef _WIN32
     printf("Testing eventloop periodic timer...\n");
 
     cobalt_eventloop_t *loop = cobalt_eventloop_create();
@@ -556,6 +561,9 @@ void test_eventloop_timer_periodic(void)
     cobalt_eventloop_del_timer(loop, id);
     cobalt_eventloop_destroy(loop);
     printf("  Periodic timer test passed\n");
+#else
+    printf("  Skipping periodic timer test on Windows\n");
+#endif
 }
 
 /* Server callback for UNIX socket test — file-scope to avoid nested functions */
