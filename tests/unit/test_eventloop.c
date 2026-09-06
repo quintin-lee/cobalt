@@ -21,7 +21,9 @@
 #endif
 
 static int  timer_called  = 0;
+#ifndef _WIN32
 static int  fd_called     = 0;
+#endif
 static int *g_fired_order = NULL;
 static int  g_fire_idx    = 0;
 
