@@ -402,6 +402,7 @@ void test_eventloop_fd_edge_cases(void)
 #endif
 }
 
+#ifndef _WIN32
 static void test_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
 {
     (void)fd;
@@ -421,6 +422,7 @@ static void test_close_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
         *flag = 1;
     }
 }
+#endif
 
 void test_eventloop_signal(void)
 {
@@ -483,6 +485,7 @@ void test_eventloop_close_callback(void)
 #endif
 }
 
+#ifndef _WIN32
 static int g_rapid_signal_count = 0;
 
 static void rapid_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *ud)
@@ -492,6 +495,7 @@ static void rapid_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *u
     (void)ud;
     g_rapid_signal_count++;
 }
+#endif
 
 void test_eventloop_rapid_signals(void)
 {
@@ -535,13 +539,13 @@ void test_eventloop(void)
     test_eventloop_timing();
     test_eventloop_timer_edge_cases();
     test_eventloop_fd_edge_cases();
+#ifndef _WIN32
     test_eventloop_signal();
     test_eventloop_close_callback();
-#ifndef _WIN32
     test_eventloop_unix_socket();
+    test_eventloop_rapid_signals();
 #endif
     test_eventloop_timer_periodic();
-    test_eventloop_rapid_signals();
     printf("  Eventloop tests completed\n");
 }
 
