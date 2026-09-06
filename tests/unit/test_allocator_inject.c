@@ -92,7 +92,6 @@ static void mock_free_all(void)
 static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
 {
     (void)self;
-    mock_alloc_count++;
     if (mock_fail_next) {
         mock_fail_next = 0;
         return NULL;
