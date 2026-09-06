@@ -529,7 +529,7 @@ void test_json_long_escapes(void)
         body[2 * i + 1] = 'n';
     }
     body[400] = '\0';
-    char doc[412];
+    char doc[512];
     snprintf(doc, sizeof(doc), "\"%s\"", body);
 
     json_node_t *root = json_parse_with_alloc(doc, alloc);
@@ -608,7 +608,7 @@ void test_json_oom(void)
         esc_body[2 * i + 1] = 'n';
     }
     esc_body[400] = '\0';
-    char esc_doc[412];
+    char esc_doc[512];
     snprintf(esc_doc, sizeof(esc_doc), "\"%s\"", esc_body);
 
     const char *parse_inputs[] = {

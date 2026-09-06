@@ -426,39 +426,6 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
 }
 
 /**
- * @brief Change the watched event mask of a registered descriptor.
- *
- * @param loop Event loop owning the backend state.
- * @param fd Descriptor already registered with the backend.
- * @param events New event mask to wait for.
- * @return 0 on success, nonzero when the backend rejects the change.
- */
-static int platform_mod_fd(cobalt_eventloop_t *loop, int fd, short events)
-{
-#ifdef __linux__
-    struct epoll_event ev = {0};
-    ev.events             = events;
-    ev.data.ptr           = NULL;
-    return epoll_ctl(loop->epoll_fd, EPOLL_CTL_MOD, fd, &ev);
-#elif __APPLE__
-    struct kevent kev;
-    EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
-    return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
-#elif defined(_WIN32)
-    (void)loop;
-    (void)fd;
-    (void)events;
-    return -1;
-#else
-    if (fd < 0 || fd >= loop->pollfds_capacity) {
-        return -1;
-    }
-    loop->pollfds[fd].events = events;
-    return 0;
-#endif
-}
-
-/**
  * @brief Remove a descriptor from the platform wait backend.
  *
  * @param loop Event loop owning the backend state.
@@ -498,6 +465,7 @@ static int platform_del_fd(cobalt_eventloop_t *loop, int fd)
 static void
 platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out, int max_events)
 {
+    (void)max_events;
 #ifdef __linux__
     int timeout_ms = calculate_timeout_ms(loop, NULL);
     *event_count_out =

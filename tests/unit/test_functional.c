@@ -30,11 +30,6 @@ static int predicate_greater_than_100(const void *item)
 }
 
 /* Helper operations for tests */
-static void sum_adder(void *item)
-{
-    *(int *)item += *(int *)item;
-}
-
 static void sum_negator(void *item)
 {
     *(int *)item = -*(int *)item;
@@ -156,12 +151,14 @@ void test_functional_for_each(void)
 /* Map helper: doubles each element */
 static void map_double(const void *item, void *out, void *ud)
 {
+    (void)ud;
     *(int *)out = *(int *)item * 2;
 }
 
 /* Fold helper: adds item to accumulator */
 static void *fold_add(void *acc, const void *item, void *ud)
 {
+    (void)ud;
     *(int *)acc += *(int *)item;
     return acc;
 }
@@ -169,6 +166,7 @@ static void *fold_add(void *acc, const void *item, void *ud)
 /* Fold helper: multiplies item into accumulator */
 static void *fold_mul(void *acc, const void *item, void *ud)
 {
+    (void)ud;
     *(int *)acc *= *(int *)item;
     return acc;
 }

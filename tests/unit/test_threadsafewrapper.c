@@ -57,7 +57,6 @@ void test_threadsafewrapper_vector_null(void)
 void test_threadsafewrapper_vector_allocator(void)
 {
     printf("Testing thread-safe vector with custom allocator...\n");
-    extern cobalt_allocator_t mock_allocator; /* from test_allocator_inject.c */
     /* We just verify the API accepts a non-NULL allocator */
     cobalt_tsvector_t *v = cobalt_tsvector_create_with_allocator(4, cobalt_allocator_get_system());
     TEST_ASSERT(v != NULL);

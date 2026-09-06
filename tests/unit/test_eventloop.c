@@ -43,18 +43,10 @@ static void on_timer(uint64_t id, void *user_data)
     }
 }
 
-static void on_timer_quiet(uint64_t id, void *user_data)
-{
-    (void)id;
-    int *counter = (int *)user_data;
-    if (counter) {
-        (*counter)++;
-    }
-}
-
 static void on_fd(int fd, short events, void *user_data)
 {
     (void)events;
+    (void)user_data;
     fd_called++;
     printf("  FD %d ready (call #%d)\n", fd, fd_called);
 }
@@ -234,7 +226,7 @@ void test_eventloop_multiple_timers(void)
 
     cobalt_eventloop_iteration(loop);
 
-    printf("  Timer1 counter: %d, Timer2 counter: %d\n", counter1, counter2);
+    printf("  Timer1 counter: %d, Timer2 counter: %d\n", (int)counter1, (int)counter2);
 
     cobalt_eventloop_del_timer(loop, id1);
     cobalt_eventloop_del_timer(loop, id2);
@@ -252,11 +244,8 @@ void test_eventloop_timer_heap_order(void)
     const int       timer_count = 100;
     static int      fired_order[100];
     static uint64_t timer_ids[101];
-    static int      fire_idx = 0;
-
     memset(fired_order, -1, sizeof(fired_order));
     memset(timer_ids, 0, sizeof(timer_ids));
-    fire_idx = 0;
 
     g_fired_order = fired_order;
     g_fire_idx    = 0;
@@ -500,6 +489,7 @@ static void rapid_signal_handler(cobalt_fd_t fd, cobalt_events_t events, void *u
 {
     (void)fd;
     (void)events;
+    (void)ud;
     g_rapid_signal_count++;
 }
 
@@ -576,7 +566,7 @@ void test_eventloop_timer_periodic(void)
         usleep(5000);
     }
 
-    printf("  Periodic timer fired %d times\n", fire_count);
+    printf("  Periodic timer fired %d times\n", (int)fire_count);
     TEST_ASSERT(fire_count >= 1);
 
     cobalt_eventloop_del_timer(loop, id);

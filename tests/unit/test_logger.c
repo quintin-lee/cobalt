@@ -9,7 +9,6 @@
 #include <string.h>
 
 /* Capture log output to string */
-static char  log_buffer[1024];
 static FILE *log_fp;
 
 void test_logger_levels(void)

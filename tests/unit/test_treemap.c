@@ -500,7 +500,7 @@ void test_treemap_generic_keys(void)
         int ret = cobalt_treemap_put(map, keys[i], &values[i]);
         TEST_ASSERT(ret == 0);
     }
-    TEST_ASSERT(cobalt_treemap_size(map) == n);
+    TEST_ASSERT((size_t)cobalt_treemap_size(map) == (size_t)n);
 
     /* Verify all values are retrievable */
     for (int i = 0; i < n; i++) {

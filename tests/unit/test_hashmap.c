@@ -81,12 +81,6 @@ static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
     return new_ptr;
 }
 
-static cobalt_allocator_t mock_allocator = {
-    .alloc   = mock_alloc,
-    .free    = mock_free,
-    .realloc = mock_realloc,
-};
-
 void test_hashmap_basic(void)
 {
     printf("Testing hashmap basic operations...\n");

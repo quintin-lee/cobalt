@@ -26,13 +26,6 @@ static int cmp_double(const void *a, const void *b)
     return (x > y) - (x < y);
 }
 
-static int cmp_item_val(const void *a, const void *b)
-{
-    const int *x = (const int *)a;
-    const int *y = (const int *)b;
-    return *x - *y;
-}
-
 static int pred_gt5(const void *item)
 {
     return *(const int *)item > 5;
@@ -244,7 +237,6 @@ void test_for_each(void)
 {
     printf("Testing for_each...\n");
     int arr[]      = {1, 2, 3, 4, 5};
-    int call_count = 0;
     /* for_each signature: for_each(base, nmemb, size, op) */
     /* We can't easily capture call_count, so use a global trick */
     cobalt_for_each(arr, 5, sizeof(int), op_count);

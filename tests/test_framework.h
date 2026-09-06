@@ -11,6 +11,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#ifndef UNUSED
+#define UNUSED(x) (void)(x)
+#endif
+
 /* Test result tracking */
 typedef struct {
     int passed;
@@ -18,20 +22,7 @@ typedef struct {
     int total;
 } TestResults;
 
-static TestResults g_test_results = {0, 0, 0};
-
-/* Print test result */
-static void test_report(const char *name, int passed)
-{
-    g_test_results.total++;
-    if (passed) {
-        printf("[PASS] %s\n", name);
-        g_test_results.passed++;
-    } else {
-        printf("[FAIL] %s\n", name);
-        g_test_results.failed++;
-    }
-}
+static TestResults g_test_results __attribute__((unused)) = {0, 0, 0};
 
 /* Simple assertion macro - aborts on failure in this simple framework */
 #define TEST_ASSERT(cond)                                                                          \

@@ -18,16 +18,6 @@ static int pred_less_than_3(const void *item)
     return *(const int *)item < 3;
 }
 
-static int pred_greater_than_0(const void *item)
-{
-    return *(const int *)item > 0;
-}
-
-static int pred_greater_than_10(const void *item)
-{
-    return *(const int *)item > 10;
-}
-
 static int pred_always_true(const void *item)
 {
     (void)item;
