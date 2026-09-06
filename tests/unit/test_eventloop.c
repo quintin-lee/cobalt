@@ -8,6 +8,7 @@
 #ifndef _WIN32
 #include <fcntl.h>
 #include <poll.h>
+#include <string.h>
 #include <signal.h>
 #include <sys/socket.h>
 #include <sys/un.h>

@@ -99,6 +99,8 @@ struct cobalt_eventloop {
     int                 epoll_capacity;
 #elif __APPLE__
     int kq;
+#elif defined(_WIN32)
+    /* No backend fields for unsupported Windows port */
 #else
     struct pollfd *pollfds;
     int            pollfds_capacity;
@@ -396,6 +398,9 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
     struct kevent kev;
     EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
+#elif defined(_WIN32)
+    (void)loop; (void)fd; (void)events;
+    return -1;
 #else
     int idx = fd;
     if (idx >= loop->pollfds_capacity) {
@@ -437,6 +442,9 @@ static int platform_mod_fd(cobalt_eventloop_t *loop, int fd, short events)
     struct kevent kev;
     EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
+#elif defined(_WIN32)
+    (void)loop; (void)fd; (void)events;
+    return -1;
 #else
     if (fd < 0 || fd >= loop->pollfds_capacity) {
         return -1;
@@ -461,6 +469,9 @@ static int platform_del_fd(cobalt_eventloop_t *loop, int fd)
     struct kevent kev;
     EV_SET(&kev, fd, EVFILT_READ, EV_DELETE, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
+#elif defined(_WIN32)
+    (void)loop; (void)fd;
+    return 0;
 #else
     if (fd < 0 || fd >= loop->pollfds_capacity) {
         return 0;
@@ -493,6 +504,10 @@ platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out
     struct kevent   events[COBALT_EVENTLOOP_DEFAULT_CAPACITY];
     *event_count_out = kevent(loop->kq, NULL, 0, events, COBALT_EVENTLOOP_DEFAULT_CAPACITY, &ts);
     *entries_out     = events;
+#elif defined(_WIN32)
+    (void)loop; (void)max_events;
+    *event_count_out = 0;
+    *entries_out     = NULL;
 #else
     int timeout_ms   = calculate_timeout_ms(loop, NULL);
     *event_count_out = poll(loop->pollfds, (nfds_t)loop->pollfds_capacity, timeout_ms);
