@@ -8,8 +8,8 @@
 #ifndef _WIN32
 #include <fcntl.h>
 #include <poll.h>
-#include <string.h>
 #include <signal.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <time.h>
@@ -619,4 +619,3 @@ void test_eventloop_unix_socket(void)
     printf("  Skipping UNIX socket test on Windows (POSIX-only)\n");
 #endif
 }
-
