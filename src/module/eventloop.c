@@ -767,9 +767,9 @@ int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop,
     g_signal_table[slot].user_data = user_data;
 
 #ifndef _WIN32
-    g_signal_table[slot].active    = 1;
-    struct sigaction sa = {};
-    sa.sa_handler       = cobalt_signal_handler;
+    g_signal_table[slot].active = 1;
+    struct sigaction sa         = {};
+    sa.sa_handler               = cobalt_signal_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
     if (sigaction(signum, &sa, NULL) != 0) {
@@ -1066,6 +1066,10 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
             entry->callback(fd, ev, entry->user_data);
         }
     }
+#elif defined(_WIN32)
+    (void)loop;
+    (void)event_count;
+    (void)entries;
 #else
     struct pollfd *pfds = (struct pollfd *)entries;
     for (int i = 0; i < event_count; i++) {
