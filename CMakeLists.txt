@@ -6,6 +6,9 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 # Generate compile_commands.json for clang-tidy/clang-format
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+# Strict warning policy for CI and local development
+add_compile_options(-Wall -Wextra -Werror)
+
 
 # Options
 option(COBALT_BUILD_TESTS "Build tests" ON)
