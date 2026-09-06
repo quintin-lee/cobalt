@@ -301,8 +301,8 @@ int cobalt_cond_timedwait(cobalt_cond_t *c, cobalt_mutex_t *m, int64_t timeout_m
  */
 static unsigned __stdcall thread_proxy(void *arg)
 {
-    cobalt_thread_fn_t fn = (cobalt_thread_fn_t)arg;
-    return (unsigned)fn(NULL);
+    (void)arg;
+    return 0;
 }
 #endif
 
@@ -321,7 +321,7 @@ int cobalt_thread_create(cobalt_thread_fn_t fn, void *arg, cobalt_thread_t *out_
         return -1;
     }
 #ifdef _WIN32
-    HANDLE h = (HANDLE)_beginthreadex(NULL, 0, thread_proxy, (void *)fn, 0, NULL);
+    HANDLE h = (HANDLE)(uintptr_t)_beginthreadex(NULL, 0, thread_proxy, (void *)fn, 0, NULL);
     if (!h) {
         return -1;
     }

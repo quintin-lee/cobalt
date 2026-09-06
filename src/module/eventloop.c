@@ -395,6 +395,7 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
     ev.data.ptr           = NULL;
     return epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, fd, &ev);
 #elif __APPLE__
+    (void)events;
     struct kevent kev;
     EV_SET(&kev, fd, EVFILT_READ, EV_ADD, 0, 0, NULL);
     return kevent(loop->kq, &kev, 1, NULL, 0, NULL);
