@@ -547,7 +547,9 @@ void test_eventloop(void)
     test_eventloop_fd_edge_cases();
     test_eventloop_signal();
     test_eventloop_close_callback();
+#ifndef _WIN32
     test_eventloop_unix_socket();
+#endif
     test_eventloop_timer_periodic();
     test_eventloop_rapid_signals();
     printf("  Eventloop tests completed\n");
