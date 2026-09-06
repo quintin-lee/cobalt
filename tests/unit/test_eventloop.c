@@ -43,6 +43,7 @@ static void on_timer(uint64_t id, void *user_data)
     }
 }
 
+#ifndef _WIN32
 static void on_fd(int fd, short events, void *user_data)
 {
     (void)events;
@@ -50,6 +51,7 @@ static void on_fd(int fd, short events, void *user_data)
     fd_called++;
     printf("  FD %d ready (call #%d)\n", fd, fd_called);
 }
+#endif
 
 /* Forward declarations for new tests */
 void test_eventloop_timer_edge_cases(void);
