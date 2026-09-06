@@ -505,15 +505,9 @@ platform_wait(cobalt_eventloop_t *loop, int *event_count_out, void **entries_out
 /* UNIX domain socket helpers                                                 */
 /* -------------------------------------------------------------------------- */
 
-/**
- * @brief Create, bind and listen a UNIX domain server socket.
- *
- * @param path Filesystem path for the socket; a stale file is removed first.
- * @param sock_out Receives the listening socket on success.
- * @return 0 on success, -1 on invalid arguments or socket failure.
- */
 int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out)
 {
+#ifndef _WIN32
     if (!path || !sock_out) {
         return -1;
     }
@@ -543,24 +537,20 @@ int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out)
 
     *sock_out = (cobalt_fd_t)sock;
     return 0;
+#else
+    (void)path;
+    (void)sock_out;
+    return -1;
+#endif
 }
 
-/**
- * @brief Accept one client connection and register it with the loop.
- *
- * @param loop Event loop receiving the new connection.
- * @param listen_fd Listening socket created by create_unix_server.
- * @param events Event mask to watch the client for.
- * @param callback Handler invoked on client activity.
- * @param user_data Opaque value passed to the handler.
- * @return 0 on success, -1 on invalid arguments or accept failure.
- */
 int cobalt_eventloop_accept(cobalt_eventloop_t *loop,
                             cobalt_fd_t         listen_fd,
                             cobalt_events_t     events,
                             fd_handler_t        callback,
                             void               *user_data)
 {
+#ifndef _WIN32
     if (!loop || listen_fd < 0 || !callback) {
         return -1;
     }
@@ -577,6 +567,14 @@ int cobalt_eventloop_accept(cobalt_eventloop_t *loop,
         close(conn_fd);
     }
     return ret;
+#else
+    (void)loop;
+    (void)listen_fd;
+    (void)events;
+    (void)callback;
+    (void)user_data;
+    return -1;
+#endif
 }
 
 /* -------------------------------------------------------------------------- */

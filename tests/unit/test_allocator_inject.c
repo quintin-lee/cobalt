@@ -23,6 +23,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdalign.h>
 #include <string.h>
 
 #define MOCK_ALLOC_SIZE 4096
@@ -43,10 +44,22 @@ static void *mock_alloc(cobalt_allocator_t *self, size_t size)
         mock_fail_next = 0;
         return NULL;
     }
+
+    size_t align = alignof(max_align_t);
+    uintptr_t raw = (uintptr_t)&mock_buf[mock_offset];
+    uintptr_t aligned = (raw + align - 1) & ~(uintptr_t)(align - 1);
+    size_t adjust = (size_t)(aligned - raw);
+
+    if (adjust > MOCK_ALLOC_SIZE - mock_offset) {
+        return NULL;
+    }
+    mock_offset += adjust;
+
     if (mock_offset + size > MOCK_ALLOC_SIZE) {
         return NULL;
     }
-    void *ptr = &mock_buf[mock_offset];
+
+    void *ptr = (void *)aligned;
     mock_offset += size;
     if (mock_tracked_count < MOCK_MAX_TRACKED) {
         mock_tracked[mock_tracked_count++] = ptr;
@@ -84,15 +97,39 @@ static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
         mock_fail_next = 0;
         return NULL;
     }
+
+    if (ptr == NULL) {
+        return mock_alloc(self, new_size);
+    }
+
+    if (new_size == 0) {
+        mock_free(self, ptr);
+        return NULL;
+    }
+
+    size_t align = alignof(max_align_t);
+    uintptr_t raw = (uintptr_t)&mock_buf[mock_offset];
+    uintptr_t aligned = (raw + align - 1) & ~(uintptr_t)(align - 1);
+    size_t adjust = (size_t)(aligned - raw);
+
+    if (adjust > MOCK_ALLOC_SIZE - mock_offset) {
+        return NULL;
+    }
+    mock_offset += adjust;
+
     if (mock_offset + new_size > MOCK_ALLOC_SIZE) {
         return NULL;
     }
-    void *new_ptr = &mock_buf[mock_offset];
-    if (ptr && new_size > 0) {
-        size_t old_size = new_size; /* simplified: just copy */
-        memcpy(new_ptr, ptr, old_size < new_size ? old_size : new_size);
-    }
+
+    void *new_ptr = (void *)aligned;
+    size_t old_size = new_size;
+    memcpy(new_ptr, ptr, old_size);
     mock_offset += new_size;
+
+    mock_free(self, ptr);
+    if (mock_tracked_count < MOCK_MAX_TRACKED) {
+        mock_tracked[mock_tracked_count++] = new_ptr;
+    }
     return new_ptr;
 }
 
