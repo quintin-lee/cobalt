@@ -779,7 +779,6 @@ cobalt_map_iterator_t *cobalt_treemap_iterator_create(cobalt_treemap_t *map)
 /* Public API                                                                 */
 /* ========================================================================= */
 
-cobalt_treemap_t *cobalt_treemap_create_with_allocator(cobalt_allocator_t *alloc);
 /**
  * @brief create empty tree map using system allocator
  * @return new map, or NULL on allocation failure
