@@ -74,6 +74,7 @@ set(SOURCES
     src/container/treemap.c
     src/container/stack.c
     src/container/queue.c
+    src/container/lfqueue.c
     src/container/set.c
     src/container/deque.c
     src/container/threadsafewrapper.c
