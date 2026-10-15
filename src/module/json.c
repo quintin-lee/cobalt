@@ -15,26 +15,9 @@
 
 #include "cobalt/module/json.h"
 #include "cobalt/memory/allocator.h"
+#include "json_internal.h"
 #include <stdlib.h>
 #include <string.h>
-
-/**
- * @brief Internal JSON node structure
- *
- * @details Forms the building block of the JSON document tree. For composite types
- *          (objects and arrays), child nodes are linked via the `next` pointer:
- *          - Objects: Object_Node -> Key_Node -> Value_Node -> Key_Node -> ...
- *          - Arrays:  Array_Node -> Element_Node -> Element_Node -> ...
- *
- *          The `key` field is only valid for object key nodes and string scalar nodes.
- *          The `value` union holds the actual data for leaf nodes.
- */
-struct json_node {
-    json_type_t       type;  /**< Node type: scalar, array, or object */
-    json_value_t      value; /**< Union holding scalar data (number, string, bool) */
-    struct json_node *next;  /**< Next sibling node in the parent's child list */
-    char *key; /**< Key string for object members; NULL for array elements and scalars */
-};
 
 /* ========================================================================= */
 /* Type-predicate accessors                                                  */
@@ -135,7 +118,20 @@ json_node_t *json_tree_get_child(json_node_t *parent, const char *key)
         return NULL;
     }
 
-    json_node_t *kv = parent->next; /* First key node */
+    /* Support hierarchical child-linked representation */
+    if (parent->child) {
+        json_node_t *kv = parent->child;
+        while (kv) {
+            if (kv->key && strcmp(kv->key, key) == 0) {
+                return kv->child ? kv->child : kv->next;
+            }
+            kv = kv->next;
+        }
+        return NULL;
+    }
+
+    /* Fallback to legacy alternating representation */
+    json_node_t *kv = parent->next;
     while (kv) {
         if (kv->key && strcmp(kv->key, key) == 0) {
             return kv->next; /* Return the value node paired with this key */
@@ -166,11 +162,28 @@ void json_destroy_with_alloc(json_node_t *node, cobalt_allocator_t *alloc)
     if (!node) {
         return;
     }
+
+    /* Fast path: O(1) bulk destruction when backed by a memory arena */
+    if (node->arena) {
+        if (node->owns_arena) {
+            cobalt_arena_destroy(node->arena);
+        }
+        return;
+    }
+
     if (!alloc) {
         alloc = cobalt_allocator_get_system();
     }
 
-    if (node->type == JSON_OBJECT || node->type == JSON_ARRAY) {
+    if (node->child) {
+        json_node_t *curr = node->child;
+        while (curr) {
+            json_node_t *next = curr->next;
+            json_destroy_with_alloc(curr, alloc);
+            curr = next;
+        }
+        node->child = NULL;
+    } else if (node->type == JSON_OBJECT || node->type == JSON_ARRAY) {
         json_node_t *child = node->next;
         while (child) {
             json_node_t *value   = child->next;

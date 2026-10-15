@@ -1,254 +1,226 @@
 /**
  * @file json_serialize.c
- * @brief Implementation of the JSON serializer
+ * @brief Optimized implementation of the JSON serializer
  */
 #include "cobalt/memory/allocator.h"
 #include "cobalt/module/json.h"
-
-/**
- * @brief Opaque node structure — definition kept private to JSON module
- */
-struct json_node {
-    json_type_t       type;
-    json_value_t      value;
-    struct json_node *next;
-    char             *key;
-};
-#include <stdarg.h>
+#include "json_internal.h"
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 /**
- * @brief Grow the output buffer so it holds at least @p need bytes
- * @return 0 on success (or when already large enough), -1 on allocation failure
+ * @brief Dynamic string buffer for single-pass geometric expansion
  */
-static int ensure_capacity(char **buf, size_t *cap, size_t need, cobalt_allocator_t *alloc)
+typedef struct {
+    char               *data;
+    size_t              cap;
+    size_t              len;
+    cobalt_allocator_t *alloc;
+    bool                oom;
+} json_buf_t;
+
+static inline bool buf_ensure(json_buf_t *b, size_t needed)
 {
-    if (need > *cap) {
-        size_t new_cap = (*cap + need) * 2;
-        char  *tmp     = cobalt_allocator_realloc(alloc, *buf, new_cap);
+    if (b->oom) {
+        return false;
+    }
+    if (b->len + needed + 1 > b->cap) {
+        size_t new_cap = (b->cap + needed + 1) * 2;
+        if (new_cap < 512) {
+            new_cap = 512;
+        }
+        char *tmp = (char *)cobalt_allocator_realloc(b->alloc, b->data, new_cap);
         if (!tmp) {
-            return -1;
+            b->oom = true;
+            return false;
         }
-        *buf = tmp;
-        *cap = new_cap;
+        b->data = tmp;
+        b->cap  = new_cap;
     }
-    return 0;
+    return true;
+}
+
+static inline void buf_append_char(json_buf_t *b, char c)
+{
+    if (buf_ensure(b, 1)) {
+        b->data[b->len++] = c;
+    }
+}
+
+static inline void buf_append_str(json_buf_t *b, const char *s, size_t len)
+{
+    if (len == 0) {
+        return;
+    }
+    if (buf_ensure(b, len)) {
+        memcpy(b->data + b->len, s, len);
+        b->len += len;
+    }
+}
+
+static inline void buf_append_number(json_buf_t *b, double val)
+{
+    char tmp[64];
+    int  n = snprintf(tmp, sizeof(tmp), "%.17g", val);
+    if (n > 0) {
+        buf_append_str(b, tmp, (size_t)n);
+    }
 }
 
 /**
- * @brief Append printf-formatted output to the buffer, growing it as needed
- * @return 0 on success, -1 on format or allocation failure
+ * @brief Fast escaped string appender avoiding intermediate heap allocation
  */
-static int
-json_append(char **buf, size_t *cap, size_t *len, cobalt_allocator_t *alloc, const char *fmt, ...)
+static void buf_append_escaped_string(json_buf_t *b, const char *s, size_t len)
 {
-    va_list args;
-    va_start(args, fmt);
+    buf_append_char(b, '"');
 
-    int n = vsnprintf(NULL, 0, fmt, args);
-    va_end(args);
-    if (n < 0) {
-        return -1;
-    }
-
-    if (ensure_capacity(buf, cap, *len + n + 1, alloc) != 0) {
-        return -1;
-    }
-
-    va_start(args, fmt);
-    n = vsnprintf(*buf + *len, *cap - *len, fmt, args);
-    va_end(args);
-    if (n < 0 || (size_t)n >= *cap - *len) {
-        if (ensure_capacity(buf, cap, *len + n + 1, alloc) != 0) {
-            return -1;
-        }
-        va_start(args, fmt);
-        n = vsnprintf(*buf + *len, *cap - *len, fmt, args);
-        va_end(args);
-    }
-    *len += n;
-    return 0;
-}
-
-/** @brief Duplicate a string with the given allocator; NULL on failure. */
-static char *jstrdup(cobalt_allocator_t *alloc, const char *s)
-{
-    size_t len = strlen(s) + 1;
-    char  *dup = cobalt_allocator_alloc(alloc, len);
-    if (dup) {
-        memcpy(dup, s, len);
-    }
-    return dup;
-}
-
-/**
- * @brief Escape a raw string into its JSON representation
- * @param s Raw bytes to escape (may contain quotes, backslashes, controls)
- * @param len Number of bytes to read from @p s
- * @param alloc Allocator for the escaped output; NULL on allocation failure
- * @return Newly allocated escaped string, NULL on allocation failure
- */
-static char *json_escape(const char *s, size_t len, cobalt_allocator_t *alloc)
-{
-    size_t out = 0;
-    for (const char *p = s; p < s + len; p++) {
-        switch (*p) {
-        case '"':
-        case '\\':
-        case '\n':
-        case '\r':
-        case '\t':
-            out += 2;
-            break;
-        default:
-            out += ((unsigned char)*p < 0x20) ? 6 : 1;
+    /* Fast scan: check if any byte needs escaping */
+    bool needs_escape = false;
+    for (size_t i = 0; i < len; i++) {
+        uint8_t c = (uint8_t)s[i];
+        if (c == '"' || c == '\\' || c < 0x20) {
+            needs_escape = true;
             break;
         }
     }
 
-    char *result = cobalt_allocator_alloc(alloc, out + 1);
-    if (!result) {
-        return NULL;
-    }
-
-    char *out_ptr = result;
-    for (const char *p = s; p < s + len; p++) {
-        switch (*p) {
-        case '"':
-            *out_ptr++ = '\\';
-            *out_ptr++ = '"';
-            break;
-        case '\\':
-            *out_ptr++ = '\\';
-            *out_ptr++ = '\\';
-            break;
-        case '\n':
-            *out_ptr++ = '\\';
-            *out_ptr++ = 'n';
-            break;
-        case '\r':
-            *out_ptr++ = '\\';
-            *out_ptr++ = 'r';
-            break;
-        case '\t':
-            *out_ptr++ = '\\';
-            *out_ptr++ = 't';
-            break;
-        default:
-            if ((unsigned char)*p < 0x20) {
-                out_ptr += sprintf(out_ptr, "\\u00%02x", (unsigned char)*p);
-            } else {
-                *out_ptr++ = *p;
+    if (!needs_escape) {
+        /* Direct copy for clean ASCII and UTF-8 strings */
+        buf_append_str(b, s, len);
+    } else {
+        /* Escape characters directly into output buffer */
+        for (size_t i = 0; i < len; i++) {
+            uint8_t c = (uint8_t)s[i];
+            switch (c) {
+            case '"':
+                buf_append_str(b, "\\\"", 2);
+                break;
+            case '\\':
+                buf_append_str(b, "\\\\", 2);
+                break;
+            case '\n':
+                buf_append_str(b, "\\n", 2);
+                break;
+            case '\r':
+                buf_append_str(b, "\\r", 2);
+                break;
+            case '\t':
+                buf_append_str(b, "\\t", 2);
+                break;
+            case '\b':
+                buf_append_str(b, "\\b", 2);
+                break;
+            case '\f':
+                buf_append_str(b, "\\f", 2);
+                break;
+            default:
+                if (c < 0x20) {
+                    char hex_buf[8];
+                    snprintf(hex_buf, sizeof(hex_buf), "\\u00%02x", c);
+                    buf_append_str(b, hex_buf, 6);
+                } else {
+                    buf_append_char(b, (char)c);
+                }
+                break;
             }
-            break;
+            if (b->oom) {
+                return;
+            }
         }
     }
-    *out_ptr = '\0';
-    return result;
+
+    buf_append_char(b, '"');
 }
 
 /**
- * @brief Shared serialization worker used by both public entry points
- * @param node Subtree to serialize (NULL yields "null")
- * @param alloc Resolved allocator, never NULL (callers resolve NULL to system)
- * @return Newly allocated JSON string; "{}" fallback when the buffer itself fails
+ * @brief Recursive node serialization directly into the growing output buffer
  */
-static char *json_serialize_impl(json_node_t *node, cobalt_allocator_t *alloc)
+static void serialize_node(json_node_t *node, json_buf_t *b)
 {
-    if (!node) {
-        return jstrdup(alloc, "null");
+    if (b->oom) {
+        return;
     }
-
-    size_t cap = 256;
-    size_t len = 0;
-    char  *buf = cobalt_allocator_alloc(alloc, cap);
-    if (!buf) {
-        return jstrdup(alloc, "{}");
+    if (!node) {
+        buf_append_str(b, "null", 4);
+        return;
     }
 
     switch (node->type) {
     case JSON_NULL:
-        json_append(&buf, &cap, &len, alloc, "null");
+        buf_append_str(b, "null", 4);
         break;
 
     case JSON_TRUE:
-        json_append(&buf, &cap, &len, alloc, "true");
+        buf_append_str(b, "true", 4);
         break;
 
     case JSON_FALSE:
-        json_append(&buf, &cap, &len, alloc, "false");
+        buf_append_str(b, "false", 5);
         break;
 
     case JSON_NUMBER:
-        json_append(&buf, &cap, &len, alloc, "%.17g", node->value.number);
+        buf_append_number(b, node->value.number);
         break;
 
-    case JSON_STRING: {
+    case JSON_STRING:
         if (node->value.string) {
-            char *escaped = json_escape(node->value.string, strlen(node->value.string), alloc);
-            if (!escaped) {
-                cobalt_allocator_free(alloc, buf);
-                return jstrdup(alloc, "{}");
-            }
-            json_append(&buf, &cap, &len, alloc, "\"%s\"", escaped);
-            cobalt_allocator_free(alloc, escaped);
+            buf_append_escaped_string(b, node->value.string, strlen(node->value.string));
         } else {
-            json_append(&buf, &cap, &len, alloc, "\"\"");
+            buf_append_str(b, "\"\"", 2);
         }
         break;
-    }
 
     case JSON_ARRAY: {
-        json_append(&buf, &cap, &len, alloc, "[");
-        json_node_t *child = node->next;
-        int          first = 1;
-        while (child) {
+        buf_append_char(b, '[');
+        json_node_t *elem  = node->child ? node->child : node->next;
+        bool         first = true;
+        while (elem && !b->oom) {
             if (!first) {
-                json_append(&buf, &cap, &len, alloc, ",");
+                buf_append_char(b, ',');
             }
-            first   = 0;
-            char *s = json_serialize_impl(child, alloc);
-            if (s) {
-                json_append(&buf, &cap, &len, alloc, "%s", s);
-                cobalt_allocator_free(alloc, s);
-            }
-            child = child->next;
+            first = false;
+            serialize_node(elem, b);
+            elem = elem->next;
         }
-        json_append(&buf, &cap, &len, alloc, "]");
+        buf_append_char(b, ']');
         break;
     }
 
     case JSON_OBJECT: {
-        json_append(&buf, &cap, &len, alloc, "{");
-        json_node_t *kv    = node->next;
-        int          first = 1;
-        while (kv) {
+        buf_append_char(b, '{');
+        json_node_t *kv    = node->child ? node->child : node->next;
+        bool         first = true;
+        while (kv && !b->oom) {
             if (!first) {
-                json_append(&buf, &cap, &len, alloc, ",");
+                buf_append_char(b, ',');
             }
-            first = 0;
-            char *key_esc =
-                json_escape(kv->key ? kv->key : "", strlen(kv->key ? kv->key : ""), alloc);
-            if (key_esc) {
-                json_append(&buf, &cap, &len, alloc, "\"%s\":", key_esc);
-                cobalt_allocator_free(alloc, key_esc);
-            }
-            char *val = json_serialize_impl(kv->next, alloc);
-            if (val) {
-                json_append(&buf, &cap, &len, alloc, "%s", val);
-                cobalt_allocator_free(alloc, val);
-            }
-            kv = kv->next ? kv->next->next : NULL;
+            first = false;
+
+            const char *key = kv->key ? kv->key : "";
+            buf_append_escaped_string(b, key, strlen(key));
+            buf_append_char(b, ':');
+
+            json_node_t *val = kv->child ? kv->child : kv->next;
+            serialize_node(val, b);
+            kv = kv->child ? kv->next : (kv->next ? kv->next->next : NULL);
         }
-        json_append(&buf, &cap, &len, alloc, "}");
+        buf_append_char(b, '}');
         break;
     }
     }
+}
 
-    json_append(&buf, &cap, &len, alloc, "");
-    return buf;
+static char *jstrdup(cobalt_allocator_t *alloc, const char *s)
+{
+    size_t len = strlen(s) + 1;
+    char  *dup = (char *)cobalt_allocator_alloc(alloc, len);
+    if (dup) {
+        memcpy(dup, s, len);
+    }
+    return dup;
 }
 
 char *json_serialize_with_alloc(json_node_t *node, cobalt_allocator_t *alloc)
@@ -256,14 +228,37 @@ char *json_serialize_with_alloc(json_node_t *node, cobalt_allocator_t *alloc)
     if (!alloc) {
         alloc = cobalt_allocator_get_system();
     }
-    return json_serialize_impl(node, alloc);
+
+    if (!node) {
+        return jstrdup(alloc, "null");
+    }
+
+    json_buf_t b = {
+        .data  = NULL,
+        .cap   = 0,
+        .len   = 0,
+        .alloc = alloc,
+        .oom   = false,
+    };
+
+    /* Initial capacity estimation */
+    if (!buf_ensure(&b, 256)) {
+        return jstrdup(alloc, "{}");
+    }
+
+    serialize_node(node, &b);
+
+    if (b.oom || !b.data) {
+        if (b.data) {
+            cobalt_allocator_free(alloc, b.data);
+        }
+        return jstrdup(alloc, "{}");
+    }
+
+    b.data[b.len] = '\0';
+    return b.data;
 }
 
-/**
- * @brief Serialize a JSON node tree with the system allocator
- * @param node Root node of the JSON node tree
- * @return Dynamically allocated JSON string (see json_serialize_with_alloc)
- */
 char *json_serialize(json_node_t *node)
 {
     return json_serialize_with_alloc(node, NULL);

@@ -56,5 +56,6 @@
 /* --- Additional function modules --- */
 #include <cobalt/module/eventloop.h>
 #include <cobalt/module/json.h>
+#include <cobalt/module/json_sax.h>
 
 #endif /* COBALT_H */

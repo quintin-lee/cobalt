@@ -4,18 +4,11 @@
  * @note This file is typically included and compiled by json.c, not exposed separately.
  */
 #include "cobalt/memory/allocator.h"
+#include "cobalt/memory/arena.h"
 #include "cobalt/module/json.h"
-
-/**
- * @brief Opaque node structure — definition kept private to JSON module
- */
-struct json_node {
-    json_type_t       type;
-    json_value_t      value;
-    struct json_node *next;
-    char             *key;
-};
+#include "json_internal.h"
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -24,27 +17,42 @@ struct json_node {
  * Stores the string currently being parsed, position, and total length.
  */
 typedef struct {
-    const char         *str;   /**< The JSON string to be parsed */
-    size_t              pos;   /**< The current character position being parsed */
-    size_t              len;   /**< Total length of the string */
-    cobalt_allocator_t *alloc; /**< Resolved allocator (never NULL after entry) */
+    const char         *str;        /**< The JSON string to be parsed */
+    size_t              pos;        /**< The current character position being parsed */
+    size_t              len;        /**< Total length of the string */
+    cobalt_allocator_t *alloc;      /**< Resolved allocator (never NULL after entry) */
+    cobalt_arena_t     *arena;      /**< Backing memory arena (if using arena) */
+    bool                owns_arena; /**< True if parser created and owns the arena */
 } json_parse_ctx_t;
 
-/** @brief Allocate parser memory via the context's resolved allocator. */
+/** @brief Allocate parser memory via the context's resolved allocator or arena. */
 static void *jalloc(json_parse_ctx_t *ctx, size_t size)
 {
+    if (ctx->arena) {
+        return cobalt_arena_alloc(ctx->arena, size);
+    }
     return cobalt_allocator_alloc(ctx->alloc, size);
 }
 
 /** @brief Release parser memory via the context's resolved allocator. */
 static void jfree(json_parse_ctx_t *ctx, void *ptr)
 {
-    cobalt_allocator_free(ctx->alloc, ptr);
+    if (!ctx->arena && ptr) {
+        cobalt_allocator_free(ctx->alloc, ptr);
+    }
 }
 
-/** @brief Resize parser memory via the context's resolved allocator. */
+/** @brief Resize parser memory via the context's resolved allocator or arena. */
 static void *jrealloc(json_parse_ctx_t *ctx, void *ptr, size_t new_size)
 {
+    if (ctx->arena) {
+        void *new_ptr = cobalt_arena_alloc(ctx->arena, new_size);
+        if (new_ptr && ptr) {
+            /* Copy available content from old block */
+            memcpy(new_ptr, ptr, new_size / 2);
+        }
+        return new_ptr;
+    }
     return cobalt_allocator_realloc(ctx->alloc, ptr, new_size);
 }
 
@@ -79,12 +87,15 @@ static void json_skip_whitespace(json_parse_ctx_t *ctx)
  */
 static json_node_t *json_node_create(json_parse_ctx_t *ctx, json_type_t type)
 {
-    json_node_t *node = jalloc(ctx, sizeof(json_node_t));
+    json_node_t *node = (json_node_t *)jalloc(ctx, sizeof(json_node_t));
     if (node) {
         node->type = type;
         memset(&node->value, 0, sizeof(node->value));
-        node->next = NULL;
-        node->key  = NULL;
+        node->next       = NULL;
+        node->child      = NULL;
+        node->key        = NULL;
+        node->arena      = NULL;
+        node->owns_arena = false;
     }
     return node;
 }
@@ -104,7 +115,7 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
 
     size_t capacity = 64;
     size_t len      = 0;
-    char  *result   = jalloc(ctx, capacity);
+    char  *result   = (char *)jalloc(ctx, capacity);
     if (!result) {
         return NULL;
     }
@@ -185,7 +196,7 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
 
             if (len + elen + 1 > capacity) {
                 capacity  = (len + elen + 1) * 2;
-                char *tmp = jrealloc(ctx, result, capacity);
+                char *tmp = (char *)jrealloc(ctx, result, capacity);
                 if (!tmp) {
                     jfree(ctx, result);
                     return NULL;
@@ -198,7 +209,7 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
         } else {
             if (len + 2 > capacity) {
                 capacity *= 2;
-                char *tmp = jrealloc(ctx, result, capacity);
+                char *tmp = (char *)jrealloc(ctx, result, capacity);
                 if (!tmp) {
                     jfree(ctx, result);
                     return NULL;
@@ -235,6 +246,11 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
     ctx->pos++;
 
     json_node_t *root = json_node_create(ctx, JSON_OBJECT);
+    if (!root) {
+        return NULL;
+    }
+
+    json_node_t *tail = NULL;
     json_skip_whitespace(ctx);
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
         ctx->pos++;
@@ -268,20 +284,23 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
         json_node_t *kv = json_node_create(ctx, JSON_OBJECT);
         if (!kv) {
             jfree(ctx, key);
-            json_destroy_with_alloc(value, ctx->alloc);
+            if (!ctx->arena) {
+                json_destroy_with_alloc(value, ctx->alloc);
+            }
             break;
         }
-        kv->key  = key;
-        kv->next = value;
-        if (!root->next) {
-            root->next = kv;
+        kv->key   = key;
+        kv->child = value;
+        kv->next  = NULL;
+
+        /* O(1) tail append */
+        if (!tail) {
+            root->child = kv;
+            root->next  = kv;
         } else {
-            json_node_t *tail = root->next;
-            while (tail->next) {
-                tail = tail->next;
-            }
             tail->next = kv;
         }
+        tail = kv;
 
         json_skip_whitespace(ctx);
         if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ',') {
@@ -316,6 +335,10 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
     ctx->pos++;
 
     json_node_t *root = json_node_create(ctx, JSON_ARRAY);
+    if (!root) {
+        return NULL;
+    }
+
     json_node_t *tail = NULL;
     json_skip_whitespace(ctx);
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
@@ -331,7 +354,8 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
 
         elem->next = NULL;
         if (!tail) {
-            root->next = elem;
+            root->child = elem;
+            root->next  = elem;
         } else {
             tail->next = elem;
         }
@@ -388,13 +412,30 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
 
     if (c == '-' || isdigit((unsigned char)c)) {
         size_t start = ctx->pos;
-        // Simple handling: skip all digits, minus sign, decimal point
-        while (ctx->pos < ctx->len &&
-               (isdigit((unsigned char)ctx->str[ctx->pos]) || ctx->str[ctx->pos] == '.')) {
+        if (c == '-') {
             ctx->pos++;
         }
+        while (ctx->pos < ctx->len && isdigit((unsigned char)ctx->str[ctx->pos])) {
+            ctx->pos++;
+        }
+        if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '.') {
+            ctx->pos++;
+            while (ctx->pos < ctx->len && isdigit((unsigned char)ctx->str[ctx->pos])) {
+                ctx->pos++;
+            }
+        }
+        if (ctx->pos < ctx->len && (ctx->str[ctx->pos] == 'e' || ctx->str[ctx->pos] == 'E')) {
+            ctx->pos++;
+            if (ctx->pos < ctx->len && (ctx->str[ctx->pos] == '+' || ctx->str[ctx->pos] == '-')) {
+                ctx->pos++;
+            }
+            while (ctx->pos < ctx->len && isdigit((unsigned char)ctx->str[ctx->pos])) {
+                ctx->pos++;
+            }
+        }
+
         size_t num_len = ctx->pos - start;
-        char  *num_str = jalloc(ctx, num_len + 1);
+        char  *num_str = (char *)jalloc(ctx, num_len + 1);
         if (!num_str) {
             return NULL;
         }
@@ -411,15 +452,15 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
         return node;
     }
 
-    if (strncmp(ctx->str + ctx->pos, "true", 4) == 0) {
+    if (ctx->pos + 4 <= ctx->len && strncmp(ctx->str + ctx->pos, "true", 4) == 0) {
         ctx->pos += 4;
         return json_node_create(ctx, JSON_TRUE);
     }
-    if (strncmp(ctx->str + ctx->pos, "false", 5) == 0) {
+    if (ctx->pos + 5 <= ctx->len && strncmp(ctx->str + ctx->pos, "false", 5) == 0) {
         ctx->pos += 5;
         return json_node_create(ctx, JSON_FALSE);
     }
-    if (strncmp(ctx->str + ctx->pos, "null", 4) == 0) {
+    if (ctx->pos + 4 <= ctx->len && strncmp(ctx->str + ctx->pos, "null", 4) == 0) {
         ctx->pos += 4;
         return json_node_create(ctx, JSON_NULL);
     }
@@ -427,11 +468,47 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx)
     return NULL;
 }
 
-/*
- * @brief Exposed entry point for parsing
- *
- * Wraps the text, initializes the parsing context, and calls json_parse_value.
- */
+/* -----------------------------------------------------------------------------
+ *  Public DOM Parsing Functions
+ * -------------------------------------------------------------------------- */
+
+json_node_t *json_parse_with_arena(const char *text, cobalt_arena_t *arena)
+{
+    if (!text || !arena) {
+        return NULL;
+    }
+    size_t len = strlen(text);
+    if (len == 0) {
+        return NULL;
+    }
+
+    json_parse_ctx_t ctx = {
+        .str        = text,
+        .pos        = 0,
+        .len        = len,
+        .alloc      = NULL,
+        .arena      = arena,
+        .owns_arena = false,
+    };
+
+    json_skip_whitespace(&ctx);
+    if (ctx.pos >= ctx.len) {
+        return NULL;
+    }
+
+    json_node_t *root = json_parse_value(&ctx);
+    if (root) {
+        root->arena      = arena;
+        root->owns_arena = false;
+    }
+    return root;
+}
+
+json_node_t *cobalt_json_parse_with_arena(const char *text, cobalt_arena_t *arena)
+{
+    return json_parse_with_arena(text, arena);
+}
+
 json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc)
 {
     if (!text) {
@@ -442,21 +519,38 @@ json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc)
         return NULL;
     }
 
-    json_parse_ctx_t ctx = {
-        .str = text, .pos = 0, .len = len, .alloc = alloc ? alloc : cobalt_allocator_get_system()};
-    json_skip_whitespace(&ctx);
-    if (ctx.pos >= ctx.len) {
+    cobalt_allocator_t *effective_alloc = alloc ? alloc : cobalt_allocator_get_system();
+    cobalt_arena_t     *arena           = cobalt_arena_create_with_allocator(4096, effective_alloc);
+    if (!arena) {
         return NULL;
     }
 
-    return json_parse_value(&ctx);
+    json_parse_ctx_t ctx = {
+        .str        = text,
+        .pos        = 0,
+        .len        = len,
+        .alloc      = effective_alloc,
+        .arena      = arena,
+        .owns_arena = true,
+    };
+
+    json_skip_whitespace(&ctx);
+    if (ctx.pos >= ctx.len) {
+        cobalt_arena_destroy(arena);
+        return NULL;
+    }
+
+    json_node_t *root = json_parse_value(&ctx);
+    if (!root) {
+        cobalt_arena_destroy(arena);
+        return NULL;
+    }
+
+    root->arena      = arena;
+    root->owns_arena = true;
+    return root;
 }
 
-/**
- * @brief Parse a JSON string with the system allocator
- * @param text Null-terminated JSON formatted text
- * @return Root node on success, NULL on failure (see json_parse_with_alloc)
- */
 json_node_t *json_parse(const char *text)
 {
     return json_parse_with_alloc(text, NULL);

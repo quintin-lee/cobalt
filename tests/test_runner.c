@@ -27,6 +27,7 @@ void test_sort(void);
 void test_functional(void);
 void test_stream(void);
 void test_json(void);
+void test_json_sax(void);
 void test_eventloop(void);
 void test_stack(void);
 void test_queue(void);
@@ -67,6 +68,7 @@ static const TestEntry test_registry[] = {
     {"sort", test_sort},
     {"stream", test_stream},
     {"json", test_json},
+    {"json_sax", test_json_sax},
     {"eventloop", test_eventloop},
     {"stack", test_stack},
     {"queue", test_queue},

@@ -18,6 +18,7 @@ void test_json_allocator(void);
 void test_json_malformed_paths(void);
 void test_json_long_escapes(void);
 void test_json_oom(void);
+void test_json_arena(void);
 
 /* Counting allocator: delegates to libc, counts live blocks.
  * realloc is counted as free(old)+alloc(new) on success, so a full
@@ -693,6 +694,7 @@ void test_json(void)
     test_json_malformed_paths();
     test_json_long_escapes();
     test_json_oom();
+    test_json_arena();
     printf("  JSON tests completed\n");
 }
 
@@ -891,4 +893,36 @@ void test_json_parse_extended(void)
     }
 
     printf("  Extended parsing tests completed\n");
+}
+
+void test_json_arena(void)
+{
+    printf("Testing JSON arena-backed parsing and reset...\n");
+
+    cobalt_arena_t *arena = cobalt_arena_create(4096);
+    TEST_ASSERT(arena != NULL);
+
+    /* Parse multiple documents using the same arena */
+    for (int i = 0; i < 50; i++) {
+        char doc[64];
+        snprintf(doc, sizeof(doc), "{\"index\": %d, \"valid\": true}", i);
+        json_node_t *root = json_parse_with_arena(doc, arena);
+        TEST_ASSERT(root != NULL);
+        json_node_t *idx_node = json_tree_get_child(root, "index");
+        TEST_ASSERT(idx_node != NULL && json_get_number(idx_node) == (double)i);
+
+        /* json_destroy on arena-backed node does NOT destroy the external arena */
+        json_destroy(root);
+    }
+
+    /* Reset arena and parse again */
+    cobalt_arena_reset(arena);
+    json_node_t *after_reset = json_parse_with_arena("{\"hello\": \"world\"}", arena);
+    TEST_ASSERT(after_reset != NULL);
+    json_node_t *hello = json_tree_get_child(after_reset, "hello");
+    TEST_ASSERT(hello != NULL && strcmp(json_get_string(hello), "world") == 0);
+    json_destroy(after_reset);
+
+    cobalt_arena_destroy(arena);
+    printf("  JSON arena parsing: OK\n");
 }

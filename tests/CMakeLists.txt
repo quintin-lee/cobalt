@@ -42,6 +42,7 @@ add_test(NAME test_string COMMAND cobalt_test --filter string)
 add_test(NAME test_functional COMMAND cobalt_test --filter functional)
 add_test(NAME test_stream COMMAND cobalt_test --filter stream)
 add_test(NAME test_json COMMAND cobalt_test --filter json)
+add_test(NAME test_json_sax COMMAND cobalt_test --filter json_sax)
 if(NOT WIN32)
 add_test(NAME test_eventloop COMMAND cobalt_test --filter eventloop)
 endif()
@@ -92,6 +93,9 @@ target_link_libraries(benchmark_threadsafewrapper cobalt pthread m)
 add_executable(benchmark_lfqueue benchmark/benchmark_lfqueue.c)
 target_link_libraries(benchmark_lfqueue cobalt pthread m)
 
+add_executable(benchmark_json benchmark/benchmark_json.c)
+target_link_libraries(benchmark_json cobalt m)
+
 # Register benchmarks with CTest
 add_test(NAME bench_vector COMMAND benchmark_vector
          PASS_REGULAR_EXPRESSION "Benchmark completed")
@@ -106,6 +110,8 @@ add_test(NAME bench_deque COMMAND benchmark_deque
 add_test(NAME bench_threadsafewrapper COMMAND benchmark_threadsafewrapper
          PASS_REGULAR_EXPRESSION "Benchmark suite complete")
 add_test(NAME bench_lfqueue COMMAND benchmark_lfqueue
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+add_test(NAME bench_json COMMAND benchmark_json
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 
 # Unified benchmark runner

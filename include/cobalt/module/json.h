@@ -9,6 +9,7 @@
  */
 
 #include "cobalt/memory/allocator.h"
+#include "cobalt/memory/arena.h"
 #include <stddef.h>
 
 /**
@@ -97,6 +98,21 @@ char *json_serialize_with_alloc(json_node_t *node, cobalt_allocator_t *alloc);
  * @param alloc Allocator the tree was built with; NULL selects the system allocator
  */
 void json_destroy_with_alloc(json_node_t *node, cobalt_allocator_t *alloc);
+
+/**
+ * @brief Parse a JSON string using a caller-provided memory arena
+ * @param text Null-terminated JSON formatted text
+ * @param arena Backing memory arena (must not be NULL)
+ * @return Returns the root node of the parsed JSON node tree on success, NULL on failure
+ * @note The tree's lifetime is tied to @p arena. Calling json_destroy(node) will NOT
+ *       destroy @p arena, allowing callers to reset and reuse the arena across parses.
+ */
+json_node_t *json_parse_with_arena(const char *text, cobalt_arena_t *arena);
+
+/**
+ * @brief Canonical framework alias for json_parse_with_arena
+ */
+json_node_t *cobalt_json_parse_with_arena(const char *text, cobalt_arena_t *arena);
 
 /* -----------------------------------------------------------------------------
  *  JSON Query Helper Functions

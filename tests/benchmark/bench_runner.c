@@ -12,6 +12,8 @@
 #include "cobalt/container/stack.h"
 #include "cobalt/container/treemap.h"
 #include "cobalt/container/vector.h"
+#include "cobalt/module/json.h"
+#include "cobalt/module/json_sax.h"
 #include "cobalt/utils/benchmark.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -169,6 +171,29 @@ static void bench_lfqueue(void)
     cobalt_lfqueue_destroy(q);
 }
 
+/* ===== JSON ===== */
+static const char *g_bench_json_sample =
+    "{\"name\":\"Cobalt\",\"version\":2.4,\"active\":true,\"features\":[\"sax\",\"arena\","
+    "\"swar\"],\"data\":{\"count\":42,\"ratio\":3.14159}}";
+
+static void bench_json_sax(void)
+{
+    cobalt_json_sax_handler_t h;
+    memset(&h, 0, sizeof(h));
+    size_t len = strlen(g_bench_json_sample);
+    for (int i = 0; i < 20000; i++) {
+        cobalt_json_sax_parse(g_bench_json_sample, len, &h, NULL, NULL);
+    }
+}
+
+static void bench_json_dom(void)
+{
+    for (int i = 0; i < 20000; i++) {
+        json_node_t *node = json_parse(g_bench_json_sample);
+        json_destroy(node);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     int json_mode = 0;
@@ -206,7 +231,11 @@ int main(int argc, char *argv[])
         cobalt_bench_run("set_insert", 3, bench_set_insert, &results[10]);
         results[11].name = "lfqueue";
         cobalt_bench_run("lfqueue", 3, bench_lfqueue, &results[11]);
-        results[12].name = NULL;
+        results[12].name = "json_sax";
+        cobalt_bench_run("json_sax", 3, bench_json_sax, &results[12]);
+        results[13].name = "json_dom";
+        cobalt_bench_run("json_dom", 3, bench_json_dom, &results[13]);
+        results[14].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         return 0;
@@ -244,6 +273,10 @@ int main(int argc, char *argv[])
 
     printf("--- Set ---\n");
     BENCH_RUN("set insert (100k)", 3, bench_set_insert);
+
+    printf("--- JSON ---\n");
+    BENCH_RUN("json sax parse (20k)", 3, bench_json_sax);
+    BENCH_RUN("json dom parse+destroy (20k)", 3, bench_json_dom);
 
     printf("\nBenchmark suite complete.\n");
     return 0;
