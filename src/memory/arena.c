@@ -2,15 +2,18 @@
  * @file arena.c
  * @brief Implementation of the arena (region-based) memory allocator
  *
- * @details Provides a high-performance linear "bump pointer" allocator. The arena
- *          allocates a large contiguous buffer upfront and satisfies requests by
- *          linearly advancing a cursor. Memory is never individually freed during
- *          the arena's lifetime — instead, `cobalt_arena_reset()` rewinds the
- *          cursor in O(1), making the entire buffer available for reuse.
+ * @details Provides a high-performance linear "bump pointer" allocator using a
+ *          chunked block architecture. The arena allocates chunks of memory upfront
+ *          and satisfies requests by linearly advancing a cursor within the active chunk.
+ *          When a chunk's remaining space is exhausted, a new chunk is allocated and
+ *          linked without moving or reallocating existing chunks.
  *
- *          Allocation requests are rounded up to `alignof(max_align_t)` to ensure
- *          the returned pointer is suitably aligned for any C data type. When the
- *          current buffer is exhausted, the arena doubles its capacity via `realloc`.
+ *          This guarantees pointer stability: memory addresses returned by
+ *          `cobalt_arena_alloc()` never change or become invalid during the lifetime
+ *          of the arena.
+ *
+ *          `cobalt_arena_reset()` rewinds cursors in O(K) (where K is chunk count)
+ *          retaining all chunk buffers for immediate reuse without system calls.
  */
 
 #include "cobalt/memory/arena.h"
@@ -19,19 +22,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define COBALT_ARENA_MIN_CHUNK_SIZE 4096
+
+/**
+ * @brief Singly-linked memory block backing the arena
+ */
+typedef struct arena_chunk {
+    struct arena_chunk *next;                   /**< Next chunk in the allocated chain */
+    size_t              capacity;               /**< Byte capacity of the data buffer */
+    size_t              used;                   /**< Number of bytes allocated from this chunk */
+    _Alignas(max_align_t) unsigned char data[]; /**< Natural-aligned payload memory */
+} arena_chunk_t;
+
 /**
  * @brief Internal arena control structure
- *
- * @details Maintains the state for a single arena instance. Note the distinction
- *          between `size` (the initial/logical size, currently unused in allocation
- *          logic) and `capacity` (the actual bytes backing the arena's buffer).
  */
 struct cobalt_arena {
-    void               *buffer;   /**< Base address of the underlying memory block */
-    size_t              size;     /**< Initial or logical size; retained for introspection */
-    size_t              used;     /**< Number of bytes already allocated (bump-pointer cursor) */
-    size_t              capacity; /**< Total capacity of the underlying buffer in bytes */
-    cobalt_allocator_t *alloc;    /**< Backing allocator used for buffer growth and destruction */
+    arena_chunk_t      *current;            /**< Active chunk serving allocations */
+    arena_chunk_t      *chunks;             /**< Head of chunk linked list */
+    size_t              default_chunk_size; /**< Default chunk capacity */
+    size_t              total_allocated;    /**< Total capacity allocated across all chunks */
+    cobalt_allocator_t *alloc;              /**< Backing allocator */
 };
 
 /* ========================================================================= */
@@ -52,10 +63,6 @@ cobalt_arena_t *cobalt_arena_create(size_t initial_size)
 /**
  * @brief Create a new memory arena with a custom backing allocator
  *
- * @details Allocates the arena control structure and the underlying memory buffer
- *          in sequence. If the buffer allocation fails, the control structure is
- *          freed before returning NULL to avoid leaks.
- *
  * @param initial_size Initial capacity of the arena in bytes
  * @param alloc        Custom allocator (must not be NULL)
  * @return Pointer to the created arena, or NULL on failure
@@ -70,34 +77,46 @@ cobalt_arena_t *cobalt_arena_create_with_allocator(size_t initial_size, cobalt_a
         return NULL;
     }
 
-    arena->buffer = alloc->alloc(alloc, initial_size);
-    if (!arena->buffer) {
+    size_t chunk_cap = initial_size > 0 ? initial_size : COBALT_ARENA_MIN_CHUNK_SIZE;
+    /* Ensure chunk_cap is aligned to max_align_t */
+    chunk_cap = (chunk_cap + alignof(max_align_t) - 1) & ~(alignof(max_align_t) - 1);
+
+    arena_chunk_t *chunk = (arena_chunk_t *)alloc->alloc(alloc, sizeof(arena_chunk_t) + chunk_cap);
+    if (!chunk) {
         alloc->free(alloc, arena);
         return NULL;
     }
 
-    arena->size     = initial_size;
-    arena->used     = 0;
-    arena->capacity = initial_size;
-    arena->alloc    = alloc;
+    chunk->next     = NULL;
+    chunk->capacity = chunk_cap;
+    chunk->used     = 0;
+
+    arena->current            = chunk;
+    arena->chunks             = chunk;
+    arena->default_chunk_size = chunk_cap;
+    arena->total_allocated    = chunk_cap;
+    arena->alloc              = alloc;
     return arena;
 }
 
 /**
  * @brief Destroy an arena and release all underlying memory
  *
- * @details Frees the backing buffer first, then the arena control structure.
- *          After this call, all pointers previously returned by `cobalt_arena_alloc()`
- *          from this arena are invalid.
- *
  * @param arena Pointer to the arena to destroy; if NULL, no action is taken
  */
 void cobalt_arena_destroy(cobalt_arena_t *arena)
 {
-    if (arena) {
-        arena->alloc->free(arena->alloc, arena->buffer);
-        arena->alloc->free(arena->alloc, arena);
+    if (!arena) {
+        return;
     }
+
+    arena_chunk_t *curr = arena->chunks;
+    while (curr) {
+        arena_chunk_t *next = curr->next;
+        arena->alloc->free(arena->alloc, curr);
+        curr = next;
+    }
+    arena->alloc->free(arena->alloc, arena);
 }
 
 /* ========================================================================= */
@@ -107,59 +126,80 @@ void cobalt_arena_destroy(cobalt_arena_t *arena)
 /**
  * @brief Allocate memory from the arena
  *
- * @details Uses a linear bump-pointer strategy:
- *          1. Round `size` up to `alignof(max_align_t)` via bitwise arithmetic
- *          2. If the rounded size exceeds remaining capacity, double the buffer
- *          3. Return the current cursor position and advance `used`
- *
- *          The alignment formula `(size + align - 1) & ~(align - 1)` rounds up
- *          without branches or division.
- *
  * @param arena Pointer to the arena
  * @param size  Number of bytes to allocate
- * @return Pointer to the allocated memory, or NULL if the arena is NULL or
- *         reallocation fails
+ * @return Pointer to the allocated memory, or NULL if the arena is NULL or allocation fails
  */
 void *cobalt_arena_alloc(cobalt_arena_t *arena, size_t size)
 {
-    if (!arena) {
+    if (!arena || size == 0) {
         return NULL;
     }
 
     /* Align size to max_align_t so the returned pointer works for any C type */
     size_t aligned_size = (size + alignof(max_align_t) - 1) & ~(alignof(max_align_t) - 1);
 
-    if (arena->used + aligned_size > arena->capacity) {
-        size_t new_capacity = arena->capacity * 2;
-        void  *new_buffer   = arena->alloc->realloc(arena->alloc, arena->buffer, new_capacity);
-        if (!new_buffer) {
-            return NULL;
-        }
-        arena->buffer   = new_buffer;
-        arena->capacity = new_capacity;
+    /* Fast path: allocate from current chunk */
+    if (arena->current && (arena->current->capacity - arena->current->used >= aligned_size)) {
+        void *ptr = arena->current->data + arena->current->used;
+        arena->current->used += aligned_size;
+        return ptr;
     }
 
-    void *ptr = (char *)arena->buffer + arena->used;
-    arena->used += aligned_size;
-    return ptr;
+    /* Reuse path after reset: advance to existing next chunk if it fits */
+    if (arena->current && arena->current->next &&
+        (arena->current->next->capacity >= aligned_size)) {
+        arena->current = arena->current->next;
+        void *ptr      = arena->current->data + arena->current->used;
+        arena->current->used += aligned_size;
+        return ptr;
+    }
+
+    /* Slow path: allocate new chunk without relocating previously allocated chunks */
+    size_t new_cap =
+        aligned_size > arena->default_chunk_size ? aligned_size : arena->default_chunk_size;
+    new_cap = (new_cap + alignof(max_align_t) - 1) & ~(alignof(max_align_t) - 1);
+
+    arena_chunk_t *new_chunk =
+        (arena_chunk_t *)arena->alloc->alloc(arena->alloc, sizeof(arena_chunk_t) + new_cap);
+    if (!new_chunk) {
+        return NULL;
+    }
+
+    new_chunk->capacity = new_cap;
+    new_chunk->used     = aligned_size;
+
+    if (arena->current) {
+        new_chunk->next      = arena->current->next;
+        arena->current->next = new_chunk;
+    } else {
+        new_chunk->next = arena->chunks;
+        arena->chunks   = new_chunk;
+    }
+    arena->current = new_chunk;
+    arena->total_allocated += new_cap;
+
+    return new_chunk->data;
 }
 
 /**
  * @brief Reset the arena, making all previously allocated memory available again
  *
- * @details Simply rewinds the `used` cursor to 0. The underlying buffer is NOT
- *          returned to the system — it is retained for fast reuse. This makes
- *          reset() an O(1) operation.
- *
- *          @warning Any pointers previously returned by `cobalt_arena_alloc()` become
- *          dangling after this call. The old data remains in the buffer but will be
- *          overwritten by subsequent allocations.
+ * @details Resets the used cursor of each chunk in the chunk chain back to 0.
+ *          Chunk memory is retained for fast reuse, avoiding heap reallocations.
  *
  * @param arena Pointer to the arena; if NULL, no action is taken
  */
 void cobalt_arena_reset(cobalt_arena_t *arena)
 {
-    if (arena) {
-        arena->used = 0;
+    if (!arena) {
+        return;
     }
+
+    arena_chunk_t *curr = arena->chunks;
+    while (curr) {
+        curr->used = 0;
+        curr       = curr->next;
+    }
+    arena->current = arena->chunks;
 }

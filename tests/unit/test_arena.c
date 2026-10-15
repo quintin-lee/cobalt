@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 void test_arena_create_destroy(void)
 {
@@ -122,6 +123,42 @@ void test_arena_alignment(void)
     cobalt_arena_destroy(arena);
 }
 
+void test_arena_pointer_stability(void)
+{
+    printf("Testing arena pointer stability...\n");
+
+    /* Small initial capacity to force multiple chunk allocations */
+    cobalt_arena_t *arena = cobalt_arena_create(128);
+    TEST_ASSERT(arena != NULL);
+
+#define NUM_SLICES 64
+#define SLICE_SIZE 64
+    void *ptrs[NUM_SLICES];
+
+    for (int i = 0; i < NUM_SLICES; i++) {
+        ptrs[i] = cobalt_arena_alloc(arena, SLICE_SIZE);
+        TEST_ASSERT(ptrs[i] != NULL);
+        memset(ptrs[i], (i & 0xFF), SLICE_SIZE);
+    }
+
+    /* Verify all pointers remain stable and data is not corrupted by subsequent allocations */
+    for (int i = 0; i < NUM_SLICES; i++) {
+        unsigned char *bytes = (unsigned char *)ptrs[i];
+        for (int j = 0; j < SLICE_SIZE; j++) {
+            TEST_ASSERT(bytes[j] == (unsigned char)(i & 0xFF));
+        }
+    }
+
+    cobalt_arena_reset(arena);
+    void *new_ptr = cobalt_arena_alloc(arena, 64);
+    TEST_ASSERT(new_ptr != NULL);
+
+    cobalt_arena_destroy(arena);
+#undef NUM_SLICES
+#undef SLICE_SIZE
+    printf("  Arena pointer stability test passed\n");
+}
+
 void test_arena(void)
 {
     printf("Testing arena...\n");
@@ -129,6 +166,6 @@ void test_arena(void)
     test_arena_alloc_reset();
     test_arena_boundary();
     test_arena_alignment();
+    test_arena_pointer_stability();
     printf("  Arena tests completed\n");
 }
-
