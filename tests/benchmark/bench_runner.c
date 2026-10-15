@@ -5,6 +5,7 @@
 
 #include "cobalt/container/deque.h"
 #include "cobalt/container/hashmap.h"
+#include "cobalt/container/lfqueue.h"
 #include "cobalt/container/list.h"
 #include "cobalt/container/queue.h"
 #include "cobalt/container/set.h"
@@ -155,6 +156,19 @@ static void bench_set_insert(void)
     cobalt_set_destroy(set);
 }
 
+/* ===== LFQueue ===== */
+static void bench_lfqueue(void)
+{
+    cobalt_lfqueue_t *q   = cobalt_lfqueue_create(1024);
+    void             *val = (void *)42;
+    void             *out = NULL;
+    for (int i = 0; i < BENCH_ITERS; i++) {
+        cobalt_lfqueue_enqueue(q, val);
+        cobalt_lfqueue_dequeue(q, &out);
+    }
+    cobalt_lfqueue_destroy(q);
+}
+
 int main(int argc, char *argv[])
 {
     int json_mode = 0;
@@ -190,7 +204,9 @@ int main(int argc, char *argv[])
         cobalt_bench_run("queue_enqueue", 3, bench_queue_enqueue, &results[9]);
         results[10].name = "set_insert";
         cobalt_bench_run("set_insert", 3, bench_set_insert, &results[10]);
-        results[11].name = NULL;
+        results[11].name = "lfqueue";
+        cobalt_bench_run("lfqueue", 3, bench_lfqueue, &results[11]);
+        results[12].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         return 0;
@@ -222,6 +238,9 @@ int main(int argc, char *argv[])
 
     printf("--- Queue ---\n");
     BENCH_RUN("queue enqueue (100k)", 3, bench_queue_enqueue);
+
+    printf("--- LFQueue ---\n");
+    BENCH_RUN("lfqueue enq/deq (100k)", 3, bench_lfqueue);
 
     printf("--- Set ---\n");
     BENCH_RUN("set insert (100k)", 3, bench_set_insert);
