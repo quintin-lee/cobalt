@@ -7,6 +7,7 @@
 #include "cobalt/algorithm/sort.h"
 #include "cobalt/memory/allocator.h"
 #include "test_framework.h"
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -147,6 +148,44 @@ void test_insertion_sort_single(void)
     printf("  insertion_sort single: OK\n");
 }
 
+void test_insertion_sort_double(void)
+{
+    printf("Testing insertion_sort double array...\n");
+    double arr[] = {3.14, 1.41, 2.71, 0.58};
+    cobalt_insertion_sort(arr, 4, sizeof(double), cmp_double);
+    TEST_ASSERT(arr[0] < arr[1]);
+    TEST_ASSERT(arr[1] < arr[2]);
+    TEST_ASSERT(arr[2] < arr[3]);
+    printf("  insertion_sort double: OK\n");
+}
+
+typedef struct {
+    uint64_t high;
+    uint64_t low;
+} test_u128_t;
+
+static int cmp_u128(const void *a, const void *b)
+{
+    const test_u128_t *x = (const test_u128_t *)a;
+    const test_u128_t *y = (const test_u128_t *)b;
+    if (x->high != y->high) {
+        return (x->high > y->high) - (x->high < y->high);
+    }
+    return (x->low > y->low) - (x->low < y->low);
+}
+
+void test_insertion_sort_large_struct(void)
+{
+    printf("Testing insertion_sort 16-byte struct...\n");
+    test_u128_t arr[] = {{3, 10}, {1, 20}, {2, 5}, {1, 10}};
+    cobalt_insertion_sort(arr, 4, sizeof(test_u128_t), cmp_u128);
+    TEST_ASSERT(arr[0].high == 1 && arr[0].low == 10);
+    TEST_ASSERT(arr[1].high == 1 && arr[1].low == 20);
+    TEST_ASSERT(arr[2].high == 2 && arr[2].low == 5);
+    TEST_ASSERT(arr[3].high == 3 && arr[3].low == 10);
+    printf("  insertion_sort 16-byte struct: OK\n");
+}
+
 /* -------------------------------------------------------------------------- */
 /* cobalt_bsearch                                                             */
 /* -------------------------------------------------------------------------- */
@@ -236,7 +275,7 @@ static void op_count(void *item)
 void test_for_each(void)
 {
     printf("Testing for_each...\n");
-    int arr[]      = {1, 2, 3, 4, 5};
+    int arr[] = {1, 2, 3, 4, 5};
     /* for_each signature: for_each(base, nmemb, size, op) */
     /* We can't easily capture call_count, so use a global trick */
     cobalt_for_each(arr, 5, sizeof(int), op_count);
@@ -316,6 +355,8 @@ void test_sort(void)
     test_qsort_single();
     test_qsort_already_sorted();
     test_insertion_sort_int();
+    test_insertion_sort_double();
+    test_insertion_sort_large_struct();
     test_insertion_sort_already_sorted();
     test_insertion_sort_single();
     test_sort_stable();

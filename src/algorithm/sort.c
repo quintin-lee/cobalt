@@ -6,6 +6,7 @@
 #include "cobalt/container/list.h"
 #include "cobalt/memory/allocator.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 /* compare_func_t is already defined in sort.h */
@@ -14,27 +15,81 @@
 /* Internal helpers with explicit allocator                                   */
 /* -------------------------------------------------------------------------- */
 
+static inline void cobalt_swap_bytes(char *a, char *b, size_t size)
+{
+    if (a == b) {
+        return;
+    }
+    if ((((uintptr_t)a | (uintptr_t)b | size) & (sizeof(uint64_t) - 1)) == 0) {
+        uint64_t *p1 = (uint64_t *)a;
+        uint64_t *p2 = (uint64_t *)b;
+        size_t    n  = size / sizeof(uint64_t);
+        while (n--) {
+            uint64_t tmp = *p1;
+            *p1++        = *p2;
+            *p2++        = tmp;
+        }
+    } else if ((((uintptr_t)a | (uintptr_t)b | size) & (sizeof(uint32_t) - 1)) == 0) {
+        uint32_t *p1 = (uint32_t *)a;
+        uint32_t *p2 = (uint32_t *)b;
+        size_t    n  = size / sizeof(uint32_t);
+        while (n--) {
+            uint32_t tmp = *p1;
+            *p1++        = *p2;
+            *p2++        = tmp;
+        }
+    } else {
+        while (size--) {
+            char tmp = *a;
+            *a++     = *b;
+            *b++     = tmp;
+        }
+    }
+}
+
 static void insertion_sort_impl(
     void *base, size_t nmemb, size_t size, compare_func_t compar, cobalt_allocator_t *alloc)
 {
-    if (!base || nmemb <= 1) {
+    if (!base || nmemb <= 1 || !compar || size == 0) {
         return;
     }
     char *arr = (char *)base;
-    char *key = (char *)alloc->alloc(alloc, size);
-    if (!key) {
-        return;
+    char  stack_buf[128];
+    char *key = NULL;
+
+    if (alloc) {
+        key = (char *)alloc->alloc(alloc, size);
+        if (!key) {
+            return;
+        }
+    } else {
+        if (size <= sizeof(stack_buf)) {
+            key = stack_buf;
+        } else {
+            key = (char *)malloc(size);
+            if (!key) {
+                return;
+            }
+        }
     }
+
     for (size_t i = 1; i < nmemb; i++) {
         memcpy(key, arr + i * size, size);
-        int j = (int)i - 1;
-        while (j >= 0 && compar(arr + j * size, key) > 0) {
-            memcpy(arr + (j + 1) * size, arr + j * size, size);
+        size_t j = i;
+        while (j > 0 && compar(arr + (j - 1) * size, key) > 0) {
+            memcpy(arr + j * size, arr + (j - 1) * size, size);
             j--;
         }
-        memcpy(arr + (j + 1) * size, key, size);
+        if (j != i) {
+            memcpy(arr + j * size, key, size);
+        }
     }
-    alloc->free(alloc, key);
+
+    if (alloc) {
+        alloc->free(alloc, key);
+    } else if (key != stack_buf) {
+        free(key);
+    }
 }
 
 static size_t partition_impl(void               *base,
@@ -101,7 +156,7 @@ void cobalt_qsort(void *base, size_t nmemb, size_t size, compare_func_t compar)
  */
 void cobalt_insertion_sort(void *base, size_t nmemb, size_t size, compare_func_t compar)
 {
-    insertion_sort_impl(base, nmemb, size, compar, cobalt_allocator_get_system());
+    insertion_sort_impl(base, nmemb, size, compar, NULL);
 }
 
 /**
