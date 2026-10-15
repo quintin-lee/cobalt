@@ -186,6 +186,41 @@ void test_insertion_sort_large_struct(void)
     printf("  insertion_sort 16-byte struct: OK\n");
 }
 
+typedef struct {
+    int  key;
+    char payload[252];
+} test_large_item_t;
+
+static int cmp_large_item(const void *a, const void *b)
+{
+    const test_large_item_t *x = (const test_large_item_t *)a;
+    const test_large_item_t *y = (const test_large_item_t *)b;
+    return (x->key > y->key) - (x->key < y->key);
+}
+
+void test_insertion_sort_oversized_elements(void)
+{
+    printf("Testing insertion_sort elements > 128 bytes...\n");
+    test_large_item_t arr[4];
+    int               keys[4] = {40, 10, 30, 20};
+    for (int i = 0; i < 4; i++) {
+        arr[i].key = keys[i];
+        memset(arr[i].payload, (char)(keys[i] & 0xFF), sizeof(arr[i].payload));
+    }
+
+    cobalt_insertion_sort(arr, 4, sizeof(test_large_item_t), cmp_large_item);
+
+    TEST_EQUAL(arr[0].key, 10);
+    TEST_EQUAL(arr[1].key, 20);
+    TEST_EQUAL(arr[2].key, 30);
+    TEST_EQUAL(arr[3].key, 40);
+    TEST_EQUAL((unsigned char)arr[0].payload[0], 10);
+    TEST_EQUAL((unsigned char)arr[1].payload[0], 20);
+    TEST_EQUAL((unsigned char)arr[2].payload[0], 30);
+    TEST_EQUAL((unsigned char)arr[3].payload[0], 40);
+    printf("  insertion_sort elements > 128 bytes: OK\n");
+}
+
 /* -------------------------------------------------------------------------- */
 /* cobalt_bsearch                                                             */
 /* -------------------------------------------------------------------------- */
@@ -357,6 +392,7 @@ void test_sort(void)
     test_insertion_sort_int();
     test_insertion_sort_double();
     test_insertion_sort_large_struct();
+    test_insertion_sort_oversized_elements();
     test_insertion_sort_already_sorted();
     test_insertion_sort_single();
     test_sort_stable();

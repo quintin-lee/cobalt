@@ -15,7 +15,7 @@
 /* Internal helpers with explicit allocator                                   */
 /* -------------------------------------------------------------------------- */
 
-static inline void cobalt_swap_bytes(char *a, char *b, size_t size)
+__attribute__((unused)) static inline void cobalt_swap_bytes(char *a, char *b, size_t size)
 {
     if (a == b) {
         return;
@@ -53,9 +53,9 @@ static void insertion_sort_impl(
     if (!base || nmemb <= 1 || !compar || size == 0) {
         return;
     }
-    char *arr = (char *)base;
-    char  stack_buf[128];
-    char *key = NULL;
+    char                      *arr = (char *)base;
+    _Alignas(max_align_t) char stack_buf[128];
+    char                      *key = NULL;
 
     if (alloc) {
         key = (char *)alloc->alloc(alloc, size);
