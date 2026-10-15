@@ -222,6 +222,99 @@ void test_insertion_sort_oversized_elements(void)
 }
 
 /* -------------------------------------------------------------------------- */
+/* cobalt_heapsort                                                            */
+/* -------------------------------------------------------------------------- */
+
+void cobalt_heapsort(void *base, size_t nmemb, size_t size, compare_func_t compar);
+
+void test_heapsort(void)
+{
+    printf("Testing cobalt_heapsort...\n");
+
+    /* 1. Reverse sorted array (100 elements) */
+    {
+        int arr[100];
+        for (int i = 0; i < 100; i++) {
+            arr[i] = 100 - i;
+        }
+        cobalt_heapsort(arr, 100, sizeof(int), cmp_int);
+        for (int i = 0; i < 100; i++) {
+            TEST_EQUAL(arr[i], i + 1);
+        }
+    }
+
+    /* 2. Random array (250 elements) */
+    {
+        int      arr[250];
+        uint32_t seed = 123456789;
+        for (int i = 0; i < 250; i++) {
+            seed   = seed * 1664525u + 1013904223u;
+            arr[i] = (int)(seed % 10000);
+        }
+        cobalt_heapsort(arr, 250, sizeof(int), cmp_int);
+        for (int i = 1; i < 250; i++) {
+            TEST_ASSERT(arr[i - 1] <= arr[i]);
+        }
+    }
+
+    /* 3. Array with all identical elements */
+    {
+        int arr[50];
+        for (int i = 0; i < 50; i++) {
+            arr[i] = 42;
+        }
+        cobalt_heapsort(arr, 50, sizeof(int), cmp_int);
+        for (int i = 0; i < 50; i++) {
+            TEST_EQUAL(arr[i], 42);
+        }
+    }
+
+    /* 4. Single-element and empty array (0 elements, NULL base) */
+    {
+        cobalt_heapsort(NULL, 10, sizeof(int), cmp_int);
+        cobalt_heapsort(NULL, 0, sizeof(int), cmp_int);
+
+        int dummy = 99;
+        cobalt_heapsort(&dummy, 0, sizeof(int), cmp_int);
+        TEST_EQUAL(dummy, 99);
+
+        int single = 77;
+        cobalt_heapsort(&single, 1, sizeof(int), cmp_int);
+        TEST_EQUAL(single, 77);
+
+        cobalt_heapsort(&single, 1, 0, cmp_int);
+        TEST_EQUAL(single, 77);
+
+        cobalt_heapsort(&single, 1, sizeof(int), NULL);
+        TEST_EQUAL(single, 77);
+    }
+
+    /* 5. 16-byte structs (test_u128_t) */
+    {
+        test_u128_t arr[6] = {
+            {5, 100},
+            {2, 300},
+            {8, 50},
+            {2, 100},
+            {1, 999},
+            {8, 20},
+        };
+        cobalt_heapsort(arr, 6, sizeof(test_u128_t), cmp_u128);
+        for (int i = 1; i < 6; i++) {
+            TEST_ASSERT(cmp_u128(&arr[i - 1], &arr[i]) <= 0);
+        }
+        TEST_ASSERT(arr[0].high == 1 && arr[0].low == 999);
+        TEST_ASSERT(arr[1].high == 2 && arr[1].low == 100);
+        TEST_ASSERT(arr[2].high == 2 && arr[2].low == 300);
+        TEST_ASSERT(arr[3].high == 5 && arr[3].low == 100);
+        TEST_ASSERT(arr[4].high == 8 && arr[4].low == 20);
+        TEST_ASSERT(arr[5].high == 8 && arr[5].low == 50);
+    }
+
+    printf("  heapsort: OK\n");
+}
+
+/* -------------------------------------------------------------------------- */
 /* cobalt_bsearch                                                             */
 /* -------------------------------------------------------------------------- */
 
@@ -395,6 +488,7 @@ void test_sort(void)
     test_insertion_sort_oversized_elements();
     test_insertion_sort_already_sorted();
     test_insertion_sort_single();
+    test_heapsort();
     test_sort_stable();
     test_sort_partition();
     test_sort_unique();

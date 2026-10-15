@@ -15,7 +15,7 @@
 /* Internal helpers with explicit allocator                                   */
 /* -------------------------------------------------------------------------- */
 
-__attribute__((unused)) static inline void cobalt_swap_bytes(char *a, char *b, size_t size)
+static inline void cobalt_swap_bytes(char *a, char *b, size_t size)
 {
     if (a == b) {
         return;
@@ -45,6 +45,47 @@ __attribute__((unused)) static inline void cobalt_swap_bytes(char *a, char *b, s
             *b++     = tmp;
         }
     }
+}
+
+static void
+heapsort_sift_down(char *arr, size_t root, size_t count, size_t size, compare_func_t compar)
+{
+    while (root * 2 + 1 < count) {
+        size_t child = root * 2 + 1;
+        if (child + 1 < count && compar(arr + (child + 1) * size, arr + child * size) > 0) {
+            child++;
+        }
+        if (compar(arr + child * size, arr + root * size) > 0) {
+            cobalt_swap_bytes(arr + root * size, arr + child * size, size);
+            root = child;
+        } else {
+            break;
+        }
+    }
+}
+
+static void cobalt_heapsort_impl(char *arr, size_t nmemb, size_t size, compare_func_t compar)
+{
+    if (nmemb <= 1) {
+        return;
+    }
+    for (size_t i = nmemb / 2; i > 0; i--) {
+        heapsort_sift_down(arr, i - 1, nmemb, size, compar);
+    }
+    for (size_t i = nmemb - 1; i > 0; i--) {
+        cobalt_swap_bytes(arr, arr + i * size, size);
+        heapsort_sift_down(arr, 0, i, size, compar);
+    }
+}
+
+void cobalt_heapsort(void *base, size_t nmemb, size_t size, compare_func_t compar);
+
+void cobalt_heapsort(void *base, size_t nmemb, size_t size, compare_func_t compar)
+{
+    if (!base || nmemb <= 1 || size == 0 || !compar) {
+        return;
+    }
+    cobalt_heapsort_impl((char *)base, nmemb, size, compar);
 }
 
 static void insertion_sort_impl(
