@@ -224,6 +224,7 @@ void test_hashmap_iterator(void);
 void test_hashmap_with_allocator(void);
 void test_hashmap_allocator_failure(void);
 void test_hashmap_set_funcs(void);
+void test_hashmap_large_scale(void);
 
 static unsigned int hash_fnv1a(const void *key, size_t key_len)
 {
@@ -277,7 +278,6 @@ void test_hashmap_set_funcs(void)
     printf("  set_funcs: OK\n");
 }
 
-
 void test_hashmap(void)
 {
     printf("Testing hashmap...\n");
@@ -296,6 +296,7 @@ void test_hashmap(void)
     test_hashmap_iterator();
     test_hashmap_with_allocator();
     test_hashmap_allocator_failure();
+    test_hashmap_large_scale();
     printf("  Hashmap tests completed\n");
 }
 
@@ -542,7 +543,7 @@ void test_hashmap_with_allocator(void)
     printf("Testing hashmap with custom allocator...\n");
 
     cobalt_allocator_t *alloc = cobalt_allocator_get_system();
-    cobalt_hashmap_t *map = cobalt_hashmap_create_with_allocator(4, alloc);
+    cobalt_hashmap_t   *map   = cobalt_hashmap_create_with_allocator(4, alloc);
     TEST_ASSERT(map != NULL);
 
     static int val = 42;
@@ -575,12 +576,12 @@ void test_hashmap_allocator_failure(void)
     mock_fail_next   = 0;
     mock_alloc_count = 0;
     mock_offset      = 0;
-    map = cobalt_hashmap_create_with_allocator(4, &mock_allocator);
+    map              = cobalt_hashmap_create_with_allocator(4, &mock_allocator);
     TEST_ASSERT(map != NULL);
 
-    int val = 42;
+    int val        = 42;
     mock_fail_next = 1;
-    int ret = cobalt_hashmap_put(map, "key", &val);
+    int ret        = cobalt_hashmap_put(map, "key", &val);
     TEST_ASSERT(ret == -1);
     printf("  Put with failing allocator: OK\n");
 
@@ -589,4 +590,50 @@ void test_hashmap_allocator_failure(void)
     printf("  Allocator failure test passed\n");
 }
 
+void test_hashmap_large_scale(void)
+{
+    printf("Testing hashmap large scale (5000 items)...\n");
 
+    cobalt_hashmap_t *map = cobalt_hashmap_create(16);
+    TEST_ASSERT(map != NULL);
+
+#define LARGE_N 5000
+    int *values      = (int *)malloc(sizeof(int) * LARGE_N);
+    char (*keys)[32] = malloc(sizeof(char[32]) * LARGE_N);
+    TEST_ASSERT(values != NULL && keys != NULL);
+
+    for (int i = 0; i < LARGE_N; i++) {
+        snprintf(keys[i], 32, "key_%06d", i);
+        values[i] = i * 7 + 1;
+        TEST_ASSERT(cobalt_hashmap_put(map, keys[i], &values[i]) == 0);
+    }
+    TEST_ASSERT(cobalt_hashmap_size(map) == LARGE_N);
+
+    for (int i = 0; i < LARGE_N; i++) {
+        int *val = (int *)cobalt_hashmap_get(map, keys[i]);
+        TEST_ASSERT(val != NULL);
+        TEST_ASSERT(*val == i * 7 + 1);
+    }
+
+    /* Remove half */
+    for (int i = 0; i < LARGE_N; i += 2) {
+        TEST_ASSERT(cobalt_hashmap_remove(map, keys[i]) == 0);
+    }
+    TEST_ASSERT(cobalt_hashmap_size(map) == LARGE_N / 2);
+
+    for (int i = 0; i < LARGE_N; i++) {
+        int *val = (int *)cobalt_hashmap_get(map, keys[i]);
+        if (i % 2 == 0) {
+            TEST_ASSERT(val == NULL);
+        } else {
+            TEST_ASSERT(val != NULL);
+            TEST_ASSERT(*val == i * 7 + 1);
+        }
+    }
+
+    free(values);
+    free(keys);
+    cobalt_hashmap_destroy(map);
+#undef LARGE_N
+    printf("  Large scale test passed\n");
+}
