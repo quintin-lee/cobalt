@@ -608,6 +608,7 @@ void test_fold(void)
 void test_sort_stable(void);
 void test_stable_sort_large(void);
 void test_sort_partition(void);
+void test_partition_edge_cases(void);
 void test_sort_unique(void);
 void test_sort_with_alloc(void);
 
@@ -644,6 +645,7 @@ void test_sort(void)
     test_sort_stable();
     test_stable_sort_large();
     test_sort_partition();
+    test_partition_edge_cases();
     test_sort_unique();
     test_sort_with_alloc();
     test_bsearch_found();
@@ -777,6 +779,88 @@ void test_sort_partition(void)
     printf("  partition: OK\n");
 }
 
+void test_partition_edge_cases(void)
+{
+    printf("Testing cobalt_partition edge cases...\n");
+
+    /* 1. All elements < pivot (returns nmemb) */
+    {
+        int    arr[] = {1, 2, 3, 4, 5};
+        size_t n     = sizeof(arr) / sizeof(arr[0]);
+        int    pivot = 10;
+        size_t idx   = cobalt_partition(arr, n, sizeof(int), &pivot, cmp_int);
+        TEST_EQUAL(idx, n);
+        for (size_t i = 0; i < n; i++) {
+            TEST_ASSERT(arr[i] < pivot);
+        }
+    }
+
+    /* 2. All elements >= pivot (returns 0) */
+    {
+        int    arr[] = {10, 20, 30, 40, 50};
+        size_t n     = sizeof(arr) / sizeof(arr[0]);
+        int    pivot = 5;
+        size_t idx   = cobalt_partition(arr, n, sizeof(int), &pivot, cmp_int);
+        TEST_EQUAL(idx, 0u);
+        for (size_t i = 0; i < n; i++) {
+            TEST_ASSERT(arr[i] >= pivot);
+        }
+    }
+
+    /* 3. Array with identical elements equal to pivot */
+    {
+        int    arr[] = {7, 7, 7, 7, 7};
+        size_t n     = sizeof(arr) / sizeof(arr[0]);
+        int    pivot = 7;
+        size_t idx   = cobalt_partition(arr, n, sizeof(int), &pivot, cmp_int);
+        TEST_EQUAL(idx, 0u);
+        for (size_t i = 0; i < n; i++) {
+            TEST_ASSERT(arr[i] >= pivot);
+        }
+    }
+
+    /* 4. 16-byte structs (test_u128_t) partition */
+    {
+        test_u128_t arr[] = {
+            {3, 10},
+            {1, 20},
+            {5, 0},
+            {2, 5},
+            {4, 15},
+            {1, 10},
+        };
+        size_t      n     = sizeof(arr) / sizeof(arr[0]);
+        test_u128_t pivot = {3, 0};
+        size_t      idx   = cobalt_partition(arr, n, sizeof(test_u128_t), &pivot, cmp_u128);
+        TEST_ASSERT(idx > 0 && idx < n);
+        for (size_t i = 0; i < idx; i++) {
+            TEST_ASSERT(cmp_u128(&arr[i], &pivot) < 0);
+        }
+        for (size_t i = idx; i < n; i++) {
+            TEST_ASSERT(cmp_u128(&arr[i], &pivot) >= 0);
+        }
+    }
+
+    /* 5. Edge cases: base == NULL, nmemb == 0, size == 0, compar == NULL, pivot == NULL */
+    {
+        int arr[] = {1, 2, 3};
+        int pivot = 2;
+        TEST_EQUAL(cobalt_partition(NULL, 3, sizeof(int), &pivot, cmp_int), 0u);
+        TEST_EQUAL(cobalt_partition(arr, 0, sizeof(int), &pivot, cmp_int), 0u);
+        TEST_EQUAL(cobalt_partition(arr, 3, 0, &pivot, cmp_int), 0u);
+        TEST_EQUAL(cobalt_partition(arr, 3, sizeof(int), &pivot, NULL), 0u);
+        TEST_EQUAL(cobalt_partition(arr, 3, sizeof(int), NULL, cmp_int), 0u);
+
+        TEST_EQUAL(cobalt_partition_with_alloc(NULL, 3, sizeof(int), &pivot, cmp_int, NULL), 0u);
+        TEST_EQUAL(cobalt_partition_with_alloc(arr, 0, sizeof(int), &pivot, cmp_int, NULL), 0u);
+        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, 0, &pivot, cmp_int, NULL), 0u);
+        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, sizeof(int), &pivot, NULL, NULL), 0u);
+        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, sizeof(int), NULL, cmp_int, NULL), 0u);
+    }
+
+    printf("  partition edge cases: OK\n");
+}
+
 void test_sort_unique(void)
 {
     printf("Testing cobalt_unique...\n");
@@ -903,6 +987,16 @@ void test_sort_with_alloc(void)
     for (size_t i = idx; i < 8; i++) {
         TEST_ASSERT(arr3[i] >= pivot);
     }
+    TEST_ASSERT(mock_sort_alloc_count == 1);
+    TEST_ASSERT(mock_sort_free_count == 1);
+
+    /* cobalt_partition should perform zero allocations */
+    mock_sort_reset();
+    int    arr3_zero[] = {9, 3, 7, 1, 5, 4, 8, 2};
+    size_t idx_zero    = cobalt_partition(arr3_zero, 8, sizeof(int), &pivot, cmp_int);
+    TEST_ASSERT(idx_zero > 0 && idx_zero <= 8);
+    TEST_ASSERT(mock_sort_alloc_count == 0);
+    TEST_ASSERT(mock_sort_free_count == 0);
 
     /* NULL allocator falls back to system */
     int arr4[] = {3, 1, 2};

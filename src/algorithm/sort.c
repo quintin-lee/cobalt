@@ -138,29 +138,36 @@ static size_t partition_impl(void               *base,
                              compare_func_t      compar,
                              cobalt_allocator_t *alloc)
 {
-    if (!base || nmemb == 0 || !compar || !pivot) {
+    if (!base || nmemb == 0 || size == 0 || !compar || !pivot) {
         return 0;
     }
+
+    void *track_buf = NULL;
+    if (alloc) {
+        track_buf = alloc->alloc(alloc, size);
+        if (!track_buf) {
+            return 0;
+        }
+    }
+
     char  *arr   = (char *)base;
     size_t left  = 0;
     size_t right = nmemb;
-    char  *tmp   = (char *)alloc->alloc(alloc, size);
-    if (!tmp) {
-        return 0;
-    }
+
     while (left < right) {
         if (compar(arr + left * size, pivot) < 0) {
             left++;
         } else {
             right--;
             if (left != right) {
-                memcpy(tmp, arr + left * size, size);
-                memcpy(arr + left * size, arr + right * size, size);
-                memcpy(arr + right * size, tmp, size);
+                cobalt_swap_bytes(arr + left * size, arr + right * size, size);
             }
         }
     }
-    alloc->free(alloc, tmp);
+
+    if (alloc) {
+        alloc->free(alloc, track_buf);
+    }
     return left;
 }
 
@@ -434,8 +441,8 @@ static void adaptive_merge_sort(
         return;
     }
 
-    /* Allocate scratch buffer of size ((nmemb + 1) / 2) * size */
-    size_t max_run_len = (nmemb + 1) / 2;
+    /* Allocate scratch buffer of size ((nmemb / 2) + (nmemb & 1)) * size */
+    size_t max_run_len = (nmemb / 2) + (nmemb & 1);
     char  *scratch     = NULL;
     if (alloc) {
         scratch = (char *)alloc->alloc(alloc, max_run_len * size);
@@ -482,13 +489,23 @@ static void adaptive_merge_sort(
             if (force_len > minrun) {
                 force_len = minrun;
             }
-            insertion_sort_impl(arr + curr * size, force_len, size, compar, NULL);
+            insertion_sort_impl(arr + curr * size, force_len, size, compar, alloc);
             run_len = force_len;
         }
 
-        stack[stack_size].start = curr;
-        stack[stack_size].len   = run_len;
-        stack_size++;
+        while (stack_size >= 64) {
+            size_t n = stack_size - 1;
+            merge_runs(
+                arr, stack[n - 1].start, stack[n - 1].len, stack[n].len, size, compar, scratch);
+            stack[n - 1].len += stack[n].len;
+            stack_size--;
+        }
+
+        if (stack_size < 64) {
+            stack[stack_size].start = curr;
+            stack[stack_size].len   = run_len;
+            stack_size++;
+        }
         curr += run_len;
 
         /* Merge balance */
@@ -599,12 +616,12 @@ void cobalt_stable_sort_with_alloc(
  * @param pivot Pivot value that elements are compared against
  * @param compar Comparator establishing the element order
  * @return Index of the first element in the greater-or-equal partition, 0 on invalid input
- * @note Requires a temporary element-size buffer; returns 0 without partitioning when it fails
+ * @note Zero dynamic allocations; elements swapped in place
  */
 size_t
 cobalt_partition(void *base, size_t nmemb, size_t size, const void *pivot, compare_func_t compar)
 {
-    return partition_impl(base, nmemb, size, pivot, compar, cobalt_allocator_get_system());
+    return partition_impl(base, nmemb, size, pivot, compar, NULL);
 }
 
 /**
@@ -625,9 +642,6 @@ size_t cobalt_partition_with_alloc(void               *base,
                                    compare_func_t      compar,
                                    cobalt_allocator_t *alloc)
 {
-    if (!alloc) {
-        alloc = cobalt_allocator_get_system();
-    }
     return partition_impl(base, nmemb, size, pivot, compar, alloc);
 }
 
