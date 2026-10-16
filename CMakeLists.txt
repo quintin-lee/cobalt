@@ -86,6 +86,7 @@ set(SOURCES
     src/module/json_serialize.c
     src/module/json_sax.c
     src/module/eventloop.c
+    src/module/threadpool.c
     src/interface/iterator.c
     src/interface/map.c
     src/interface/sequence.c
