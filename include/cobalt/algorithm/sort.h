@@ -93,7 +93,7 @@ void cobalt_list_sort(void **head, size_t *count, compare_func_t compar);
  * -------------------------------------------------------------------------- */
 
 /**
- * @brief Stable sort (uses insertion sort internally)
+ * @brief Stable sort (uses adaptive run mergesort / TimSort-lite internally)
  * @param base Pointer to the first element of the array to be sorted
  * @param nmemb Number of elements in the array
  * @param size Size of each element in bytes

@@ -3,6 +3,8 @@
  * @brief Benchmark suite for Cobalt sorting algorithms (PDQSort and Adaptive Merge Sort)
  */
 
+#define _POSIX_C_SOURCE 199309L
+
 #include "cobalt/algorithm/sort.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -90,9 +92,9 @@ int main(void)
     }
 
     /* 1. cobalt_qsort - Random distribution */
-    uint32_t seed = 123456789u;
+    uint32_t seed = 123456789U;
     for (int i = 0; i < NUM_ELEMENTS; i++) {
-        seed            = seed * 1664525u + 1013904223u;
+        seed            = seed * 1664525U + 1013904223U;
         template_arr[i] = (int)(seed & 0x7FFFFFFF);
     }
     run_benchmark("1. cobalt_qsort - Random distribution",
@@ -125,9 +127,9 @@ int main(void)
                   NUM_RUNS);
 
     /* 4. cobalt_qsort - Low-cardinality duplicates (5 distinct keys, O(N) DNF) */
-    seed = 987654321u;
+    seed = 987654321U;
     for (int i = 0; i < NUM_ELEMENTS; i++) {
-        seed            = seed * 1664525u + 1013904223u;
+        seed            = seed * 1664525U + 1013904223U;
         template_arr[i] = (int)(seed % 5);
     }
     run_benchmark("4. cobalt_qsort - Low-cardinality duplicates (5 distinct keys, O(N) DNF)",
@@ -138,9 +140,9 @@ int main(void)
                   NUM_RUNS);
 
     /* 5. cobalt_stable_sort - Random distribution */
-    seed = 123456789u;
+    seed = 123456789U;
     for (int i = 0; i < NUM_ELEMENTS; i++) {
-        seed            = seed * 1664525u + 1013904223u;
+        seed            = seed * 1664525U + 1013904223U;
         template_arr[i] = (int)(seed & 0x7FFFFFFF);
     }
     run_benchmark("5. cobalt_stable_sort - Random distribution",

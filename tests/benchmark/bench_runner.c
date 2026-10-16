@@ -211,9 +211,9 @@ static void ensure_sort_bench_data(void)
     if (!g_bench_random_ints) {
         g_bench_random_ints = (int *)malloc(sizeof(int) * BENCH_ITERS);
         if (g_bench_random_ints) {
-            uint32_t seed = 42;
+            uint32_t seed = 42U;
             for (int i = 0; i < BENCH_ITERS; i++) {
-                seed                   = seed * 1664525u + 1013904223u;
+                seed                   = seed * 1664525U + 1013904223U;
                 g_bench_random_ints[i] = (int)(seed & 0x7FFFFFFF);
             }
         }

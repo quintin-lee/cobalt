@@ -242,7 +242,7 @@ void test_qsort_adversarial(void)
         TEST_ASSERT(arr != NULL);
         uint32_t seed = 987654321;
         for (int i = 0; i < 10000; i++) {
-            seed   = seed * 1664525u + 1013904223u;
+            seed   = seed * 1664525U + 1013904223U;
             arr[i] = (int)(seed % 50000);
         }
         cobalt_qsort(arr, 10000, sizeof(int), cmp_int);
@@ -329,9 +329,9 @@ void test_qsort_adversarial(void)
         TEST_ASSERT(arr != NULL);
         uint32_t seed = 543216789;
         for (int i = 0; i < 1000; i++) {
-            seed        = seed * 1664525u + 1013904223u;
+            seed        = seed * 1664525U + 1013904223U;
             arr[i].high = seed % 100;
-            seed        = seed * 1664525u + 1013904223u;
+            seed        = seed * 1664525U + 1013904223U;
             arr[i].low  = seed % 10000;
         }
         cobalt_qsort(arr, 1000, sizeof(test_u128_t), cmp_u128);
@@ -398,7 +398,7 @@ void test_heapsort(void)
         int      arr[250];
         uint32_t seed = 123456789;
         for (int i = 0; i < 250; i++) {
-            seed   = seed * 1664525u + 1013904223u;
+            seed   = seed * 1664525U + 1013904223U;
             arr[i] = (int)(seed % 10000);
         }
         cobalt_heapsort(arr, 250, sizeof(int), cmp_int);
@@ -586,7 +586,7 @@ void test_filter(void)
     size_t count = 8;
     int    ret   = cobalt_filter(input, output, &count, sizeof(int), pred_even);
     TEST_EQUAL(ret, 0);
-    TEST_EQUAL(count, 4u);
+    TEST_EQUAL(count, 4U);
     TEST_EQUAL(output[0], 2);
     TEST_EQUAL(output[1], 4);
     TEST_EQUAL(output[2], 6);
@@ -801,7 +801,7 @@ void test_partition_edge_cases(void)
         size_t n     = sizeof(arr) / sizeof(arr[0]);
         int    pivot = 5;
         size_t idx   = cobalt_partition(arr, n, sizeof(int), &pivot, cmp_int);
-        TEST_EQUAL(idx, 0u);
+        TEST_EQUAL(idx, 0U);
         for (size_t i = 0; i < n; i++) {
             TEST_ASSERT(arr[i] >= pivot);
         }
@@ -813,7 +813,7 @@ void test_partition_edge_cases(void)
         size_t n     = sizeof(arr) / sizeof(arr[0]);
         int    pivot = 7;
         size_t idx   = cobalt_partition(arr, n, sizeof(int), &pivot, cmp_int);
-        TEST_EQUAL(idx, 0u);
+        TEST_EQUAL(idx, 0U);
         for (size_t i = 0; i < n; i++) {
             TEST_ASSERT(arr[i] >= pivot);
         }
@@ -845,17 +845,17 @@ void test_partition_edge_cases(void)
     {
         int arr[] = {1, 2, 3};
         int pivot = 2;
-        TEST_EQUAL(cobalt_partition(NULL, 3, sizeof(int), &pivot, cmp_int), 0u);
-        TEST_EQUAL(cobalt_partition(arr, 0, sizeof(int), &pivot, cmp_int), 0u);
-        TEST_EQUAL(cobalt_partition(arr, 3, 0, &pivot, cmp_int), 0u);
-        TEST_EQUAL(cobalt_partition(arr, 3, sizeof(int), &pivot, NULL), 0u);
-        TEST_EQUAL(cobalt_partition(arr, 3, sizeof(int), NULL, cmp_int), 0u);
+        TEST_EQUAL(cobalt_partition(NULL, 3, sizeof(int), &pivot, cmp_int), 0U);
+        TEST_EQUAL(cobalt_partition(arr, 0, sizeof(int), &pivot, cmp_int), 0U);
+        TEST_EQUAL(cobalt_partition(arr, 3, 0, &pivot, cmp_int), 0U);
+        TEST_EQUAL(cobalt_partition(arr, 3, sizeof(int), &pivot, NULL), 0U);
+        TEST_EQUAL(cobalt_partition(arr, 3, sizeof(int), NULL, cmp_int), 0U);
 
-        TEST_EQUAL(cobalt_partition_with_alloc(NULL, 3, sizeof(int), &pivot, cmp_int, NULL), 0u);
-        TEST_EQUAL(cobalt_partition_with_alloc(arr, 0, sizeof(int), &pivot, cmp_int, NULL), 0u);
-        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, 0, &pivot, cmp_int, NULL), 0u);
-        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, sizeof(int), &pivot, NULL, NULL), 0u);
-        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, sizeof(int), NULL, cmp_int, NULL), 0u);
+        TEST_EQUAL(cobalt_partition_with_alloc(NULL, 3, sizeof(int), &pivot, cmp_int, NULL), 0U);
+        TEST_EQUAL(cobalt_partition_with_alloc(arr, 0, sizeof(int), &pivot, cmp_int, NULL), 0U);
+        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, 0, &pivot, cmp_int, NULL), 0U);
+        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, sizeof(int), &pivot, NULL, NULL), 0U);
+        TEST_EQUAL(cobalt_partition_with_alloc(arr, 3, sizeof(int), NULL, cmp_int, NULL), 0U);
     }
 
     printf("  partition edge cases: OK\n");
