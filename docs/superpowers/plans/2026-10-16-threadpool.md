@@ -215,15 +215,15 @@ static int chase_lev_steal(chase_lev_deque_t *q, cobalt_task_t *out_task)
 }
 ```
 
-- [ ] **Step 3: Write tests for Chase-Lev Deque in `tests/unit/test_threadpool.c`**
+- [x] **Step 3: Write tests for Chase-Lev Deque in `tests/unit/test_threadpool.c`**
 
 Test single-threaded push/pop LIFO order, wrap-around, and multi-threaded stealer contention.
 
-- [ ] **Step 4: Update `CMakeLists.txt` and `include/cobalt/cobalt.h`**
+- [x] **Step 4: Update `CMakeLists.txt` and `include/cobalt/cobalt.h`**
 
 Add `src/module/threadpool.c` to `SOURCES` in `CMakeLists.txt`, and include `"cobalt/module/threadpool.h"` in `include/cobalt/cobalt.h`.
 
-- [ ] **Step 5: Verify build & commit**
+- [x] **Step 5: Verify build & commit**
 
 ```bash
 cmake --build build -j4
@@ -241,7 +241,7 @@ git commit -m "feat(threadpool): ✨ implement Chase-Lev work-stealing deque"
 - Modify: `tests/CMakeLists.txt`
 - Modify: `tests/test_runner.c`
 
-- [ ] **Step 1: Implement thread pool structures and lifecycle in `src/module/threadpool.c`**
+- [x] **Step 1: Implement thread pool structures and lifecycle in `src/module/threadpool.c`**
 
 Define `cobalt_worker_t` and `cobalt_threadpool_t`:
 ```c
@@ -277,16 +277,16 @@ Implement worker thread main loop executing the 4-tier pipeline:
 3. `cobalt_lfqueue_dequeue(pool->global_queue, (void **)&task_ptr)`
 4. Adaptive idle backoff (yield -> sleep on condvar)
 
-- [ ] **Step 2: Wire `test_threadpool` in `tests/CMakeLists.txt` and `tests/test_runner.c`**
+- [x] **Step 2: Wire `test_threadpool` in `tests/CMakeLists.txt` and `tests/test_runner.c`**
 
-- [ ] **Step 3: Run test suite**
+- [x] **Step 3: Run test suite**
 
 ```bash
 cmake --build build -j4 && ./build/tests/cobalt_test --filter threadpool
 ```
 Expected: PASS
 
-- [ ] **Step 4: Commit changes**
+- [x] **Step 4: Commit changes**
 
 ```bash
 git add src/module/threadpool.c tests/unit/test_threadpool.c tests/CMakeLists.txt tests/test_runner.c
@@ -301,7 +301,7 @@ git commit -m "feat(threadpool): ✨ implement core thread pool lifecycle and wo
 - Modify: `src/module/threadpool.c`
 - Modify: `tests/unit/test_threadpool.c`
 
-- [ ] **Step 1: Implement `cobalt_threadpool_submit` and `cobalt_threadpool_wait_idle`**
+- [x] **Step 1: Implement `cobalt_threadpool_submit` and `cobalt_threadpool_wait_idle`**
 
 Implement zero-alloc routing:
 - If `tl_current_worker != NULL`: attempt `chase_lev_push(&tl_current_worker->local_deque, task)`.
@@ -310,18 +310,18 @@ Implement zero-alloc routing:
 - Maintain `atomic_fetch_add(&pool->active_tasks, 1)`.
 - When task finishes, decrement `active_tasks`. If 0, signal `drain_cond`.
 
-- [ ] **Step 2: Add high-throughput concurrency test in `tests/unit/test_threadpool.c`**
+- [x] **Step 2: Add high-throughput concurrency test in `tests/unit/test_threadpool.c`**
 
 Submit 100,000 tasks across multiple concurrent producer threads and verify that every task is executed with atomic counter = 100,000.
 
-- [ ] **Step 3: Run test suite**
+- [x] **Step 3: Run test suite**
 
 ```bash
 cmake --build build -j4 && ./build/tests/cobalt_test --filter threadpool
 ```
 Expected: PASS
 
-- [ ] **Step 4: Commit changes**
+- [x] **Step 4: Commit changes**
 
 ```bash
 git add src/module/threadpool.c tests/unit/test_threadpool.c
@@ -336,7 +336,7 @@ git commit -m "feat(threadpool): ✨ implement task submission and adaptive idle
 - Modify: `src/module/threadpool.c`
 - Modify: `tests/unit/test_threadpool.c`
 
-- [ ] **Step 1: Implement `cobalt_waitgroup_t`**
+- [x] **Step 1: Implement `cobalt_waitgroup_t`**
 
 Implement:
 - `cobalt_waitgroup_create`
@@ -347,18 +347,18 @@ Implement:
   - If external thread: wait on `cobalt_cond_wait(wg->cond, wg->mutex)`.
 - `cobalt_waitgroup_destroy`
 
-- [ ] **Step 2: Add tests for WaitGroup and nested recursive tasks**
+- [x] **Step 2: Add tests for WaitGroup and nested recursive tasks**
 
 Test fork-join and recursive divide-and-conquer tasks without deadlock.
 
-- [ ] **Step 3: Run test suite**
+- [x] **Step 3: Run test suite**
 
 ```bash
 cmake --build build -j4 && ./build/tests/cobalt_test --filter threadpool
 ```
 Expected: PASS
 
-- [ ] **Step 4: Commit changes**
+- [x] **Step 4: Commit changes**
 
 ```bash
 git add src/module/threadpool.c tests/unit/test_threadpool.c
@@ -373,22 +373,22 @@ git commit -m "feat(threadpool): ✨ implement waitgroup with help-first work-st
 - Modify: `src/module/threadpool.c`
 - Modify: `tests/unit/test_threadpool.c`
 
-- [ ] **Step 1: Implement `cobalt_threadpool_parallel_for`**
+- [x] **Step 1: Implement `cobalt_threadpool_parallel_for`**
 
 Divide range $[start, end)$ into balanced chunks. Submit chunk tasks to the pool with an internal WaitGroup, while caller thread immediately executes available chunks.
 
-- [ ] **Step 2: Add unit tests for `parallel_for`**
+- [x] **Step 2: Add unit tests for `parallel_for`**
 
 Compute parallel reduction (e.g. sum of 1,000,000 array elements) and verify against expected mathematical sum.
 
-- [ ] **Step 3: Run test suite**
+- [x] **Step 3: Run test suite**
 
 ```bash
 cmake --build build -j4 && ./build/tests/cobalt_test --filter threadpool
 ```
 Expected: PASS
 
-- [ ] **Step 4: Commit changes**
+- [x] **Step 4: Commit changes**
 
 ```bash
 git add src/module/threadpool.c tests/unit/test_threadpool.c
@@ -404,7 +404,7 @@ git commit -m "feat(threadpool): ✨ implement parallel for chunking engine"
 - Modify: `tests/CMakeLists.txt`
 - Modify: `tests/benchmark/bench_runner.c`
 
-- [ ] **Step 1: Create `tests/benchmark/benchmark_threadpool.c`**
+- [x] **Step 1: Create `tests/benchmark/benchmark_threadpool.c`**
 
 Measure:
 1. Fire-and-forget task throughput (Million tasks/sec).
@@ -412,9 +412,9 @@ Measure:
 3. Parallel-for speedup across 1, 2, 4, 8 threads vs serial loop.
 Print `"Benchmark completed\n"`.
 
-- [ ] **Step 2: Wire into `tests/CMakeLists.txt` and `bench_runner.c`**
+- [x] **Step 2: Wire into `tests/CMakeLists.txt` and `bench_runner.c`**
 
-- [ ] **Step 3: Run benchmarks and verify output**
+- [x] **Step 3: Run benchmarks and verify output**
 
 ```bash
 cmake --build build -j4
@@ -423,7 +423,7 @@ ctest --test-dir build --output-on-failure -R bench_threadpool
 ```
 Expected: PASS
 
-- [ ] **Step 4: Commit changes**
+- [x] **Step 4: Commit changes**
 
 ```bash
 git add tests/benchmark/benchmark_threadpool.c tests/CMakeLists.txt tests/benchmark/bench_runner.c
@@ -437,14 +437,14 @@ git commit -m "test(bench): ⚡ add benchmark suite for thread pool"
 **Files:**
 - Repository-wide verification
 
-- [ ] **Step 1: Run clang-format check**
+- [x] **Step 1: Run clang-format check**
 
 ```bash
 clang-format -i include/cobalt/module/threadpool.h src/module/threadpool.c tests/unit/test_threadpool.c tests/benchmark/benchmark_threadpool.c
 clang-format --dry-run -Werror include/cobalt/module/threadpool.h src/module/threadpool.c tests/unit/test_threadpool.c tests/benchmark/benchmark_threadpool.c
 ```
 
-- [ ] **Step 2: Run all CTests and static analysis**
+- [x] **Step 2: Run all CTests and static analysis**
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCOBALT_RUN_TIDY=ON
@@ -452,7 +452,7 @@ cmake --build build -j4
 ctest --test-dir build --output-on-failure
 ```
 
-- [ ] **Step 3: Run AddressSanitizer & LeakSanitizer**
+- [x] **Step 3: Run AddressSanitizer & LeakSanitizer**
 
 ```bash
 cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug -DCOBALT_ENABLE_ASAN=ON
@@ -460,7 +460,7 @@ cmake --build build-asan -j4
 ctest --test-dir build-asan --output-on-failure -R threadpool
 ```
 
-- [ ] **Step 4: Commit finalization**
+- [x] **Step 4: Commit finalization**
 
 ```bash
 git commit -m "chore(threadpool): 🧹 format codebase and finalize Phase 2 thread pool" --allow-empty
