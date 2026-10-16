@@ -606,6 +606,7 @@ void test_fold(void)
 }
 
 void test_sort_stable(void);
+void test_stable_sort_large(void);
 void test_sort_partition(void);
 void test_sort_unique(void);
 void test_sort_with_alloc(void);
@@ -641,6 +642,7 @@ void test_sort(void)
     test_insertion_sort_single();
     test_heapsort();
     test_sort_stable();
+    test_stable_sort_large();
     test_sort_partition();
     test_sort_unique();
     test_sort_with_alloc();
@@ -674,6 +676,85 @@ void test_sort_stable(void)
     TEST_ASSERT(arr[4] == 5);
     TEST_ASSERT(arr[5] == 8);
     printf("  stable_sort: OK\n");
+}
+
+typedef struct {
+    int key;
+    int original_index;
+} stable_item_t;
+
+static int cmp_stable_item(const void *a, const void *b)
+{
+    const stable_item_t *x = (const stable_item_t *)a;
+    const stable_item_t *y = (const stable_item_t *)b;
+    return (x->key > y->key) - (x->key < y->key);
+}
+
+static int g_stable_sort_cmp_count = 0;
+static int cmp_stable_item_counted(const void *a, const void *b)
+{
+    g_stable_sort_cmp_count++;
+    return cmp_stable_item(a, b);
+}
+
+void test_stable_sort_large(void)
+{
+    printf("Testing cobalt_stable_sort stability on 10,000 items...\n");
+    size_t         count = 10000;
+    stable_item_t *items = (stable_item_t *)malloc(count * sizeof(stable_item_t));
+    TEST_ASSERT(items != NULL);
+
+    /* 1. Large array with duplicate keys (100 distinct keys across 10,000 items) */
+    for (size_t i = 0; i < count; i++) {
+        items[i].key            = (int)(i % 100);
+        items[i].original_index = (int)i;
+    }
+
+    cobalt_stable_sort(items, count, sizeof(stable_item_t), cmp_stable_item);
+
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0) {
+            TEST_ASSERT(items[i].key >= items[i - 1].key);
+            if (items[i].key == items[i - 1].key) {
+                TEST_ASSERT(items[i].original_index > items[i - 1].original_index);
+            }
+        }
+    }
+
+    /* 2. Pre-sorted array (verifying O(N) linear pass) */
+    for (size_t i = 0; i < count; i++) {
+        items[i].key            = (int)(i / 10);
+        items[i].original_index = (int)i;
+    }
+    g_stable_sort_cmp_count = 0;
+    cobalt_stable_sort(items, count, sizeof(stable_item_t), cmp_stable_item_counted);
+    for (size_t i = 0; i < count; i++) {
+        if (i > 0) {
+            TEST_ASSERT(items[i].key >= items[i - 1].key);
+            if (items[i].key == items[i - 1].key) {
+                TEST_ASSERT(items[i].original_index > items[i - 1].original_index);
+            }
+        }
+    }
+    /* O(N) linear pass: run detection completes in N - 1 comparisons */
+    TEST_ASSERT(g_stable_sort_cmp_count < (int)count);
+
+    /* 3. Strictly descending array */
+    for (size_t i = 0; i < count; i++) {
+        items[i].key            = (int)(count - i);
+        items[i].original_index = (int)i;
+    }
+    g_stable_sort_cmp_count = 0;
+    cobalt_stable_sort(items, count, sizeof(stable_item_t), cmp_stable_item_counted);
+    for (size_t i = 0; i < count; i++) {
+        TEST_EQUAL(items[i].key, (int)(i + 1));
+        TEST_EQUAL(items[i].original_index, (int)(count - 1 - i));
+    }
+    /* O(N) linear pass: strictly descending run reversed in N - 1 comparisons */
+    TEST_ASSERT(g_stable_sort_cmp_count < (int)count);
+
+    free(items);
+    printf("  stable_sort large: OK\n");
 }
 
 void test_sort_partition(void)
@@ -789,6 +870,26 @@ void test_sort_with_alloc(void)
     TEST_ASSERT(arr2[3] == 3);
     TEST_ASSERT(arr2[4] == 5);
     TEST_ASSERT(arr2[5] == 8);
+
+    /* stable_sort_with_alloc large (> 24 items) to verify scratch buffer allocation */
+    mock_sort_reset();
+    int arr2_large[64];
+    for (int i = 0; i < 64; i++) {
+        arr2_large[i] = (64 - i) % 17;
+    }
+    cobalt_stable_sort_with_alloc(arr2_large, 64, sizeof(int), cmp_int, a);
+    for (int i = 1; i < 64; i++) {
+        TEST_ASSERT(arr2_large[i - 1] <= arr2_large[i]);
+    }
+    TEST_ASSERT(mock_sort_alloc_count > 0);
+    TEST_ASSERT(mock_sort_alloc_count == mock_sort_free_count);
+
+    /* stable_sort_with_alloc with NULL allocator falls back to system */
+    int arr2_null[] = {3, 1, 2};
+    cobalt_stable_sort_with_alloc(arr2_null, 3, sizeof(int), cmp_int, NULL);
+    TEST_ASSERT(arr2_null[0] == 1);
+    TEST_ASSERT(arr2_null[1] == 2);
+    TEST_ASSERT(arr2_null[2] == 3);
 
     /* partition_with_alloc */
     mock_sort_reset();

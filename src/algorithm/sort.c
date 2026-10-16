@@ -252,11 +252,15 @@ pdqsort_loop(char *arr, size_t nmemb, size_t size, compare_func_t compar, int ba
         }
 
         if (left_size < right_size) {
-            pdqsort_loop(arr, left_size, size, compar, bad_allowed);
+            if (left_size > 1) {
+                pdqsort_loop(arr, left_size, size, compar, bad_allowed);
+            }
             arr   = arr + (gt + 1) * size;
             nmemb = right_size;
         } else {
-            pdqsort_loop(arr + (gt + 1) * size, right_size, size, compar, bad_allowed);
+            if (right_size > 1) {
+                pdqsort_loop(arr + (gt + 1) * size, right_size, size, compar, bad_allowed);
+            }
             nmemb = left_size;
         }
     }
@@ -337,8 +341,219 @@ void cobalt_list_sort(void **head, size_t *count, compare_func_t compar)
     cobalt_list_merge_sort(list_head, count, compar);
 }
 
+/* -------------------------------------------------------------------------- */
+/* Adaptive Run MergeSort (TimSort-lite)                                      */
+/* -------------------------------------------------------------------------- */
+
+typedef struct {
+    size_t start;
+    size_t len;
+} run_t;
+
+static void reverse_run(char *arr, size_t len, size_t size)
+{
+    if (len <= 1) {
+        return;
+    }
+    size_t left  = 0;
+    size_t right = len - 1;
+    while (left < right) {
+        cobalt_swap_bytes(arr + left * size, arr + right * size, size);
+        left++;
+        right--;
+    }
+}
+
+static void merge_runs(char          *arr,
+                       size_t         a_start,
+                       size_t         a_len,
+                       size_t         b_len,
+                       size_t         size,
+                       compare_func_t compar,
+                       char          *scratch)
+{
+    char *a = arr + a_start * size;
+    char *b = arr + (a_start + a_len) * size;
+
+    if (a_len <= b_len) {
+        /* Copy left run A to scratch buffer and merge forward */
+        memcpy(scratch, a, a_len * size);
+
+        size_t i    = 0;
+        size_t j    = 0;
+        size_t dest = 0;
+
+        while (i < a_len && j < b_len) {
+            /* Stability: prefer scratch (left run A) when equal */
+            if (compar(scratch + i * size, b + j * size) <= 0) {
+                memcpy(a + dest * size, scratch + i * size, size);
+                i++;
+            } else {
+                memcpy(a + dest * size, b + j * size, size);
+                j++;
+            }
+            dest++;
+        }
+
+        if (i < a_len) {
+            memcpy(a + dest * size, scratch + i * size, (a_len - i) * size);
+        }
+    } else {
+        /* When left run A is larger than right run B, copy run B to scratch
+         * and merge backward to guarantee scratch never exceeds (nmemb + 1) / 2.
+         * Stability: when elements are equal, copy from scratch (run B) first
+         * into higher index so run A elements remain before run B elements. */
+        memcpy(scratch, b, b_len * size);
+
+        size_t i    = a_len;
+        size_t j    = b_len;
+        size_t dest = a_len + b_len;
+
+        while (i > 0 && j > 0) {
+            dest--;
+            if (compar(a + (i - 1) * size, scratch + (j - 1) * size) > 0) {
+                i--;
+                memcpy(a + dest * size, a + i * size, size);
+            } else {
+                j--;
+                memcpy(a + dest * size, scratch + j * size, size);
+            }
+        }
+
+        if (j > 0) {
+            memcpy(a, scratch, j * size);
+        }
+    }
+}
+
+static void adaptive_merge_sort(
+    char *arr, size_t nmemb, size_t size, compare_func_t compar, cobalt_allocator_t *alloc)
+{
+    if (nmemb <= 24) {
+        insertion_sort_impl(arr, nmemb, size, compar, alloc);
+        return;
+    }
+
+    /* Allocate scratch buffer of size ((nmemb + 1) / 2) * size */
+    size_t max_run_len = (nmemb + 1) / 2;
+    char  *scratch     = NULL;
+    if (alloc) {
+        scratch = (char *)alloc->alloc(alloc, max_run_len * size);
+    } else {
+        scratch = (char *)malloc(max_run_len * size);
+    }
+
+    if (!scratch) {
+        /* OOM fallback gracefully to insertion_sort_impl */
+        insertion_sort_impl(arr, nmemb, size, compar, alloc);
+        return;
+    }
+
+    /* Identify natural runs */
+    run_t  stack[64];
+    size_t stack_size = 0;
+    size_t curr       = 0;
+
+    while (curr < nmemb) {
+        size_t run_len = 1;
+        if (curr + 1 < nmemb) {
+            if (compar(arr + curr * size, arr + (curr + 1) * size) > 0) {
+                /* Strictly descending run: reverse with reverse_run */
+                run_len = 2;
+                while (curr + run_len < nmemb && compar(arr + (curr + run_len - 1) * size,
+                                                        arr + (curr + run_len) * size) > 0) {
+                    run_len++;
+                }
+                reverse_run(arr + curr * size, run_len, size);
+            } else {
+                /* Non-descending run */
+                run_len = 2;
+                while (curr + run_len < nmemb && compar(arr + (curr + run_len - 1) * size,
+                                                        arr + (curr + run_len) * size) <= 0) {
+                    run_len++;
+                }
+            }
+        }
+
+        /* Short runs (< 16) are extended up to min(16, remaining) */
+        size_t minrun = 16;
+        if (run_len < minrun && curr + run_len < nmemb) {
+            size_t force_len = nmemb - curr;
+            if (force_len > minrun) {
+                force_len = minrun;
+            }
+            insertion_sort_impl(arr + curr * size, force_len, size, compar, NULL);
+            run_len = force_len;
+        }
+
+        stack[stack_size].start = curr;
+        stack[stack_size].len   = run_len;
+        stack_size++;
+        curr += run_len;
+
+        /* Merge balance */
+        while (stack_size >= 2) {
+            size_t n = stack_size - 1;
+            if (stack_size >= 3 && stack[n - 2].len <= stack[n - 1].len + stack[n].len) {
+                if (stack[n - 2].len < stack[n].len) {
+                    merge_runs(arr,
+                               stack[n - 2].start,
+                               stack[n - 2].len,
+                               stack[n - 1].len,
+                               size,
+                               compar,
+                               scratch);
+                    stack[n - 2].len += stack[n - 1].len;
+                    stack[n - 1] = stack[n];
+                    stack_size--;
+                } else {
+                    merge_runs(arr,
+                               stack[n - 1].start,
+                               stack[n - 1].len,
+                               stack[n].len,
+                               size,
+                               compar,
+                               scratch);
+                    stack[n - 1].len += stack[n].len;
+                    stack_size--;
+                }
+            } else if (stack[n - 1].len <= stack[n].len) {
+                merge_runs(
+                    arr, stack[n - 1].start, stack[n - 1].len, stack[n].len, size, compar, scratch);
+                stack[n - 1].len += stack[n].len;
+                stack_size--;
+            } else {
+                break;
+            }
+        }
+    }
+
+    /* Unwind all remaining runs */
+    while (stack_size > 1) {
+        size_t n = stack_size - 1;
+        if (stack_size >= 3 && stack[n - 2].len < stack[n].len) {
+            merge_runs(
+                arr, stack[n - 2].start, stack[n - 2].len, stack[n - 1].len, size, compar, scratch);
+            stack[n - 2].len += stack[n - 1].len;
+            stack[n - 1] = stack[n];
+            stack_size--;
+        } else {
+            merge_runs(
+                arr, stack[n - 1].start, stack[n - 1].len, stack[n].len, size, compar, scratch);
+            stack[n - 1].len += stack[n].len;
+            stack_size--;
+        }
+    }
+
+    if (alloc) {
+        alloc->free(alloc, scratch);
+    } else {
+        free(scratch);
+    }
+}
+
 /**
- * @brief Perform a stable sort via insertion sort
+ * @brief Perform a stable sort via adaptive run mergesort (TimSort-lite)
  *
  * @param base Pointer to the first array element
  * @param nmemb Number of elements in the array
@@ -348,7 +563,10 @@ void cobalt_list_sort(void **head, size_t *count, compare_func_t compar)
  */
 void cobalt_stable_sort(void *base, size_t nmemb, size_t size, compare_func_t compar)
 {
-    cobalt_insertion_sort(base, nmemb, size, compar);
+    if (!base || nmemb <= 1 || size == 0 || !compar) {
+        return;
+    }
+    adaptive_merge_sort((char *)base, nmemb, size, compar, NULL);
 }
 
 /**
@@ -363,10 +581,13 @@ void cobalt_stable_sort(void *base, size_t nmemb, size_t size, compare_func_t co
 void cobalt_stable_sort_with_alloc(
     void *base, size_t nmemb, size_t size, compare_func_t compar, cobalt_allocator_t *alloc)
 {
+    if (!base || nmemb <= 1 || size == 0 || !compar) {
+        return;
+    }
     if (!alloc) {
         alloc = cobalt_allocator_get_system();
     }
-    cobalt_insertion_sort_with_alloc(base, nmemb, size, compar, alloc);
+    adaptive_merge_sort((char *)base, nmemb, size, compar, alloc);
 }
 
 /**
