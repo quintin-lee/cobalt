@@ -50,7 +50,7 @@ static inline void cobalt_swap_bytes(char *a, char *b, size_t size)
 static void
 heapsort_sift_down(char *arr, size_t root, size_t count, size_t size, compare_func_t compar)
 {
-    while (root * 2 + 1 < count) {
+    while (root < count / 2) {
         size_t child = root * 2 + 1;
         if (child + 1 < count && compar(arr + (child + 1) * size, arr + child * size) > 0) {
             child++;
@@ -77,8 +77,6 @@ static void cobalt_heapsort_impl(char *arr, size_t nmemb, size_t size, compare_f
         heapsort_sift_down(arr, 0, i, size, compar);
     }
 }
-
-void cobalt_heapsort(void *base, size_t nmemb, size_t size, compare_func_t compar);
 
 void cobalt_heapsort(void *base, size_t nmemb, size_t size, compare_func_t compar)
 {
@@ -167,11 +165,111 @@ static size_t partition_impl(void               *base,
 }
 
 /* -------------------------------------------------------------------------- */
+/* PDQSort (Pattern-Defeating Quicksort)                                      */
+/* -------------------------------------------------------------------------- */
+
+static inline size_t pdq_log2(size_t n)
+{
+    size_t log = 0;
+    while (n >>= 1) {
+        log++;
+    }
+    return log;
+}
+
+static size_t
+pdq_median3(const char *arr, size_t a, size_t b, size_t c, size_t size, compare_func_t compar)
+{
+    const char *pa = arr + a * size;
+    const char *pb = arr + b * size;
+    const char *pc = arr + c * size;
+
+    if (compar(pa, pb) < 0) {
+        if (compar(pb, pc) < 0) {
+            return b;
+        }
+        return compar(pa, pc) < 0 ? c : a;
+    }
+    if (compar(pa, pc) < 0) {
+        return a;
+    }
+    return compar(pb, pc) < 0 ? c : b;
+}
+
+static size_t pdq_ninther(const char *arr, size_t nmemb, size_t size, compare_func_t compar)
+{
+    size_t s   = nmemb / 8;
+    size_t mid = nmemb / 2;
+    size_t m1  = pdq_median3(arr, 0, s, 2 * s, size, compar);
+    size_t m2  = pdq_median3(arr, mid - s, mid, mid + s, size, compar);
+    size_t m3  = pdq_median3(arr, nmemb - 1 - 2 * s, nmemb - 1 - s, nmemb - 1, size, compar);
+    return pdq_median3(arr, m1, m2, m3, size, compar);
+}
+
+static void
+pdqsort_loop(char *arr, size_t nmemb, size_t size, compare_func_t compar, int bad_allowed)
+{
+    while (nmemb > 24) {
+        if (bad_allowed <= 0) {
+            cobalt_heapsort_impl(arr, nmemb, size, compar);
+            return;
+        }
+
+        size_t pivot_idx;
+        if (nmemb > 128) {
+            pivot_idx = pdq_ninther(arr, nmemb, size, compar);
+        } else {
+            pivot_idx = pdq_median3(arr, 0, nmemb / 2, nmemb - 1, size, compar);
+        }
+
+        if (pivot_idx != 0) {
+            cobalt_swap_bytes(arr, arr + pivot_idx * size, size);
+        }
+
+        size_t lt = 0;
+        size_t i  = 1;
+        size_t gt = nmemb - 1;
+
+        while (i <= gt) {
+            int cmp = compar(arr + i * size, arr + lt * size);
+            if (cmp < 0) {
+                cobalt_swap_bytes(arr + lt * size, arr + i * size, size);
+                lt++;
+                i++;
+            } else if (cmp > 0) {
+                cobalt_swap_bytes(arr + i * size, arr + gt * size, size);
+                gt--;
+            } else {
+                i++;
+            }
+        }
+
+        size_t left_size  = lt;
+        size_t right_size = nmemb - (gt + 1);
+
+        if (left_size < nmemb / 8 || right_size < nmemb / 8) {
+            bad_allowed--;
+        }
+
+        if (left_size < right_size) {
+            pdqsort_loop(arr, left_size, size, compar, bad_allowed);
+            arr   = arr + (gt + 1) * size;
+            nmemb = right_size;
+        } else {
+            pdqsort_loop(arr + (gt + 1) * size, right_size, size, compar, bad_allowed);
+            nmemb = left_size;
+        }
+    }
+
+    insertion_sort_impl(arr, nmemb, size, compar, NULL);
+}
+
+/* -------------------------------------------------------------------------- */
 /* Public API                                                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * @brief Perform quicksort via the standard library qsort
+ * @brief Perform quicksort via pattern-defeating quicksort (PDQSort)
  *
  * @param base Pointer to the first array element
  * @param nmemb Number of elements in the array
@@ -181,7 +279,11 @@ static size_t partition_impl(void               *base,
  */
 void cobalt_qsort(void *base, size_t nmemb, size_t size, compare_func_t compar)
 {
-    qsort(base, nmemb, size, compar);
+    if (!base || nmemb <= 1 || size == 0 || !compar) {
+        return;
+    }
+    int bad_allowed = (int)(2 * pdq_log2(nmemb));
+    pdqsort_loop((char *)base, nmemb, size, compar, bad_allowed);
 }
 
 /**

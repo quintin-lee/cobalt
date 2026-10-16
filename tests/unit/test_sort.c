@@ -222,10 +222,160 @@ void test_insertion_sort_oversized_elements(void)
 }
 
 /* -------------------------------------------------------------------------- */
-/* cobalt_heapsort                                                            */
+/* cobalt_qsort adversarial and scale tests                                   */
 /* -------------------------------------------------------------------------- */
 
-void cobalt_heapsort(void *base, size_t nmemb, size_t size, compare_func_t compar);
+static int g_qsort_adversarial_cmp_count = 0;
+static int cmp_int_counted(const void *a, const void *b)
+{
+    g_qsort_adversarial_cmp_count++;
+    return cmp_int(a, b);
+}
+
+void test_qsort_adversarial(void)
+{
+    printf("Testing cobalt_qsort adversarial and scale cases...\n");
+
+    /* 1. Large random array (10,000 ints) */
+    {
+        int *arr = (int *)malloc(10000 * sizeof(int));
+        TEST_ASSERT(arr != NULL);
+        uint32_t seed = 987654321;
+        for (int i = 0; i < 10000; i++) {
+            seed   = seed * 1664525u + 1013904223u;
+            arr[i] = (int)(seed % 50000);
+        }
+        cobalt_qsort(arr, 10000, sizeof(int), cmp_int);
+        for (int i = 1; i < 10000; i++) {
+            TEST_ASSERT(arr[i - 1] <= arr[i]);
+        }
+        free(arr);
+    }
+
+    /* 2. All-equal array (2,000 ints) — verifies DNF 3-way partition O(N) */
+    {
+        int *arr = (int *)malloc(2000 * sizeof(int));
+        TEST_ASSERT(arr != NULL);
+        for (int i = 0; i < 2000; i++) {
+            arr[i] = 42;
+        }
+        g_qsort_adversarial_cmp_count = 0;
+        cobalt_qsort(arr, 2000, sizeof(int), cmp_int_counted);
+        for (int i = 0; i < 2000; i++) {
+            TEST_EQUAL(arr[i], 42);
+        }
+        /* DNF 3-way partition finishes in linear time (< 4000 comparisons for 2000 elements) */
+        TEST_ASSERT(g_qsort_adversarial_cmp_count < 4000);
+        free(arr);
+    }
+
+    /* 3. Organ-pipe / Sawtooth array (2,048 ints) */
+    {
+        int *arr = (int *)malloc(2048 * sizeof(int));
+        TEST_ASSERT(arr != NULL);
+
+        /* 3a. Organ-pipe: first half ascending, second half descending */
+        for (int i = 0; i < 1024; i++) {
+            arr[i]        = i;
+            arr[2047 - i] = i;
+        }
+        cobalt_qsort(arr, 2048, sizeof(int), cmp_int);
+        for (int i = 1; i < 2048; i++) {
+            TEST_ASSERT(arr[i - 1] <= arr[i]);
+        }
+
+        /* 3b. Sawtooth array: repeated ramps of 64 elements */
+        for (int i = 0; i < 2048; i++) {
+            arr[i] = i % 64;
+        }
+        cobalt_qsort(arr, 2048, sizeof(int), cmp_int);
+        for (int i = 1; i < 2048; i++) {
+            TEST_ASSERT(arr[i - 1] <= arr[i]);
+        }
+        free(arr);
+    }
+
+    /* 4. Strictly descending array (5,000 ints) */
+    {
+        int *arr = (int *)malloc(5000 * sizeof(int));
+        TEST_ASSERT(arr != NULL);
+        for (int i = 0; i < 5000; i++) {
+            arr[i] = 5000 - i;
+        }
+        cobalt_qsort(arr, 5000, sizeof(int), cmp_int);
+        for (int i = 0; i < 5000; i++) {
+            TEST_EQUAL(arr[i], i + 1);
+        }
+        free(arr);
+    }
+
+    /* 5. Strictly ascending array (5,000 ints) */
+    {
+        int *arr = (int *)malloc(5000 * sizeof(int));
+        TEST_ASSERT(arr != NULL);
+        for (int i = 0; i < 5000; i++) {
+            arr[i] = i + 1;
+        }
+        cobalt_qsort(arr, 5000, sizeof(int), cmp_int);
+        for (int i = 0; i < 5000; i++) {
+            TEST_EQUAL(arr[i], i + 1);
+        }
+        free(arr);
+    }
+
+    /* 6. 16-byte structs (test_u128_t) with cobalt_qsort (1,000 items) */
+    {
+        test_u128_t *arr = (test_u128_t *)malloc(1000 * sizeof(test_u128_t));
+        TEST_ASSERT(arr != NULL);
+        uint32_t seed = 543216789;
+        for (int i = 0; i < 1000; i++) {
+            seed        = seed * 1664525u + 1013904223u;
+            arr[i].high = seed % 100;
+            seed        = seed * 1664525u + 1013904223u;
+            arr[i].low  = seed % 10000;
+        }
+        cobalt_qsort(arr, 1000, sizeof(test_u128_t), cmp_u128);
+        for (int i = 1; i < 1000; i++) {
+            TEST_ASSERT(cmp_u128(&arr[i - 1], &arr[i]) <= 0);
+        }
+        free(arr);
+    }
+
+    /* 7. Edge cases (base == NULL, nmemb == 0, size == 0, compar == NULL) with nmemb >= 2 */
+    {
+        int dummy[4] = {40, 30, 20, 10};
+
+        /* base == NULL with nmemb >= 2 */
+        cobalt_qsort(NULL, 10, sizeof(int), cmp_int);
+        cobalt_qsort(NULL, 0, sizeof(int), cmp_int);
+
+        /* nmemb == 0 */
+        cobalt_qsort(dummy, 0, sizeof(int), cmp_int);
+        TEST_EQUAL(dummy[0], 40);
+        TEST_EQUAL(dummy[1], 30);
+
+        /* size == 0 with nmemb >= 2 */
+        cobalt_qsort(dummy, 4, 0, cmp_int);
+        TEST_EQUAL(dummy[0], 40);
+        TEST_EQUAL(dummy[1], 30);
+
+        /* compar == NULL with nmemb >= 2 */
+        cobalt_qsort(dummy, 4, sizeof(int), NULL);
+        TEST_EQUAL(dummy[0], 40);
+        TEST_EQUAL(dummy[1], 30);
+
+        /* Single element and NULL base with 0 nmemb/size/compar */
+        cobalt_qsort(dummy, 1, sizeof(int), cmp_int);
+        TEST_EQUAL(dummy[0], 40);
+        cobalt_qsort(NULL, 0, 0, NULL);
+    }
+
+    printf("  qsort adversarial: OK\n");
+}
+
+/* -------------------------------------------------------------------------- */
+/* cobalt_heapsort                                                            */
+/* -------------------------------------------------------------------------- */
 
 void test_heapsort(void)
 {
@@ -482,6 +632,7 @@ void test_sort(void)
     test_qsort_empty();
     test_qsort_single();
     test_qsort_already_sorted();
+    test_qsort_adversarial();
     test_insertion_sort_int();
     test_insertion_sort_double();
     test_insertion_sort_large_struct();

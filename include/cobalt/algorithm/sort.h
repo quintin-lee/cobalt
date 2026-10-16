@@ -35,10 +35,20 @@ typedef int (*compare_func_t)(const void *a, const void *b);
  * @param nmemb Number of elements in the array
  * @param size Size of each element in the array (in bytes)
  * @param compar Function used to compare two elements
- * @note Internally calls the standard library's qsort function, which is an unstable sorting
- * algorithm.
+ * @note In-place pattern-defeating quicksort (PDQSort) with O(N log N) worst-case time complexity.
+ * Unstable sorting algorithm.
  */
 void cobalt_qsort(void *base, size_t nmemb, size_t size, compare_func_t compar);
+
+/**
+ * @brief In-place heapsort
+ * @param base Pointer to the first element of the array to be sorted
+ * @param nmemb Number of elements in the array
+ * @param size Size of each element in bytes
+ * @param compar Function used to compare two elements
+ * @note In-place, zero dynamic allocations, O(N log N) worst-case time complexity.
+ */
+void cobalt_heapsort(void *base, size_t nmemb, size_t size, compare_func_t compar);
 
 /**
  * @brief Insertion sort
