@@ -15,7 +15,9 @@
 #include "cobalt/container/vector.h"
 #include "cobalt/module/json.h"
 #include "cobalt/module/json_sax.h"
+#include "cobalt/module/threadpool.h"
 #include "cobalt/utils/benchmark.h"
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -267,6 +269,52 @@ static void bench_stable_sort_random(void)
     free(arr);
 }
 
+static void bench_tp_noop_task(void *arg)
+{
+    atomic_int *counter = (atomic_int *)arg;
+    atomic_fetch_add_explicit(counter, 1, memory_order_relaxed);
+}
+
+static void bench_threadpool_throughput(void)
+{
+    cobalt_threadpool_t *pool = cobalt_threadpool_create(4);
+    if (!pool) {
+        return;
+    }
+    atomic_int counter;
+    atomic_init(&counter, 0);
+    const int tasks = 50000;
+    for (int i = 0; i < tasks; i++) {
+        cobalt_threadpool_submit(pool, bench_tp_noop_task, &counter);
+    }
+    cobalt_threadpool_wait_idle(pool);
+    cobalt_threadpool_destroy(pool);
+}
+
+static void bench_tp_pfor_kernel(size_t index, void *arg)
+{
+    int *arr   = (int *)arg;
+    arr[index] = arr[index] * 1664525U + 1013904223U;
+}
+
+static void bench_threadpool_parallel_for(void)
+{
+    cobalt_threadpool_t *pool = cobalt_threadpool_create(4);
+    if (!pool) {
+        return;
+    }
+    const size_t n   = 100000;
+    int         *arr = (int *)malloc(sizeof(int) * n);
+    if (arr) {
+        for (size_t i = 0; i < n; i++) {
+            arr[i] = (int)i;
+        }
+        cobalt_threadpool_parallel_for(pool, 0, n, 0, bench_tp_pfor_kernel, arr);
+        free(arr);
+    }
+    cobalt_threadpool_destroy(pool);
+}
+
 int main(int argc, char *argv[])
 {
     int json_mode = 0;
@@ -277,7 +325,7 @@ int main(int argc, char *argv[])
     }
 
     if (json_mode) {
-        cobalt_bench_result_t results[20];
+        cobalt_bench_result_t results[24];
         memset(results, 0, sizeof(results));
 
         results[0].name = "vector_push";
@@ -314,7 +362,11 @@ int main(int argc, char *argv[])
         cobalt_bench_run("qsort_sorted", 3, bench_qsort_sorted, &results[15]);
         results[16].name = "stable_sort_random";
         cobalt_bench_run("stable_sort_random", 3, bench_stable_sort_random, &results[16]);
-        results[17].name = NULL;
+        results[17].name = "threadpool_throughput";
+        cobalt_bench_run("threadpool_throughput", 3, bench_threadpool_throughput, &results[17]);
+        results[18].name = "threadpool_parallel_for";
+        cobalt_bench_run("threadpool_parallel_for", 3, bench_threadpool_parallel_for, &results[18]);
+        results[19].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         free(g_bench_random_ints);
@@ -363,6 +415,10 @@ int main(int argc, char *argv[])
     BENCH_RUN("qsort random (100k)", 3, bench_qsort_random);
     BENCH_RUN("qsort sorted (100k)", 3, bench_qsort_sorted);
     BENCH_RUN("stable_sort random (100k)", 3, bench_stable_sort_random);
+
+    printf("--- ThreadPool ---\n");
+    BENCH_RUN("threadpool throughput (50k)", 3, bench_threadpool_throughput);
+    BENCH_RUN("threadpool parallel_for (100k)", 3, bench_threadpool_parallel_for);
 
     printf("\nBenchmark suite complete.\n");
     free(g_bench_random_ints);
