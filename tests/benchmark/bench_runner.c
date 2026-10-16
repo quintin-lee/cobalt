@@ -3,6 +3,7 @@
  * @brief Unified benchmark runner — executes all benchmarks with statistics
  */
 
+#include "cobalt/algorithm/sort.h"
 #include "cobalt/container/deque.h"
 #include "cobalt/container/hashmap.h"
 #include "cobalt/container/lfqueue.h"
@@ -194,6 +195,78 @@ static void bench_json_dom(void)
     }
 }
 
+/* ===== Sort ===== */
+static int bench_sort_cmp_int(const void *a, const void *b)
+{
+    int ia = *(const int *)a;
+    int ib = *(const int *)b;
+    return (ia > ib) - (ia < ib);
+}
+
+static int *g_bench_random_ints = NULL;
+static int *g_bench_sorted_ints = NULL;
+
+static void ensure_sort_bench_data(void)
+{
+    if (!g_bench_random_ints) {
+        g_bench_random_ints = (int *)malloc(sizeof(int) * BENCH_ITERS);
+        if (g_bench_random_ints) {
+            uint32_t seed = 42;
+            for (int i = 0; i < BENCH_ITERS; i++) {
+                seed                   = seed * 1664525u + 1013904223u;
+                g_bench_random_ints[i] = (int)(seed & 0x7FFFFFFF);
+            }
+        }
+    }
+    if (!g_bench_sorted_ints) {
+        g_bench_sorted_ints = (int *)malloc(sizeof(int) * BENCH_ITERS);
+        if (g_bench_sorted_ints) {
+            for (int i = 0; i < BENCH_ITERS; i++) {
+                g_bench_sorted_ints[i] = i;
+            }
+        }
+    }
+}
+
+static void bench_qsort_random(void)
+{
+    ensure_sort_bench_data();
+    int *arr = (int *)malloc(sizeof(int) * BENCH_ITERS);
+    if (!arr || !g_bench_random_ints) {
+        free(arr);
+        return;
+    }
+    memcpy(arr, g_bench_random_ints, sizeof(int) * BENCH_ITERS);
+    cobalt_qsort(arr, BENCH_ITERS, sizeof(int), bench_sort_cmp_int);
+    free(arr);
+}
+
+static void bench_qsort_sorted(void)
+{
+    ensure_sort_bench_data();
+    int *arr = (int *)malloc(sizeof(int) * BENCH_ITERS);
+    if (!arr || !g_bench_sorted_ints) {
+        free(arr);
+        return;
+    }
+    memcpy(arr, g_bench_sorted_ints, sizeof(int) * BENCH_ITERS);
+    cobalt_qsort(arr, BENCH_ITERS, sizeof(int), bench_sort_cmp_int);
+    free(arr);
+}
+
+static void bench_stable_sort_random(void)
+{
+    ensure_sort_bench_data();
+    int *arr = (int *)malloc(sizeof(int) * BENCH_ITERS);
+    if (!arr || !g_bench_random_ints) {
+        free(arr);
+        return;
+    }
+    memcpy(arr, g_bench_random_ints, sizeof(int) * BENCH_ITERS);
+    cobalt_stable_sort(arr, BENCH_ITERS, sizeof(int), bench_sort_cmp_int);
+    free(arr);
+}
+
 int main(int argc, char *argv[])
 {
     int json_mode = 0;
@@ -204,7 +277,7 @@ int main(int argc, char *argv[])
     }
 
     if (json_mode) {
-        cobalt_bench_result_t results[16];
+        cobalt_bench_result_t results[20];
         memset(results, 0, sizeof(results));
 
         results[0].name = "vector_push";
@@ -235,9 +308,17 @@ int main(int argc, char *argv[])
         cobalt_bench_run("json_sax", 3, bench_json_sax, &results[12]);
         results[13].name = "json_dom";
         cobalt_bench_run("json_dom", 3, bench_json_dom, &results[13]);
-        results[14].name = NULL;
+        results[14].name = "qsort_random";
+        cobalt_bench_run("qsort_random", 3, bench_qsort_random, &results[14]);
+        results[15].name = "qsort_sorted";
+        cobalt_bench_run("qsort_sorted", 3, bench_qsort_sorted, &results[15]);
+        results[16].name = "stable_sort_random";
+        cobalt_bench_run("stable_sort_random", 3, bench_stable_sort_random, &results[16]);
+        results[17].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
+        free(g_bench_random_ints);
+        free(g_bench_sorted_ints);
         return 0;
     }
 
@@ -278,6 +359,13 @@ int main(int argc, char *argv[])
     BENCH_RUN("json sax parse (20k)", 3, bench_json_sax);
     BENCH_RUN("json dom parse+destroy (20k)", 3, bench_json_dom);
 
+    printf("--- Sort ---\n");
+    BENCH_RUN("qsort random (100k)", 3, bench_qsort_random);
+    BENCH_RUN("qsort sorted (100k)", 3, bench_qsort_sorted);
+    BENCH_RUN("stable_sort random (100k)", 3, bench_stable_sort_random);
+
     printf("\nBenchmark suite complete.\n");
+    free(g_bench_random_ints);
+    free(g_bench_sorted_ints);
     return 0;
 }

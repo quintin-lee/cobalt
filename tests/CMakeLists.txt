@@ -96,6 +96,9 @@ target_link_libraries(benchmark_lfqueue cobalt pthread m)
 add_executable(benchmark_json benchmark/benchmark_json.c)
 target_link_libraries(benchmark_json cobalt m)
 
+add_executable(benchmark_sort benchmark/benchmark_sort.c)
+target_link_libraries(benchmark_sort cobalt m)
+
 # Register benchmarks with CTest
 add_test(NAME bench_vector COMMAND benchmark_vector
          PASS_REGULAR_EXPRESSION "Benchmark completed")
@@ -112,6 +115,8 @@ add_test(NAME bench_threadsafewrapper COMMAND benchmark_threadsafewrapper
 add_test(NAME bench_lfqueue COMMAND benchmark_lfqueue
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 add_test(NAME bench_json COMMAND benchmark_json
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+add_test(NAME bench_sort COMMAND benchmark_sort
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 
 # Unified benchmark runner

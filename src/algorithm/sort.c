@@ -608,7 +608,7 @@ void cobalt_stable_sort_with_alloc(
 }
 
 /**
- * @brief Partition an array around a pivot value (Lomuto-style)
+ * @brief Partition an array around a pivot value (Hoare-style)
  *
  * @param base Pointer to the first array element
  * @param nmemb Number of elements in the array
@@ -631,9 +631,10 @@ cobalt_partition(void *base, size_t nmemb, size_t size, const void *pivot, compa
  * @param size Size of each element in bytes
  * @param pivot Pivot value that elements are compared against
  * @param compar Comparator establishing the element order
- * @param alloc Custom allocator (NULL falls back to system)
+ * @param alloc Custom allocator (NULL performs zero dynamic allocations)
  * @return Index of the first element in the greater-or-equal partition, 0 on invalid input
- * @note Same behavior as cobalt_partition but with injectable allocator
+ * @note Same behavior as cobalt_partition but with injectable allocator; passing NULL
+ *       alloc performs zero dynamic allocations.
  */
 size_t cobalt_partition_with_alloc(void               *base,
                                    size_t              nmemb,

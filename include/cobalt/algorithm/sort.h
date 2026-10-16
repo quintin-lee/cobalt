@@ -115,7 +115,7 @@ void cobalt_stable_sort_with_alloc(
     void *base, size_t nmemb, size_t size, compare_func_t compar, cobalt_allocator_t *alloc);
 
 /**
- * @brief Partition array around a pivot value
+ * @brief Partition array around a pivot value (Hoare-style)
  * @param base Pointer to the first element
  * @param nmemb Number of elements
  * @param size Element size in bytes
@@ -135,9 +135,10 @@ cobalt_partition(void *base, size_t nmemb, size_t size, const void *pivot, compa
  * @param size Element size in bytes
  * @param pivot Value to partition around
  * @param compar Comparison function
- * @param alloc Custom allocator (NULL falls back to system)
+ * @param alloc Custom allocator (NULL performs zero dynamic allocations)
  * @return Index of the first element in the "greater-or-equal" partition
- * @note Same behavior as cobalt_partition but with injectable allocator
+ * @note Same behavior as cobalt_partition but with injectable allocator; passing NULL
+ *       alloc performs zero dynamic allocations.
  */
 size_t cobalt_partition_with_alloc(void               *base,
                                    size_t              nmemb,
