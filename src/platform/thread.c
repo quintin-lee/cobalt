@@ -139,12 +139,11 @@ void cobalt_mutex_unlock(cobalt_mutex_t *m)
 
 /**
  * @brief Opaque condition variable structure
- * @details Wraps an event plus mutex on Windows, pthread_cond_t otherwise.
+ * @details Wraps CONDITION_VARIABLE on Windows, pthread_cond_t otherwise.
  */
 struct cobalt_cond {
 #ifdef _WIN32
-    HANDLE          event;
-    cobalt_mutex_t *mutex;
+    CONDITION_VARIABLE cv;
 #else
     pthread_cond_t c;
 #endif
@@ -161,12 +160,7 @@ cobalt_cond_t *cobalt_cond_create(void)
         return NULL;
     }
 #ifdef _WIN32
-    c->event = CreateEvent(NULL, TRUE, FALSE, NULL);
-    c->mutex = NULL;
-    if (!c->event) {
-        free(c);
-        return NULL;
-    }
+    InitializeConditionVariable(&c->cv);
 #else
     if (pthread_cond_init(&c->c, NULL) != 0) {
         free(c);
@@ -185,11 +179,7 @@ void cobalt_cond_destroy(cobalt_cond_t *c)
     if (!c) {
         return;
     }
-#ifdef _WIN32
-    if (c->event) {
-        CloseHandle(c->event);
-    }
-#else
+#ifndef _WIN32
     pthread_cond_destroy(&c->c);
 #endif
     free(c);
@@ -207,10 +197,7 @@ void cobalt_cond_wait(cobalt_cond_t *c, cobalt_mutex_t *m)
         return;
     }
 #ifdef _WIN32
-    /* Release mutex, wait on event */
-    cobalt_mutex_unlock(m);
-    WaitForSingleObject(c->event, INFINITE);
-    cobalt_mutex_lock(m);
+    SleepConditionVariableCS(&c->cv, &m->cs, INFINITE);
 #else
     pthread_cond_wait(&c->c, &m->m);
 #endif
@@ -226,7 +213,7 @@ void cobalt_cond_signal(cobalt_cond_t *c)
         return;
     }
 #ifdef _WIN32
-    SetEvent(c->event);
+    WakeConditionVariable(&c->cv);
 #else
     pthread_cond_signal(&c->c);
 #endif
@@ -242,11 +229,7 @@ void cobalt_cond_broadcast(cobalt_cond_t *c)
         return;
     }
 #ifdef _WIN32
-    /* Win32 manual-reset event simulates broadcast */
-    SetEvent(c->event);
-    /* Reset after all waiters have acquired it */
-    /* Note: this is a simplified broadcast for manual-reset events */
-    ResetEvent(c->event);
+    WakeAllConditionVariable(&c->cv);
 #else
     pthread_cond_broadcast(&c->c);
 #endif
@@ -266,11 +249,11 @@ int cobalt_cond_timedwait(cobalt_cond_t *c, cobalt_mutex_t *m, int64_t timeout_m
         return -1;
     }
 #ifdef _WIN32
-    cobalt_mutex_unlock(m);
-    DWORD dwMs   = (timeout_ms < 0) ? INFINITE : (DWORD)timeout_ms;
-    DWORD result = WaitForSingleObject(c->event, dwMs);
-    cobalt_mutex_lock(m);
-    return (result == WAIT_TIMEOUT) ? -1 : 0;
+    DWORD dwMs = (timeout_ms < 0) ? INFINITE : (DWORD)timeout_ms;
+    if (SleepConditionVariableCS(&c->cv, &m->cs, dwMs)) {
+        return 0;
+    }
+    return -1;
 #else
     if (timeout_ms < 0) {
         pthread_cond_wait(&c->c, &m->m);
