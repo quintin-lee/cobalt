@@ -246,7 +246,7 @@ git commit -m "feat(eventloop): ✨ implement cobalt_stream_t async buffered str
 - Modify: `tests/CMakeLists.txt`
 - Modify: `tests/benchmark/bench_runner.c`
 
-- [ ] **Step 1: Create `tests/benchmark/benchmark_eventloop.c`**
+- [x] **Step 1: Create `tests/benchmark/benchmark_eventloop.c`**
 
 Benchmark:
 1. Timing Wheel throughput (100,000 adds, ticks, and cancels).
@@ -254,11 +254,11 @@ Benchmark:
 3. Zero-copy buffer throughput (GB/sec append and retrieve).
 Print `"Benchmark completed\n"`.
 
-- [ ] **Step 2: Wire into `tests/CMakeLists.txt` and `tests/benchmark/bench_runner.c`**
+- [x] **Step 2: Wire into `tests/CMakeLists.txt` and `tests/benchmark/bench_runner.c`**
 
 Register `benchmark_eventloop` executable and `bench_eventloop` test in `tests/CMakeLists.txt`. Wire into `bench_runner.c` in both human-readable and `--json` modes.
 
-- [ ] **Step 3: Build, run benchmarks & commit**
+- [x] **Step 3: Build, run benchmarks & commit**
 
 ```bash
 clang-format -i tests/benchmark/benchmark_eventloop.c tests/benchmark/bench_runner.c
