@@ -60,10 +60,10 @@ typedef struct {
     _Alignas(64) atomic_uint_fast64_t read_cursor;
 
     /* Cache Line 4: Synchronization & Waiter Tracking */
-    _Alignas(64) atomic_uint_fast32_t channel_state;
-    atomic_uint_fast32_t waiting_readers;
-    atomic_uint_fast32_t waiting_writers;
-    uint8_t              state_padding[52];
+    _Alignas(64) _Atomic uint32_t channel_state;
+    _Atomic uint32_t waiting_readers;
+    _Atomic uint32_t waiting_writers;
+    uint8_t          state_padding[52];
 } cobalt_shm_header_t;
 
 /**
@@ -143,5 +143,12 @@ int cobalt_shm_spsc_consume(cobalt_shm_spsc_t *spsc);
  * @return Pointer to underlying shared memory header, or NULL if spsc is NULL
  */
 cobalt_shm_header_t *cobalt_shm_spsc_get_header(cobalt_shm_spsc_t *spsc);
+
+/**
+ * @brief Cancel a pending reservation without committing any message.
+ * @param spsc SPSC handle
+ * @return COBALT_SUCCESS on success, error code otherwise
+ */
+int cobalt_shm_spsc_cancel(cobalt_shm_spsc_t *spsc);
 
 #endif /* COBALT_CONTAINER_SHM_RING_H */

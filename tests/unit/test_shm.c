@@ -579,13 +579,17 @@ static void test_spsc_queue_full(void)
 
 static void test_spsc_invalid_args(void)
 {
-    printf("Testing cobalt_shm_spsc invalid arguments...\n");
+    printf("Testing cobalt_shm_spsc invalid arguments and edge cases...\n");
 
-    cobalt_shm_spsc_t *spsc = NULL;
-    uint8_t            buffer[2048];
+    cobalt_shm_spsc_t   *spsc = NULL;
+    _Alignas(64) uint8_t buffer[2048];
 
     /* init: NULL address */
     TEST_ASSERT(cobalt_shm_spsc_init(NULL, sizeof(buffer), 1024, &spsc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: unaligned address */
+    TEST_ASSERT(cobalt_shm_spsc_init(buffer + 1, sizeof(buffer) - 1, 1024, &spsc) ==
                 COBALT_ERROR_INVALID_ARGUMENT);
 
     /* init: NULL out_spsc */
@@ -608,6 +612,20 @@ static void test_spsc_invalid_args(void)
     TEST_ASSERT(rc == COBALT_SUCCESS);
     TEST_ASSERT(spsc != NULL);
 
+    /* attach: unaligned address */
+    cobalt_shm_spsc_t *spsc_att = NULL;
+    TEST_ASSERT(cobalt_shm_spsc_attach(buffer + 1, sizeof(buffer) - 1, &spsc_att) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* attach: NULL address or out_spsc */
+    TEST_ASSERT(cobalt_shm_spsc_attach(NULL, sizeof(buffer), &spsc_att) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_spsc_attach(buffer, sizeof(buffer), NULL) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* attach: undersized total_size */
+    TEST_ASSERT(cobalt_shm_spsc_attach(buffer, 100, &spsc_att) == COBALT_ERROR_INVALID_ARGUMENT);
+
     /* reserve: NULL spsc or NULL out_ptr */
     void *ptr = NULL;
     TEST_ASSERT(cobalt_shm_spsc_reserve(NULL, 10, &ptr) == COBALT_ERROR_INVALID_ARGUMENT);
@@ -618,6 +636,16 @@ static void test_spsc_invalid_args(void)
 
     /* commit without reserve */
     TEST_ASSERT(cobalt_shm_spsc_commit(spsc, 1, 10) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* cancel without reserve */
+    TEST_ASSERT(cobalt_shm_spsc_cancel(spsc) == COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_spsc_cancel(NULL) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* reserve and then cancel */
+    rc = cobalt_shm_spsc_reserve(spsc, 64, &ptr);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(cobalt_shm_spsc_cancel(spsc) == COBALT_SUCCESS);
+    TEST_ASSERT(cobalt_shm_spsc_cancel(spsc) == COBALT_ERROR_INVALID_ARGUMENT);
 
     /* consume without peek */
     TEST_ASSERT(cobalt_shm_spsc_consume(spsc) == COBALT_ERROR_INVALID_ARGUMENT);

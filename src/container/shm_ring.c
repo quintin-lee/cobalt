@@ -44,7 +44,8 @@ int cobalt_shm_spsc_init(void               *shm_addr,
                          size_t              capacity,
                          cobalt_shm_spsc_t **out_spsc)
 {
-    if (!shm_addr || !out_spsc || capacity == 0 || (capacity & (capacity - 1)) != 0) {
+    if (!shm_addr || !out_spsc || capacity == 0 || (capacity & (capacity - 1)) != 0 ||
+        ((uintptr_t)shm_addr % 64) != 0) {
         return COBALT_ERROR_INVALID_ARGUMENT;
     }
 
@@ -91,7 +92,8 @@ int cobalt_shm_spsc_init(void               *shm_addr,
 
 int cobalt_shm_spsc_attach(void *shm_addr, size_t total_size, cobalt_shm_spsc_t **out_spsc)
 {
-    if (!shm_addr || !out_spsc || total_size < sizeof(cobalt_shm_header_t)) {
+    if (!shm_addr || !out_spsc || total_size < sizeof(cobalt_shm_header_t) ||
+        ((uintptr_t)shm_addr % 64) != 0) {
         return COBALT_ERROR_INVALID_ARGUMENT;
     }
 
@@ -219,6 +221,7 @@ int cobalt_shm_spsc_peek(cobalt_shm_spsc_t *spsc,
         return COBALT_ERROR_INVALID_ARGUMENT;
     }
 
+    int wrap_count = 0;
     while (1) {
         uint64_t read_pos  = atomic_load_explicit(&spsc->hdr->read_cursor, memory_order_relaxed);
         uint64_t write_pos = atomic_load_explicit(&spsc->hdr->write_cursor, memory_order_acquire);
@@ -226,15 +229,28 @@ int cobalt_shm_spsc_peek(cobalt_shm_spsc_t *spsc,
         if (read_pos == write_pos) {
             return COBALT_ERROR_EMPTY_CONTAINER;
         }
+        if (read_pos > write_pos) {
+            return COBALT_ERROR_GENERAL;
+        }
 
         size_t              offset = (size_t)(read_pos & spsc->mask);
         cobalt_shm_frame_t *frame  = (cobalt_shm_frame_t *)(spsc->buffer + offset);
 
         if (frame->flags & COBALT_SHM_FRAME_WRAP) {
+            if (offset == 0 || ++wrap_count > 1) {
+                return COBALT_ERROR_GENERAL;
+            }
             size_t tail_space = spsc->capacity - offset;
             atomic_store_explicit(
                 &spsc->hdr->read_cursor, read_pos + tail_space, memory_order_release);
             continue;
+        }
+
+        uint64_t unread = write_pos - read_pos;
+        size_t   frame_size =
+            ALIGN_UP(sizeof(cobalt_shm_frame_t) + (size_t)frame->length, COBALT_SHM_ALIGN);
+        if ((uint64_t)frame_size > unread || offset + frame_size > spsc->capacity) {
+            return COBALT_ERROR_GENERAL;
         }
 
         if (out_type) {
@@ -245,9 +261,8 @@ int cobalt_shm_spsc_peek(cobalt_shm_spsc_t *spsc,
             *out_len = (size_t)frame->length;
         }
 
-        spsc->peeked_frame_len =
-            ALIGN_UP(sizeof(cobalt_shm_frame_t) + (size_t)frame->length, COBALT_SHM_ALIGN);
-        spsc->is_peeked = true;
+        spsc->peeked_frame_len = frame_size;
+        spsc->is_peeked        = true;
         return COBALT_SUCCESS;
     }
 }
@@ -262,6 +277,15 @@ int cobalt_shm_spsc_consume(cobalt_shm_spsc_t *spsc)
     atomic_store_explicit(
         &spsc->hdr->read_cursor, read_pos + spsc->peeked_frame_len, memory_order_release);
     spsc->is_peeked = false;
+    return COBALT_SUCCESS;
+}
+
+int cobalt_shm_spsc_cancel(cobalt_shm_spsc_t *spsc)
+{
+    if (!spsc || !spsc->is_reserved) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+    spsc->is_reserved = false;
     return COBALT_SUCCESS;
 }
 
