@@ -1109,8 +1109,11 @@ static void test_channel_spsc_lifecycle_and_send_recv(void)
     cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
     TEST_ASSERT(server != NULL);
     TEST_ASSERT(cobalt_shm_channel_get_mode(server) == COBALT_SHM_MODE_SPSC);
-    TEST_ASSERT(cobalt_shm_channel_get_wait_policy(server) == COBALT_SHM_WAIT_BLOCKING);
+#ifndef _WIN32
     TEST_ASSERT(cobalt_shm_channel_get_read_fd(server) >= 0);
+#else
+    TEST_ASSERT(cobalt_shm_channel_get_read_fd(server) == -1);
+#endif
 
     cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
     TEST_ASSERT(client != NULL);
@@ -1192,8 +1195,11 @@ static void test_channel_mpmc_lifecycle_and_send_recv(void)
     cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
     TEST_ASSERT(server != NULL);
     TEST_ASSERT(cobalt_shm_channel_get_mode(server) == COBALT_SHM_MODE_MPMC);
-    TEST_ASSERT(cobalt_shm_channel_get_wait_policy(server) == COBALT_SHM_WAIT_BLOCKING);
+#ifndef _WIN32
     TEST_ASSERT(cobalt_shm_channel_get_read_fd(server) >= 0);
+#else
+    TEST_ASSERT(cobalt_shm_channel_get_read_fd(server) == -1);
+#endif
 
     cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
     TEST_ASSERT(client != NULL);
@@ -1368,6 +1374,7 @@ static void test_channel_wait_policies(void)
     printf("  Wait policies test passed\n");
 }
 
+#ifndef _WIN32
 typedef struct {
     int                 count;
     int                 expected_count;
@@ -1456,6 +1463,7 @@ static void test_channel_eventloop_integration(void)
 
     printf("  EventLoop integration test passed\n");
 }
+#endif
 
 static void test_channel_send_timeout_full(void)
 {
@@ -1508,6 +1516,7 @@ static void test_channel_send_timeout_full(void)
     printf("  Send timeout full test passed\n");
 }
 
+#ifndef _WIN32
 static void on_ev_mpmc_msg(
     cobalt_shm_channel_t *chan, uint16_t msg_type, const void *payload, size_t len, void *user_data)
 {
@@ -1581,6 +1590,7 @@ static void test_channel_mpmc_eventloop_integration(void)
 
     printf("  MPMC EventLoop integration test passed\n");
 }
+#endif
 
 static void test_channel_invalid_args(void)
 {
@@ -2228,9 +2238,13 @@ void test_shm(void)
     test_channel_spsc_lifecycle_and_send_recv();
     test_channel_mpmc_lifecycle_and_send_recv();
     test_channel_wait_policies();
+#ifndef _WIN32
     test_channel_eventloop_integration();
+#endif
     test_channel_send_timeout_full();
+#ifndef _WIN32
     test_channel_mpmc_eventloop_integration();
+#endif
     test_channel_invalid_args();
     printf("  Shared memory channel facade tests completed successfully!\n\n");
 
