@@ -110,6 +110,7 @@ docs/superpowers/plans/
 __pycache__/
 *.bak
 *.tmp
+.omp/
 *.temp
 build-asan/
 
