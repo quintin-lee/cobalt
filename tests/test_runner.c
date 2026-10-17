@@ -40,6 +40,7 @@ void test_sequence(void);
 void test_thread(void);
 void test_platform_utils(void);
 void test_threadpool(void);
+void test_buffer(void);
 
 typedef struct {
     const char *name;
@@ -85,6 +86,7 @@ static const TestEntry test_registry[] = {
     {"thread_safety", test_thread_safety},
     {"threadsafewrapper", test_threadsafewrapper},
     {"threadpool", test_threadpool},
+    {"buffer", test_buffer},
 };
 
 static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);

@@ -38,6 +38,7 @@
 #include <cobalt/utils/string.h>
 
 /* --- Container components --- */
+#include <cobalt/container/buffer.h>
 #include <cobalt/container/deque.h>
 #include <cobalt/container/hashmap.h>
 #include <cobalt/container/lfqueue.h>
