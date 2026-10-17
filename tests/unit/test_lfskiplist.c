@@ -10,7 +10,9 @@
 #include "cobalt/algorithm/functional.h"
 #include "cobalt/container/lfskiplist.h"
 #include "cobalt/memory/allocator.h"
+#include "cobalt/platform/thread.h"
 #include "test_framework.h"
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -350,6 +352,84 @@ static void test_lfskiplist_pin_unpin(void)
     printf("  lfskiplist explicit pin/unpin: OK\n");
 }
 
+typedef struct {
+    cobalt_lfskiplist_t *sl;
+    int                  thread_id;
+    int                  num_ops;
+    atomic_size_t       *reads;
+    atomic_size_t       *writes;
+    atomic_size_t       *removes;
+} lfskiplist_stress_arg_t;
+
+static void *lfskiplist_stress_worker(void *arg)
+{
+    lfskiplist_stress_arg_t *w    = (lfskiplist_stress_arg_t *)arg;
+    uint32_t                 seed = (uint32_t)w->thread_id + 1;
+
+    for (int i = 0; i < w->num_ops; i++) {
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+
+        int op  = seed % 100;
+        int key = (seed >> 8) % 2000;
+
+        if (op < 70) {
+            void *val = NULL;
+            cobalt_lfskiplist_get(w->sl, (void *)(intptr_t)key, &val);
+            atomic_fetch_add(w->reads, 1);
+        } else if (op < 90) {
+            cobalt_lfskiplist_put(w->sl, (void *)(intptr_t)key, (void *)(intptr_t)(key * 2), NULL);
+            atomic_fetch_add(w->writes, 1);
+        } else {
+            cobalt_lfskiplist_remove(w->sl, (void *)(intptr_t)key, NULL);
+            atomic_fetch_add(w->removes, 1);
+        }
+    }
+    return NULL;
+}
+
+static void test_lfskiplist_concurrency_stress(void)
+{
+    printf("Testing lfskiplist 8-thread concurrency stress (mixed read/write/remove)...\n");
+
+    cobalt_lfskiplist_t *sl = cobalt_lfskiplist_create(int_comparator);
+    TEST_ASSERT(sl != NULL);
+
+    for (int i = 0; i < 1000; i++) {
+        cobalt_lfskiplist_insert(sl, (void *)(intptr_t)i, (void *)(intptr_t)(i * 2));
+    }
+
+    const int               num_threads    = 8;
+    const int               ops_per_thread = 25000;
+    cobalt_thread_t         threads[8];
+    lfskiplist_stress_arg_t args[8];
+    atomic_size_t           reads   = 0;
+    atomic_size_t           writes  = 0;
+    atomic_size_t           removes = 0;
+
+    for (int i = 0; i < num_threads; i++) {
+        args[i].sl        = sl;
+        args[i].thread_id = i;
+        args[i].num_ops   = ops_per_thread;
+        args[i].reads     = &reads;
+        args[i].writes    = &writes;
+        args[i].removes   = &removes;
+        TEST_EQUAL(cobalt_thread_create(lfskiplist_stress_worker, &args[i], &threads[i]), 0);
+    }
+
+    for (int i = 0; i < num_threads; i++) {
+        cobalt_thread_join(threads[i]);
+    }
+
+    int total_done = (int)(atomic_load(&reads) + atomic_load(&writes) + atomic_load(&removes));
+    TEST_EQUAL(total_done, num_threads * ops_per_thread);
+
+    cobalt_lfskiplist_destroy(sl);
+    printf("  lfskiplist 8-thread concurrency stress (%d ops total): OK\n",
+           num_threads * ops_per_thread);
+}
+
 void test_lfskiplist(void)
 {
     test_lfskiplist_create_destroy();
@@ -359,4 +439,5 @@ void test_lfskiplist(void)
     test_lfskiplist_struct_keys();
     test_lfskiplist_range_scan();
     test_lfskiplist_pin_unpin();
+    test_lfskiplist_concurrency_stress();
 }

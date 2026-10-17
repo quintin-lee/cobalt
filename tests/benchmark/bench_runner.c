@@ -9,6 +9,7 @@
 #include "cobalt/container/deque.h"
 #include "cobalt/container/hashmap.h"
 #include "cobalt/container/lfqueue.h"
+#include "cobalt/container/lfskiplist.h"
 #include "cobalt/container/list.h"
 #include "cobalt/container/queue.h"
 #include "cobalt/container/set.h"
@@ -503,6 +504,26 @@ static void bench_regex_ipv4(void)
     cobalt_regex_destroy(re);
 }
 
+static int bench_lfskiplist_cmp(const void *a, const void *b)
+{
+    intptr_t ia = (intptr_t)a;
+    intptr_t ib = (intptr_t)b;
+    return (ia < ib) ? -1 : (ia > ib) ? 1 : 0;
+}
+
+static void bench_lfskiplist_ops(void)
+{
+    cobalt_lfskiplist_t *sl = cobalt_lfskiplist_create(bench_lfskiplist_cmp);
+    for (int i = 0; i < 50000; i++) {
+        cobalt_lfskiplist_insert(sl, (void *)(intptr_t)i, (void *)(intptr_t)i);
+    }
+    for (int i = 0; i < 50000; i++) {
+        void *val = NULL;
+        cobalt_lfskiplist_get(sl, (void *)(intptr_t)i, &val);
+    }
+    cobalt_lfskiplist_destroy(sl);
+}
+
 int main(int argc, char *argv[])
 {
     int json_mode = 0;
@@ -573,7 +594,9 @@ int main(int argc, char *argv[])
         cobalt_bench_run("regex_email", 3, bench_regex_email, &results[26]);
         results[27].name = "regex_ipv4";
         cobalt_bench_run("regex_ipv4", 3, bench_regex_ipv4, &results[27]);
-        results[28].name = NULL;
+        results[28].name = "lfskiplist_ops";
+        cobalt_bench_run("lfskiplist_ops", 3, bench_lfskiplist_ops, &results[28]);
+        results[29].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         free(g_bench_random_ints);
@@ -639,6 +662,9 @@ int main(int argc, char *argv[])
     BENCH_RUN("regex redos immunity (1k)", 3, bench_regex_redos);
     BENCH_RUN("regex email validation (10k)", 3, bench_regex_email);
     BENCH_RUN("regex ipv4 extraction (10k)", 3, bench_regex_ipv4);
+
+    printf("--- Lock-Free SkipList ---\n");
+    BENCH_RUN("lfskiplist put/get (50k)", 3, bench_lfskiplist_ops);
 
     printf("\nBenchmark suite complete.\n");
     free(g_bench_random_ints);
