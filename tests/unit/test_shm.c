@@ -24,6 +24,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#ifdef __linux__
+#include <sys/prctl.h>
+#endif
 #endif
 
 static void test_shm_create_and_close(void)
@@ -1648,7 +1651,7 @@ static void init_crc32_table(void)
     for (uint32_t i = 0; i < 256; i++) {
         uint32_t c = i;
         for (int j = 0; j < 8; j++) {
-            c = (c & 1) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
+            c = (c & 1) ? (0xEDB88320U ^ (c >> 1)) : (c >> 1);
         }
         g_crc32_table[i] = c;
     }
@@ -1658,11 +1661,11 @@ static void init_crc32_table(void)
 static uint32_t calc_crc32(const uint8_t *data, size_t len)
 {
     init_crc32_table();
-    uint32_t crc = 0xFFFFFFFFu;
+    uint32_t crc = 0xFFFFFFFFU;
     for (size_t i = 0; i < len; i++) {
         crc = g_crc32_table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
     }
-    return crc ^ 0xFFFFFFFFu;
+    return crc ^ 0xFFFFFFFFU;
 }
 
 typedef struct {
@@ -1670,9 +1673,9 @@ typedef struct {
     uint32_t crc;
 } fork_spsc_msg_hdr_t;
 
-static void test_shm_fork_spsc_pingpong(void)
+static void test_shm_fork_spsc_stream(void)
 {
-    printf("Testing cobalt_shm fork SPSC pingpong (50,000 variable length messages + CRC32)...\n");
+    printf("Testing cobalt_shm fork SPSC stream (50,000 variable length messages + CRC32)...\n");
 
     const char *name = "/cobalt_fork_spsc";
     cleanup_shm_and_notif(name);
@@ -1865,19 +1868,21 @@ static void test_shm_fork_mpmc_contention(void)
                 _exit(12);
             }
 
+            int consecutive_timeouts = 0;
             while (atomic_load_explicit(&c_tracker->total_consumed, memory_order_acquire) < 50000) {
                 fork_mpmc_item_t item;
                 size_t           out_len = 0;
                 int              recv_rc =
                     cobalt_shm_channel_recv(client, NULL, &item, sizeof(item), &out_len, 100);
                 if (recv_rc == COBALT_SUCCESS) {
+                    consecutive_timeouts = 0;
                     if (out_len != sizeof(item)) {
                         _exit(13);
                     }
                     if (item.producer_id >= 2 || item.seq >= 25000) {
                         _exit(14);
                     }
-                    if (item.payload[0] != (uint32_t)(item.producer_id * 100000 + item.seq)) {
+                    if (item.payload[0] != (item.producer_id * 100000 + item.seq)) {
                         _exit(15);
                     }
                     uint8_t prev = atomic_exchange_explicit(
@@ -1895,6 +1900,9 @@ static void test_shm_fork_mpmc_contention(void)
                     if (atomic_load_explicit(&c_tracker->total_consumed, memory_order_acquire) >=
                         50000) {
                         break;
+                    }
+                    if (++consecutive_timeouts > 100) {
+                        _exit(18);
                     }
                 } else {
                     _exit(17);
@@ -2089,6 +2097,9 @@ static void test_shm_fork_crash_recovery(void)
 
     if (child_pid == 0) {
         close(sync_pipe[0]);
+#ifdef __linux__
+        prctl(PR_SET_PDEATHSIG, SIGKILL);
+#endif
 
         cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
         if (!client) {
@@ -2225,7 +2236,7 @@ void test_shm(void)
 
 #ifndef _WIN32
     printf("Testing multi-process fork stress and crash recovery...\n");
-    test_shm_fork_spsc_pingpong();
+    test_shm_fork_spsc_stream();
     test_shm_fork_mpmc_contention();
     test_shm_fork_eventloop_drain();
     test_shm_fork_crash_recovery();
