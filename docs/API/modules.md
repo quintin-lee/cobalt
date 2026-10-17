@@ -4,6 +4,8 @@
 - JSON Processing (`include/cobalt/module/json.h`)
 - Event Loop Engine (`include/cobalt/module/eventloop.h`)
 - Work-Stealing Thread Pool (`include/cobalt/module/threadpool.h`)
+- Parallel Sorting Engine (`include/cobalt/module/parallel_sort.h`)
+- DAG TaskGraph Scheduler (`include/cobalt/module/taskgraph.h`)
 
 ---
 
@@ -239,3 +241,101 @@ void                cobalt_waitgroup_destroy(cobalt_waitgroup_t *wg);
 
 #### Help-First Work-Stealing Guarantee
 When a worker thread calls `cobalt_waitgroup_wait(wg)`, it does **not** sleep on an OS condition variable. Instead, it enters an active execution loop, popping local tasks and stealing tasks from peer workers until the counter drops to zero. This completely prevents thread-starvation deadlocks in recursive fork-join task graphs.
+
+---
+
+## 4. Parallel Sorting Module
+
+**Header:** `include/cobalt/module/parallel_sort.h`
+
+Multi-core parallel sorting algorithms built on top of the Cobalt work-stealing thread pool and Help-First synchronization barriers.
+
+### API Signatures
+
+```c
+void cobalt_parallel_qsort(cobalt_threadpool_t *pool,
+                           void                *base,
+                           size_t               nmemb,
+                           size_t               size,
+                           compare_func_t       compar);
+
+void cobalt_parallel_qsort_with_cutoff(cobalt_threadpool_t *pool,
+                                       void                *base,
+                                       size_t               nmemb,
+                                       size_t               size,
+                                       compare_func_t       compar,
+                                       size_t               cutoff);
+
+void cobalt_parallel_stable_sort(cobalt_threadpool_t *pool,
+                                 void                *base,
+                                 size_t               nmemb,
+                                 size_t               size,
+                                 compare_func_t       compar);
+
+void cobalt_parallel_stable_sort_with_alloc(cobalt_threadpool_t *pool,
+                                            void                *base,
+                                            size_t               nmemb,
+                                            size_t               size,
+                                            compare_func_t       compar,
+                                            cobalt_allocator_t  *alloc);
+```
+
+| Function | Complexity | Stability | Allocation | Description |
+|:---|:---:|:---:|:---:|:---|
+| `cobalt_parallel_qsort` | $O(N \log N)$ | No | Zero (in-place) | In-place multi-core PDQSort with adaptive cutoff $\max(4096, N / (4 \times \text{threads}))$. Larger partition is dispatched to the thread pool while current thread tail-recurses on smaller partition. |
+| `cobalt_parallel_qsort_with_cutoff` | $O(N \log N)$ | No | Zero (in-place) | Parallel PDQSort with custom sequential fallback threshold. |
+| `cobalt_parallel_stable_sort` | $O(N \log N)$ | **100% Yes** | Scratch buffer $N \times \text{size}$ | Concurrent chunk sorting via `cobalt_threadpool_parallel_for` followed by parallel pairwise binary-tree merge barriers. Uses system `malloc`/`free`. |
+| `cobalt_parallel_stable_sort_with_alloc` | $O(N \log N)$ | **100% Yes** | Scratch buffer $N \times \text{size}$ | Parallel stable sort with caller-injected memory allocator (`cobalt_allocator_t`). |
+
+---
+
+## 5. DAG TaskGraph Scheduler Module
+
+**Header:** `include/cobalt/module/taskgraph.h`
+
+Reusable, event-driven Directed Acyclic Graph (DAG) task scheduler with Kahn cycle detection and pure atomic in-degree push dispatch.
+
+### Lifecycle & Configuration
+
+```c
+typedef size_t cobalt_task_id_t;
+#define COBALT_INVALID_TASK_ID ((cobalt_task_id_t)-1)
+
+typedef struct cobalt_taskgraph cobalt_taskgraph_t;
+
+cobalt_taskgraph_t *cobalt_taskgraph_create(void);
+cobalt_taskgraph_t *cobalt_taskgraph_create_with_alloc(cobalt_allocator_t *alloc);
+void                cobalt_taskgraph_destroy(cobalt_taskgraph_t *graph);
+```
+
+### Graph Construction & Compilation
+
+```c
+cobalt_task_id_t cobalt_taskgraph_add_node(cobalt_taskgraph_t *graph,
+                                           cobalt_task_fn_t    fn,
+                                           void               *ctx);
+
+int cobalt_taskgraph_add_edge(cobalt_taskgraph_t *graph,
+                              cobalt_task_id_t    from_id,
+                              cobalt_task_id_t    to_id);
+
+int cobalt_taskgraph_compile(cobalt_taskgraph_t *graph);
+```
+
+- **`cobalt_taskgraph_add_node`**: Adds an executable node to the DAG. Returns a sequential ID.
+- **`cobalt_taskgraph_add_edge`**: Defines a dependency `from_id -> to_id` (`from_id` must finish before `to_id` starts). Automatic edge deduplication.
+- **`cobalt_taskgraph_compile`**: Runs Kahn's algorithm to verify acyclicity. Returns `0` on success, or `-1` with `COBALT_ERROR_INVALID_ARGUMENT` if any cycle (self-loop, 2-node cycle, or multi-node cycle) is detected. Caches root nodes (`in_degree == 0`). Modifying the graph after compilation is rejected.
+
+### Execution & High-Frequency Reuse
+
+```c
+int    cobalt_taskgraph_run(cobalt_taskgraph_t *graph, cobalt_threadpool_t *pool);
+int    cobalt_taskgraph_run_and_wait(cobalt_taskgraph_t *graph, cobalt_threadpool_t *pool);
+void   cobalt_taskgraph_reset(cobalt_taskgraph_t *graph);
+size_t cobalt_taskgraph_node_count(const cobalt_taskgraph_t *graph);
+```
+
+- **`cobalt_taskgraph_run`**: Asynchronously dispatches root nodes to `pool`. Successors are triggered via pure atomic decrement (`atomic_fetch_sub_explicit(..., 1, memory_order_acq_rel)`). When a successor's in-degree drops to 0, it is immediately submitted to the pool with zero central queue polling.
+- **`cobalt_taskgraph_run_and_wait`**: Starts execution and blocks until all nodes finish. Uses Help-First WaitGroup stealing to ensure zero thread-starvation deadlock.
+- **`cobalt_taskgraph_reset`**: Restores dynamic `remaining_in_degree` to `static_in_degree` across all nodes, enabling re-execution without re-compilation or memory reallocation.
+

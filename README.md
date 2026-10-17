@@ -10,9 +10,11 @@ A lightweight, zero-dependency C11 framework providing object-oriented capabilit
 - **Thread Safety**: Atomic operations with `stdatomic.h` and platform primitives
 - **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, LFQueue (lock-free MPMC queue), and Buffer (zero-copy dynamic stream buffer)
 - **Algorithms**: Pattern-Defeating QuickSort (PDQSort), Introspective Heapsort, Adaptive Run MergeSort (TimSort-lite), binary search, find_if, for_each, predicates
+- **Parallel Algorithms**: Multi-core in-place parallel PDQSort (`cobalt_parallel_qsort`) and 100% stable parallel MergeSort (`cobalt_parallel_stable_sort`) with adaptive cutoff heuristics and Help-First work-stealing barriers
+- **TaskGraph DAG Scheduler**: Event-driven Directed Acyclic Graph task scheduler (`cobalt_taskgraph_t`) with Kahn's algorithm cycle detection, zero-reallocation graph reuse, and atomic in-degree push dispatch
 - **Thread Pool**: Work-stealing task scheduler with Chase-Lev lock-free deques, waitgroups, and dynamic parallel-for loops
 - **Event Loop & Asynchronous I/O**: High-performance reactor with 4-level hierarchical timing wheel ($O(1)$ add/cancel), `eventfd` async task dispatch, and buffered stream abstraction (`cobalt_stream_t`)
-- **Modules**: JSON DOM & SAX parser/serializer, Work-Stealing Thread Pool, Event loop (epoll/kqueue)
+- **Modules**: JSON DOM & SAX parser/serializer, Work-Stealing Thread Pool, Event loop (epoll/kqueue), Parallel Sort, DAG TaskGraph Scheduler
 - **Cross-platform**: Linux (epoll, eventfd), macOS (kqueue), Windows support
 - **String utilities**: Split, join, and strip with `cobalt_split()`, `cobalt_join()`, `cobalt_strip()`
 - **HashMap runtime replacement**: Swap hash/equal functions at runtime via `cobalt_hashmap_set_funcs()`
@@ -29,7 +31,7 @@ L6  Core           → Object system, Class system, Interface tables
 L5  Interface      → Sequence, Map, Set, Iterator protocols
 L4  Container      → Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, Buffer, LFQueue
 L3  Algorithm      → PDQSort, Heapsort, TimSort, Search, Predicates, Functional stream operators
-L2  Module         → JSON (DOM/SAX), Work-Stealing Thread Pool, Event Loop (Timing Wheel, Async Stream)
+L2  Module         → JSON (DOM/SAX), Thread Pool, Event Loop, Parallel Sort, TaskGraph DAG
 L1  Application    → Example applications, Benchmarks
 ```
 
@@ -104,7 +106,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 50/50 tests passing (100%)
+ctest --output-on-failure  # 54/54 tests passing (100%)
 # or with verbose output
 ctest --verbose
 ```
@@ -153,18 +155,18 @@ cd build
 
 | Category | Count |
 |----------|-------|
-| Source files (`src/**/*.c`) | 38 |
-| Header files (`include/**/*.h`) | 40 |
-| Test files (`tests/**/*.c`) | 54 |
-| Benchmark files (`tests/benchmark/*.c`) | 11 |
+| Source files (`src/**/*.c`) | 40 |
+| Header files (`include/**/*.h`) | 42 |
+| Test files (`tests/**/*.c`) | 58 |
+| Benchmark files (`tests/benchmark/*.c`) | 16 |
 | Example files (`examples/*.c`) | 17 |
-| Documentation files (`docs/**/*.md`, `*.md`) | 41 |
+| Documentation files (`docs/**/*.md`, `*.md`) | 43 |
 
 | Metric | Value |
 |--------|-------|
-| Total lines of code (src + include) | ~19,100 |
+| Total lines of code (src + include) | ~20,100 |
 | Git commits | 450+ |
-| CTest status | 50/50 passing (100%) |
+| CTest status | 54/54 passing (100%) |
 | Sanitizer status | Clean (ASan/LSan 0 leaks, 0 errors) |
 
 
@@ -220,6 +222,10 @@ Benchmark results (x86_64 Linux, Release build, averaged across iterations):
 | **PDQSort (Random)** | 100k integers | ~69 ms | Introspective Pattern-Defeating QuickSort |
 | **PDQSort (Pre-sorted)** | 100k integers | ~46 ms | O(N) linear time on presorted data |
 | **Adaptive MergeSort** | 100k integers | ~43 ms | TimSort-lite 100% stable sorting |
+| **Parallel PDQSort** | 1M integers (8 threads) | ~294 ms (3.40M elem/s) | 3.37x multi-core speedup |
+| **Parallel Stable Sort** | 1M integers (4 threads) | ~270 ms (3.70M elem/s) | 2.84x multi-core speedup, 100% stable |
+| **TaskGraph DAG (Fan-out/in)**| 10k tasks | ~1.96M tasks/sec | Pure event-driven atomic in-degree dispatch |
+| **TaskGraph DAG (Pipeline)** | 10k tasks (500x20) | ~4.64M tasks/sec | Multi-layer pipelined DAG execution |
 | **ThreadPool Task Dispatch** | 100k tasks (4 threads) | ~1.82M tasks/sec | Hybrid Chase-Lev work-stealing |
 | **ThreadPool Parallel-For** | 100k items | ~1.2 ms | Dynamic chunked parallel loop |
 | **Timing Wheel Add** | 100k timers | ~1.21M ops/sec | 4-level bitwise wheel (O(1) insert) |
@@ -232,6 +238,8 @@ Run benchmarks locally:
 cd build && cmake .. -DCOBALT_RUN_TIDY=OFF -DCOBALT_RUN_FORMAT=OFF && make -j8
 ./tests/bench_runner
 ./tests/benchmark_sort
+./tests/benchmark_parallel_sort
+./tests/benchmark_taskgraph
 ./tests/benchmark_threadpool
 ./tests/benchmark_eventloop
 ```

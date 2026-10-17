@@ -3,8 +3,19 @@
 ## Unreleased
 
 ### Added
+- **Multi-Core Parallel Sorting Engine (`cobalt/module/parallel_sort.h`)**:
+  - `cobalt_parallel_qsort` & `cobalt_parallel_qsort_with_cutoff`: Pure C11 in-place parallel PDQSort with adaptive cutoff (`max(4096, N / (4 * threads))`), Hoare multi-word partitioning, larger-partition threadpool task offloading, smaller-partition tail recursion, and Help-First WaitGroup stealing to completely eliminate recursive starvation deadlocks. Achieves up to 3.4x speedup on 8 threads.
+  - `cobalt_parallel_stable_sort` & `cobalt_parallel_stable_sort_with_alloc`: 100% stable parallel TimSort-lite combining concurrent chunk sorting via `cobalt_threadpool_parallel_for` with pairwise binary tree merge barriers and left-run equality preference. Achieves up to 2.8x speedup on 4 threads. Supports custom allocator injection.
+- **Event-Driven DAG TaskGraph Scheduler (`cobalt/module/taskgraph.h`)**:
+  - Reusable Directed Acyclic Graph (DAG) task scheduler with zero reallocation across repeated runs.
+  - Kahn's topological sort algorithm for compilation and acyclicity validation with cycle detection.
+  - Pure event-driven push dispatch using atomic in-degree counter decrements (`atomic_fetch_sub_explicit(..., 1, memory_order_acq_rel)`), immediately pushing ready successors into the thread pool without central polling.
+  - Help-First WaitGroup stealing barrier in `cobalt_taskgraph_run_and_wait` to guarantee starvation-free execution.
+  - High-throughput execution: over 2,000,000 DAG tasks/sec in fan-out/fan-in and over 4,600,000 DAG tasks/sec in layered pipeline topologies.
+- **Dedicated Benchmark Suite**:
+  - Added `benchmark_parallel_sort` and `benchmark_taskgraph` executables and integrated them into unified `bench_runner` (supporting human-readable and `--json` outputs).
 - Strict warning policy: CMake now enables `-Wall -Wextra -Werror` by default
-- Documentation updates: README and developer guide now describe strict warning policy
+- Documentation updates: README, API reference, and module specifications updated for Parallel Sort and TaskGraph
 
 ### Fixed
 - Windows CI: fixed `test_thread` mutex trylock behavior and eventloop compilation/test guards
@@ -14,6 +25,7 @@
 - clang-tidy: removed redundant `cobalt_treemap_create_with_allocator` declaration in `treemap.c`
 
 ### Changed
+- Total test count expanded from 50 to 54 tests, passing with 100% success under both standard CTest and AddressSanitizer/LeakSanitizer (ASan/LSan).
 - Improved cross-platform test coverage with conditional compilation guards for Windows and POSIX-specific tests
 
 

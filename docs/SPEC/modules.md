@@ -1,7 +1,7 @@
 # SPEC: Modules & Task Schedulers (Layer 2)
 
 **Module:** `include/cobalt/module/`, `src/module/`  
-**Files:** `json.h`, `eventloop.h`, `threadpool.h`, `json.c`, `eventloop.c`, `threadpool.c`
+**Files:** `json.h`, `eventloop.h`, `threadpool.h`, `parallel_sort.h`, `taskgraph.h`, `json.c`, `eventloop.c`, `threadpool.c`, `parallel_sort.c`, `taskgraph.c`
 
 ## 1. Overview
 
@@ -9,6 +9,8 @@ The Module layer sits directly above algorithms and containers, providing indust
 - **JSON Processing**: Tree-based parser, serializer, and typed tree navigators with pluggable memory allocators.
 - **Event Loop Engine**: High-performance single-threaded event multiplexing featuring a 4-level hierarchical timing wheel, lock-free cross-thread post queue with syscall coalescing, and zero-copy asynchronous streams (`cobalt_stream_t`).
 - **Work-Stealing Thread Pool**: Multi-core lock-free task scheduler featuring Chase-Lev SPMC work-stealing deques, global MPMC queue, Help-First WaitGroup synchronization barriers, and dynamic parallel loops.
+- **Parallel Sorting Engine**: Multi-core parallel PDQSort and 100% stable parallel TimSort-lite leveraging threadpool work-stealing and pairwise merge barriers.
+- **DAG TaskGraph Scheduler**: Event-driven Directed Acyclic Graph scheduler featuring Kahn's cycle detection, zero-reallocation graph reuse, and atomic in-degree push dispatch.
 
 ---
 
@@ -215,7 +217,56 @@ To balance sub-microsecond task dispatch latency with low CPU usage when the poo
 
 ---
 
-## 5. Module Concurrency & Thread-Safety Guarantees
+## 5. Parallel Sorting Engine
+
+**Header:** `include/cobalt/module/parallel_sort.h`
+
+Multi-core parallel divide-and-conquer sorting implementations designed for high concurrency with zero recursive deadlocks.
+
+### 5.1 Parallel In-Place PDQSort (`cobalt_parallel_qsort`)
+- **Adaptive Cutoff**: Dynamically determines sequential threshold:
+  $$\text{cutoff} = \max\left(4096, \frac{N}{4 \times \text{threads}}\right)$$
+  Prevents over-subscription and task-creation overhead on small slices.
+- **Hoare 2-Way Partitioning**: Partitions input array in-place using word-swapping without dynamic memory allocation.
+- **Tail-Recursion Optimization**: The larger sub-partition is dispatched to the thread pool with `cobalt_waitgroup_add(wg, 1)`, while the calling worker immediately tail-recurses on the smaller sub-partition.
+- **Help-First Synchronization**: Top-level coordination uses `cobalt_waitgroup_wait(wg)`, enabling worker threads to actively steal and execute sub-partitions instead of sleeping, completely avoiding thread starvation deadlocks.
+
+### 5.2 Parallel Adaptive Stable MergeSort (`cobalt_parallel_stable_sort`)
+- **Chunk Partitioning**: Selects a power-of-two chunk count $K = 2^{\lceil \log_2(2 \times \text{threads}) \rceil}$ (capped at 64).
+- **Phase 1 Concurrent Sort**: Uses `cobalt_threadpool_parallel_for` to sort each chunk concurrently via `cobalt_stable_sort_with_alloc`.
+- **Phase 2 Binary-Tree Merge**: Merges adjacent chunks across $\log_2 K$ levels using pairwise parallel merge tasks synchronized with `cobalt_waitgroup_t`.
+- **100% Stability Guarantee**: All merging strictly favors the left run when elements compare equal (`compar(A, B) <= 0`).
+
+---
+
+## 6. DAG TaskGraph Scheduler Module
+
+**Header:** `include/cobalt/module/taskgraph.h`
+
+Reusable, event-driven Directed Acyclic Graph (DAG) task scheduler with Kahn cycle detection and pure atomic in-degree push dispatch.
+
+### 6.1 Topology & Kahn's Cycle Detection
+- Directed dependencies are defined via `cobalt_taskgraph_add_edge(graph, from, to)`.
+- Upon `cobalt_taskgraph_compile`:
+  - Runs Kahn's topological sort in $O(V + E)$ time using dynamic in-degree tracking and a FIFO queue.
+  - Cycle detection: If visited node count $< |V|$, a cycle exists (including self-loops $A \to A$, 2-node cycles $A \to B \to A$, or complex cycles). The compiler aborts, returns `-1`, and sets `COBALT_ERROR_INVALID_ARGUMENT`.
+  - Caches root tasks (nodes with static in-degree 0).
+
+### 6.2 Event-Driven Push Dispatch
+- When `cobalt_taskgraph_run` or `cobalt_taskgraph_run_and_wait` is invoked:
+  - Dynamic `remaining_in_degree` counters are initialized to `static_in_degree`.
+  - Root tasks are pushed into the thread pool.
+  - As each task completes, it decrements the `remaining_in_degree` of every successor using `atomic_fetch_sub_explicit(&succ->remaining_in_degree, 1, memory_order_acq_rel)`.
+  - The exact thread whose decrement drops the remaining in-degree to 0 immediately dispatches the successor task into the thread pool.
+  - No central scheduler thread or polling loop is required.
+
+### 6.3 Zero-Reallocation Reuse
+- The compiled graph topology and neighbor lists are completely immutable during execution.
+- Calling `cobalt_taskgraph_reset` or running the graph again re-arms the dynamic atomic counters in $O(V)$ time with zero memory allocations.
+
+---
+
+## 7. Module Concurrency & Thread-Safety Guarantees
 
 | Module / Component | Function / Type | Thread-Safety Guarantee |
 |--------------------|-----------------|-------------------------|
@@ -226,3 +277,6 @@ To balance sub-microsecond task dispatch latency with low CPU usage when the poo
 | **ThreadPool** | `cobalt_threadpool_submit` | **Thread-Safe**: Lock-free dispatch from both worker and non-worker threads. |
 | **ThreadPool** | `cobalt_threadpool_parallel_for` | **Thread-Safe**: Can be invoked concurrently across multiple callers. |
 | **WaitGroup** | `cobalt_waitgroup_*` | **Thread-Safe**: Atomics-based counter with help-first stealing. |
+| **Parallel Sort** | `cobalt_parallel_qsort`, `cobalt_parallel_stable_sort` | **Thread-Safe**: Reentrant on distinct memory buffers across threads. |
+| **TaskGraph** | `cobalt_taskgraph_run`, `cobalt_taskgraph_run_and_wait` | **Reentrant**: Multiple distinct graphs can execute concurrently. A single graph can be re-run sequentially. |
+
