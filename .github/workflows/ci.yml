@@ -46,7 +46,7 @@ jobs:
         run: cmake --build build --target format
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 120
 
       - name: Tidy
         run: cmake --build build --target tidy
@@ -121,7 +121,7 @@ jobs:
         run: cmake --build build-ubsan --parallel
 
       - name: Test with UBsan
-        run: ctest --test-dir build-ubsan --output-on-failure
+        run: ctest --test-dir build-ubsan --output-on-failure --timeout 120
 
   # ---- Cross-platform build & test ----
   macos:
@@ -153,7 +153,7 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 120
 
   windows:
     runs-on: windows-latest
@@ -183,7 +183,7 @@ jobs:
         run: cmake --build build --parallel
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure
+        run: ctest --test-dir build --output-on-failure --timeout 120
 
   # ---- ABI regression gate ----
   abi-check:

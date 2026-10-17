@@ -807,6 +807,7 @@ void test_eventloop_timing_wheel_cascade(void)
 #endif
 }
 
+#ifndef _WIN32
 typedef struct {
     uint64_t            timer_id;
     int                 fire_count;
@@ -825,6 +826,7 @@ static void on_tw_repeating_timer(uint64_t id, void *user_data)
         }
     }
 }
+#endif
 
 void test_eventloop_timing_wheel_repeating(void)
 {

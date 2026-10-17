@@ -29,7 +29,7 @@ typedef struct cobalt_ebr_node {
  * @brief Per-thread participant handle in the EBR engine
  */
 struct cobalt_ebr_handle {
-    _Alignas(COBALT_CACHE_LINE_SIZE) atomic_uint_fast64_t active_epoch;
+    atomic_uint_fast64_t                active_epoch;
     cobalt_ebr_node_t                  *local_retired[3];
     size_t                              retired_count;
     _Atomic(struct cobalt_ebr_handle *) next;
@@ -41,13 +41,13 @@ struct cobalt_ebr_handle {
  * @brief Main EBR engine control structure
  */
 struct cobalt_ebr {
-    _Alignas(COBALT_CACHE_LINE_SIZE) atomic_uint_fast64_t global_epoch;
-    _Alignas(COBALT_CACHE_LINE_SIZE) _Atomic(cobalt_ebr_handle_t *) head_handle;
-    cobalt_allocator_t *allocator;
-    atomic_size_t       total_handles;
+    atomic_uint_fast64_t           global_epoch;
+    _Atomic(cobalt_ebr_handle_t *) head_handle;
+    cobalt_allocator_t            *allocator;
+    atomic_size_t                  total_handles;
 
     /* Orphaned retirement pool from terminated or unregistered threads */
-    _Alignas(COBALT_CACHE_LINE_SIZE) cobalt_mutex_t *orphan_lock;
+    cobalt_mutex_t    *orphan_lock;
     cobalt_ebr_node_t *orphaned_retired[3];
     uint64_t           id;
 };
