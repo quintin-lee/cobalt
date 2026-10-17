@@ -8,6 +8,8 @@
 #ifndef _WIN32
 #include <pthread.h>
 #include <time.h>
+#else
+#include <windows.h>
 #endif
 
 #define COBALT_CACHE_LINE_SIZE 64

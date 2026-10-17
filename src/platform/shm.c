@@ -241,7 +241,11 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
         return rc;
     }
 
+#if defined(O_CLOEXEC) && !defined(__APPLE__)
     int fd = shm_open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666);
+#else
+    int fd = shm_open(path, O_CREAT | O_EXCL | O_RDWR, 0666);
+#endif
     if (fd < 0) {
         int err = COBALT_ERROR_IO;
         if (errno == EACCES) {
@@ -254,6 +258,7 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
         cobalt_error_set(NULL, err);
         return err;
     }
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
 
     if (ftruncate(fd, (off_t)size) != 0) {
         close(fd);
@@ -305,7 +310,11 @@ int cobalt_shm_open(const char *name, cobalt_shm_t **out_shm)
         return rc;
     }
 
+#if defined(O_CLOEXEC) && !defined(__APPLE__)
     int fd = shm_open(path, O_RDWR | O_CLOEXEC, 0666);
+#else
+    int fd = shm_open(path, O_RDWR, 0666);
+#endif
     if (fd < 0) {
         int err = COBALT_ERROR_IO;
         if (errno == ENOENT) {
@@ -318,6 +327,7 @@ int cobalt_shm_open(const char *name, cobalt_shm_t **out_shm)
         cobalt_error_set(NULL, err);
         return err;
     }
+    fcntl(fd, F_SETFD, FD_CLOEXEC);
 
     struct stat st;
     if (fstat(fd, &st) != 0 || st.st_size <= 0) {

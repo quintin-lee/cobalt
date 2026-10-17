@@ -646,6 +646,7 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
 /* -------------------------------------------------------------------------- */
 /* Cross-Thread Task Dispatch & Wakeup Helpers                                */
 /* -------------------------------------------------------------------------- */
+#ifndef _WIN32
 /**
  * @brief Drain any bytes pending in the wakeup file descriptor.
  */
@@ -657,16 +658,15 @@ static void drain_wakeup_fd(cobalt_eventloop_t *loop)
         while (read(loop->wakeup_fd, &val, sizeof(val)) > 0) {
         }
     }
-#elif !defined(_WIN32)
+#else
     if (loop->wakeup_fd >= 0) {
         char buf[128];
         while (read(loop->wakeup_fd, buf, sizeof(buf)) > 0) {
         }
     }
-#else
-    (void)loop;
 #endif
 }
+#endif
 
 /**
  * @brief Dequeue and execute all tasks posted to the loop's lock-free queue.

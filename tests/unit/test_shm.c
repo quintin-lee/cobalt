@@ -132,8 +132,7 @@ static void test_shm_invalid_args(void)
                 COBALT_ERROR_INVALID_ARGUMENT);
 
     /* open: non-existent name */
-    TEST_ASSERT(cobalt_shm_open("/cobalt_test_nonexistent_xyz_9999", &shm) ==
-                COBALT_ERROR_NOT_FOUND);
+    TEST_ASSERT(cobalt_shm_open("/cobalt_test_nonexistent_xyz", &shm) == COBALT_ERROR_NOT_FOUND);
 
     /* unlink: NULL name */
     TEST_ASSERT(cobalt_shm_unlink(NULL) == COBALT_ERROR_INVALID_ARGUMENT);
@@ -321,8 +320,7 @@ static void test_notifier_invalid_args(void)
     TEST_ASSERT(cobalt_notifier_open("test_notif", NULL) == COBALT_ERROR_INVALID_ARGUMENT);
 
     /* open: non-existent name */
-    TEST_ASSERT(cobalt_notifier_open("/cobalt_nonexistent_notif_9999", &notif) ==
-                COBALT_ERROR_NOT_FOUND);
+    TEST_ASSERT(cobalt_notifier_open("/cobalt_nonexist_notif", &notif) == COBALT_ERROR_NOT_FOUND);
 
     /* notify: NULL handle */
     TEST_ASSERT(cobalt_notifier_notify(NULL) == COBALT_ERROR_INVALID_ARGUMENT);
