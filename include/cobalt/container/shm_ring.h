@@ -20,7 +20,11 @@
 #define COBALT_SHM_MAGIC 0x434F425F53484D31ULL /* "COB_SHM1" */
 #define COBALT_SHM_VERSION 1
 
-typedef enum { COBALT_SHM_MODE_SPSC = 1, COBALT_SHM_MODE_MPMC = 2 } cobalt_shm_mode_t;
+typedef enum {
+    COBALT_SHM_MODE_UNKNOWN = 0,
+    COBALT_SHM_MODE_SPSC    = 1,
+    COBALT_SHM_MODE_MPMC    = 2
+} cobalt_shm_mode_t;
 
 #define COBALT_SHM_FRAME_NORMAL 0x0000
 #define COBALT_SHM_FRAME_WRAP 0x0001 /* Tail padding: reader wraps to offset 0 */

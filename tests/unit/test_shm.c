@@ -1450,6 +1450,171 @@ static void test_channel_eventloop_integration(void)
     printf("  EventLoop integration test passed\n");
 }
 
+static void test_channel_send_timeout_full(void)
+{
+    printf("Testing cobalt_shm_channel send timeout on full queue...\n");
+
+    const char         *name = "/cobalt_test_chan_full";
+    cobalt_shm_config_t cfg  = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 512,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 100,
+    };
+    cobalt_shm_unlink(name);
+
+    cobalt_shm_channel_t *chan = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(chan != NULL);
+
+    char payload[64];
+    memset(payload, 'A', sizeof(payload));
+
+    /* Fill until full */
+    int rc = COBALT_SUCCESS;
+    while ((rc = cobalt_shm_channel_send(chan, 1, payload, sizeof(payload), 0)) == COBALT_SUCCESS) {
+    }
+    TEST_ASSERT(rc == COBALT_ERROR_QUEUE_FULL);
+
+    /* Timeout test with positive timeout */
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    rc = cobalt_shm_channel_send(chan, 1, payload, sizeof(payload), 20);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    TEST_ASSERT(rc == COBALT_ERROR_TIMEOUT);
+    long elapsed_ms = (t1.tv_sec - t0.tv_sec) * 1000L + (t1.tv_nsec - t0.tv_nsec) / 1000000L;
+    TEST_ASSERT(elapsed_ms >= 15);
+
+    /* Consume one item to allow writing again */
+    char     buf[64];
+    uint16_t type    = 0;
+    size_t   out_len = 0;
+    rc               = cobalt_shm_channel_recv(chan, &type, buf, sizeof(buf), &out_len, 0);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    rc = cobalt_shm_channel_send(chan, 2, payload, sizeof(payload), 0);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_shm_channel_destroy(chan);
+    printf("  Send timeout full test passed\n");
+}
+
+static void on_ev_mpmc_msg(
+    cobalt_shm_channel_t *chan, uint16_t msg_type, const void *payload, size_t len, void *user_data)
+{
+    (void)chan;
+    (void)msg_type;
+    ev_channel_test_ctx_t *ctx = (ev_channel_test_ctx_t *)user_data;
+    if (ctx && payload && len == sizeof(int)) {
+        int val = *(const int *)payload;
+        TEST_ASSERT(val >= 500 && val < 505);
+        ctx->count++;
+        if (ctx->count >= ctx->expected_count) {
+            cobalt_eventloop_stop(ctx->loop);
+        }
+    }
+}
+
+static void test_channel_mpmc_eventloop_integration(void)
+{
+    printf("Testing cobalt_shm_channel MPMC EventLoop integration...\n");
+
+    const char         *name = "/cobalt_test_chan_ev_mpmc";
+    cobalt_shm_config_t cfg  = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_MPMC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 16,
+        .slot_size         = 64,
+        .create_if_missing = true,
+        .spin_threshold    = 1000,
+    };
+    cobalt_shm_unlink(name);
+
+    cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(server != NULL);
+
+    cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
+    TEST_ASSERT(client != NULL);
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    ev_channel_test_ctx_t ctx = {
+        .count          = 0,
+        .expected_count = 5,
+        .loop           = loop,
+    };
+
+    int rc = cobalt_shm_channel_attach_eventloop(server, loop, on_ev_mpmc_msg, &ctx);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    for (int i = 0; i < 5; i++) {
+        int val = 500 + i;
+        rc      = cobalt_shm_channel_send(client, 0, &val, sizeof(val), 100);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    uint64_t timer_id = cobalt_eventloop_add_timer(loop, 2000, 0, on_ev_safety_timer, loop);
+    TEST_ASSERT(timer_id > 0);
+
+    cobalt_eventloop_run(loop);
+
+    TEST_ASSERT(ctx.count == 5);
+
+    rc = cobalt_shm_channel_detach_eventloop(server);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_eventloop_del_timer(loop, timer_id);
+    cobalt_eventloop_destroy(loop);
+    cobalt_shm_channel_destroy(client);
+    cobalt_shm_channel_destroy(server);
+
+    printf("  MPMC EventLoop integration test passed\n");
+}
+
+static void test_channel_invalid_args(void)
+{
+    printf("Testing cobalt_shm_channel invalid arguments and error paths...\n");
+
+    /* NULL configs */
+    TEST_ASSERT(cobalt_shm_channel_create(NULL) == NULL);
+
+    cobalt_shm_config_t bad_cfg = {
+        .name              = NULL,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .capacity          = 1024,
+        .create_if_missing = true,
+    };
+    TEST_ASSERT(cobalt_shm_channel_create(&bad_cfg) == NULL);
+
+    /* Non power of 2 capacity */
+    bad_cfg.name     = "/cobalt_bad_cap";
+    bad_cfg.capacity = 1000;
+    TEST_ASSERT(cobalt_shm_channel_create(&bad_cfg) == NULL);
+
+    /* Bad mode */
+    bad_cfg.capacity = 1024;
+    bad_cfg.mode     = (cobalt_shm_mode_t)99;
+    TEST_ASSERT(cobalt_shm_channel_create(&bad_cfg) == NULL);
+
+    /* Open non-existent channel */
+    TEST_ASSERT(cobalt_shm_channel_open("/non_existent_chan_9999", COBALT_SHM_WAIT_SPIN) == NULL);
+    TEST_ASSERT(cobalt_shm_channel_open(NULL, COBALT_SHM_WAIT_SPIN) == NULL);
+
+    /* Getters on NULL */
+    TEST_ASSERT(cobalt_shm_channel_get_mode(NULL) == COBALT_SHM_MODE_UNKNOWN);
+    TEST_ASSERT(cobalt_shm_channel_get_wait_policy(NULL) == COBALT_SHM_WAIT_SPIN);
+    TEST_ASSERT(cobalt_shm_channel_get_read_fd(NULL) == -1);
+
+    /* Destroy NULL is safe no-op */
+    cobalt_shm_channel_destroy(NULL);
+
+    printf("  Channel invalid arguments test passed\n");
+}
+
 void test_shm(void)
 {
     printf("Testing shared memory primitive (cobalt_shm_t)...\n");
@@ -1484,5 +1649,8 @@ void test_shm(void)
     test_channel_mpmc_lifecycle_and_send_recv();
     test_channel_wait_policies();
     test_channel_eventloop_integration();
+    test_channel_send_timeout_full();
+    test_channel_mpmc_eventloop_integration();
+    test_channel_invalid_args();
     printf("  Shared memory channel facade tests completed successfully!\n");
 }

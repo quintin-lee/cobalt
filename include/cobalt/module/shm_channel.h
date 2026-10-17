@@ -62,6 +62,11 @@ cobalt_shm_wait_policy_t cobalt_shm_channel_get_wait_policy(const cobalt_shm_cha
 int                      cobalt_shm_channel_get_read_fd(const cobalt_shm_channel_t *chan);
 
 /* EventLoop Integration */
+/**
+ * @brief Message receive callback invoked when messages arrive from EventLoop.
+ * @note cobalt_shm_channel_destroy must NOT be called directly within this callback.
+ *       Call cobalt_shm_channel_detach_eventloop or defer destroy to the next loop tick.
+ */
 typedef void (*cobalt_shm_msg_cb)(cobalt_shm_channel_t *chan,
                                   uint16_t              msg_type,
                                   const void           *payload,

@@ -94,8 +94,8 @@ static inline void cpu_pause(void)
 
 static inline void notify_readers_if_waiting(cobalt_shm_channel_t *chan)
 {
-    if (chan->wait_policy != COBALT_SHM_WAIT_SPIN && chan->notif != NULL && chan->hdr != NULL) {
-        if (atomic_load_explicit(&chan->hdr->waiting_readers, memory_order_relaxed) > 0) {
+    if (chan->notif != NULL && chan->hdr != NULL) {
+        if (atomic_load_explicit(&chan->hdr->waiting_readers, memory_order_seq_cst) > 0) {
             cobalt_notifier_notify(chan->notif);
         }
     }
@@ -103,8 +103,8 @@ static inline void notify_readers_if_waiting(cobalt_shm_channel_t *chan)
 
 static inline void notify_writers_if_waiting(cobalt_shm_channel_t *chan)
 {
-    if (chan->wait_policy != COBALT_SHM_WAIT_SPIN && chan->notif != NULL && chan->hdr != NULL) {
-        if (atomic_load_explicit(&chan->hdr->waiting_writers, memory_order_relaxed) > 0) {
+    if (chan->notif != NULL && chan->hdr != NULL) {
+        if (atomic_load_explicit(&chan->hdr->waiting_writers, memory_order_seq_cst) > 0) {
             cobalt_notifier_notify(chan->notif);
         }
     }
@@ -141,7 +141,8 @@ static int try_send(cobalt_shm_channel_t *chan, uint16_t msg_type, const void *d
 {
     if (chan->mode == COBALT_SHM_MODE_SPSC) {
         return try_send_spsc(chan, msg_type, data, len);
-    } else if (chan->mode == COBALT_SHM_MODE_MPMC) {
+    }
+    if (chan->mode == COBALT_SHM_MODE_MPMC) {
         return try_send_mpmc(chan, data, len);
     }
     return COBALT_ERROR_INVALID_ARGUMENT;
@@ -192,7 +193,8 @@ static int try_recv(
 {
     if (chan->mode == COBALT_SHM_MODE_SPSC) {
         return try_recv_spsc(chan, out_type, buf, buf_size, out_len);
-    } else if (chan->mode == COBALT_SHM_MODE_MPMC) {
+    }
+    if (chan->mode == COBALT_SHM_MODE_MPMC) {
         return try_recv_mpmc(chan, out_type, buf, buf_size, out_len);
     }
     return COBALT_ERROR_INVALID_ARGUMENT;
@@ -350,7 +352,24 @@ cobalt_shm_channel_t *cobalt_shm_channel_create(const cobalt_shm_config_t *confi
         return NULL;
     }
 
-    chan->name           = strdup(config->name);
+    chan->name = strdup(config->name);
+    if (!chan->name) {
+        if (spsc) {
+            cobalt_shm_spsc_detach(spsc);
+        }
+        if (mpmc) {
+            cobalt_shm_mpmc_detach(mpmc);
+        }
+        if (notif) {
+            cobalt_notifier_destroy(notif);
+        }
+        cobalt_shm_close(shm);
+        if (is_creator) {
+            cobalt_shm_unlink(config->name);
+        }
+        free(chan);
+        return NULL;
+    }
     chan->is_creator     = is_creator;
     chan->mode           = config->mode;
     chan->wait_policy    = config->wait_policy;
@@ -396,8 +415,12 @@ cobalt_shm_channel_t *cobalt_shm_channel_open(const char *name, cobalt_shm_wait_
         return NULL;
     }
 
-    cobalt_notifier_t *notif = NULL;
-    cobalt_notifier_open(notif_name, &notif);
+    cobalt_notifier_t *notif    = NULL;
+    int                notif_rc = cobalt_notifier_open(notif_name, &notif);
+    if (notif_rc != COBALT_SUCCESS && policy != COBALT_SHM_WAIT_SPIN) {
+        cobalt_shm_close(shm);
+        return NULL;
+    }
 
     cobalt_shm_spsc_t *spsc = NULL;
     cobalt_shm_mpmc_t *mpmc = NULL;
@@ -439,7 +462,21 @@ cobalt_shm_channel_t *cobalt_shm_channel_open(const char *name, cobalt_shm_wait_
         return NULL;
     }
 
-    chan->name           = strdup(name);
+    chan->name = strdup(name);
+    if (!chan->name) {
+        if (spsc) {
+            cobalt_shm_spsc_detach(spsc);
+        }
+        if (mpmc) {
+            cobalt_shm_mpmc_detach(mpmc);
+        }
+        if (notif) {
+            cobalt_notifier_destroy(notif);
+        }
+        cobalt_shm_close(shm);
+        free(chan);
+        return NULL;
+    }
     chan->is_creator     = false;
     chan->mode           = (cobalt_shm_mode_t)hdr->mode;
     chan->wait_policy    = policy;
@@ -608,14 +645,14 @@ int cobalt_shm_channel_send(
         }
 
         if (chan->hdr) {
-            atomic_fetch_add_explicit(&chan->hdr->waiting_writers, 1, memory_order_relaxed);
+            atomic_fetch_add_explicit(&chan->hdr->waiting_writers, 1, memory_order_seq_cst);
         }
 
         /* Recheck data before sleep */
         rc = try_send(chan, msg_type, data, len);
         if (rc != COBALT_ERROR_QUEUE_FULL) {
             if (chan->hdr) {
-                atomic_fetch_sub_explicit(&chan->hdr->waiting_writers, 1, memory_order_relaxed);
+                atomic_fetch_sub_explicit(&chan->hdr->waiting_writers, 1, memory_order_seq_cst);
             }
             return rc;
         }
@@ -628,7 +665,7 @@ int cobalt_shm_channel_send(
         }
 
         if (chan->hdr) {
-            atomic_fetch_sub_explicit(&chan->hdr->waiting_writers, 1, memory_order_relaxed);
+            atomic_fetch_sub_explicit(&chan->hdr->waiting_writers, 1, memory_order_seq_cst);
         }
 
         if (wait_rc == COBALT_ERROR_TIMEOUT) {
@@ -712,14 +749,14 @@ int cobalt_shm_channel_recv(cobalt_shm_channel_t *chan,
         }
 
         if (chan->hdr) {
-            atomic_fetch_add_explicit(&chan->hdr->waiting_readers, 1, memory_order_relaxed);
+            atomic_fetch_add_explicit(&chan->hdr->waiting_readers, 1, memory_order_seq_cst);
         }
 
         /* Recheck data before sleep */
         rc = try_recv(chan, out_type, buf, buf_size, out_len);
         if (rc != COBALT_ERROR_EMPTY_CONTAINER) {
             if (chan->hdr) {
-                atomic_fetch_sub_explicit(&chan->hdr->waiting_readers, 1, memory_order_relaxed);
+                atomic_fetch_sub_explicit(&chan->hdr->waiting_readers, 1, memory_order_seq_cst);
             }
             return rc;
         }
@@ -732,7 +769,7 @@ int cobalt_shm_channel_recv(cobalt_shm_channel_t *chan,
         }
 
         if (chan->hdr) {
-            atomic_fetch_sub_explicit(&chan->hdr->waiting_readers, 1, memory_order_relaxed);
+            atomic_fetch_sub_explicit(&chan->hdr->waiting_readers, 1, memory_order_seq_cst);
         }
 
         if (wait_rc == COBALT_ERROR_TIMEOUT) {
@@ -749,7 +786,7 @@ int cobalt_shm_channel_recv(cobalt_shm_channel_t *chan,
 cobalt_shm_mode_t cobalt_shm_channel_get_mode(const cobalt_shm_channel_t *chan)
 {
     if (!chan) {
-        return (cobalt_shm_mode_t)0;
+        return COBALT_SHM_MODE_UNKNOWN;
     }
     return chan->mode;
 }
@@ -757,7 +794,7 @@ cobalt_shm_mode_t cobalt_shm_channel_get_mode(const cobalt_shm_channel_t *chan)
 cobalt_shm_wait_policy_t cobalt_shm_channel_get_wait_policy(const cobalt_shm_channel_t *chan)
 {
     if (!chan) {
-        return (cobalt_shm_wait_policy_t)0;
+        return COBALT_SHM_WAIT_SPIN;
     }
     return chan->wait_policy;
 }
@@ -799,6 +836,11 @@ static void shm_channel_eventloop_cb(cobalt_fd_t fd, cobalt_events_t events, voi
                 break;
             }
             chan->cb(chan, type, payload, len, chan->udata);
+            if (!chan->attached_to_loop) {
+                cobalt_shm_spsc_consume(chan->spsc);
+                notify_writers_if_waiting(chan);
+                break;
+            }
             cobalt_shm_spsc_consume(chan->spsc);
             notify_writers_if_waiting(chan);
         }
@@ -853,13 +895,13 @@ int cobalt_shm_channel_attach_eventloop(cobalt_shm_channel_t *chan,
 
     /* Increment waiting_readers while managed by EventLoop so peer always notifies on write */
     if (chan->hdr) {
-        atomic_fetch_add_explicit(&chan->hdr->waiting_readers, 1, memory_order_relaxed);
+        atomic_fetch_add_explicit(&chan->hdr->waiting_readers, 1, memory_order_seq_cst);
     }
 
     int rc = cobalt_eventloop_add_fd(loop, fd, COBALT_EVENT_READ, shm_channel_eventloop_cb, chan);
     if (rc != 0) {
         if (chan->hdr) {
-            atomic_fetch_sub_explicit(&chan->hdr->waiting_readers, 1, memory_order_relaxed);
+            atomic_fetch_sub_explicit(&chan->hdr->waiting_readers, 1, memory_order_seq_cst);
         }
         chan->loop             = NULL;
         chan->cb               = NULL;
@@ -882,6 +924,12 @@ int cobalt_shm_channel_attach_eventloop(cobalt_shm_channel_t *chan,
             if (cobalt_shm_spsc_peek(chan->spsc, &t, &p, &l) == COBALT_SUCCESS) {
                 cobalt_notifier_notify(chan->notif);
             }
+        } else if (chan->mode == COBALT_SHM_MODE_MPMC && chan->mpmc && chan->hdr) {
+            uint64_t w = atomic_load_explicit(&chan->hdr->write_cursor, memory_order_relaxed);
+            uint64_t r = atomic_load_explicit(&chan->hdr->read_cursor, memory_order_relaxed);
+            if (w != r) {
+                cobalt_notifier_notify(chan->notif);
+            }
         }
     }
 
@@ -901,7 +949,7 @@ int cobalt_shm_channel_detach_eventloop(cobalt_shm_channel_t *chan)
         cobalt_eventloop_del_fd(chan->loop, fd);
     }
     if (chan->hdr) {
-        atomic_fetch_sub_explicit(&chan->hdr->waiting_readers, 1, memory_order_relaxed);
+        atomic_fetch_sub_explicit(&chan->hdr->waiting_readers, 1, memory_order_seq_cst);
     }
     chan->loop             = NULL;
     chan->cb               = NULL;
