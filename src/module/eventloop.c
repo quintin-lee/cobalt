@@ -1569,3 +1569,256 @@ int cobalt_eventloop_post(cobalt_eventloop_t *loop, cobalt_loop_task_fn_t fn, vo
 
     return 0;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Asynchronous Stream Abstraction Implementation                              */
+/* -------------------------------------------------------------------------- */
+
+struct cobalt_stream {
+    cobalt_eventloop_t             *loop;
+    cobalt_fd_t                     fd;
+    void                           *user_data;
+    cobalt_buffer_t                *input_buffer;
+    cobalt_buffer_t                *output_buffer;
+    cobalt_stream_read_fn           on_read;
+    cobalt_stream_write_complete_fn on_write_complete;
+    cobalt_stream_error_fn          on_error;
+    bool                            writing;
+};
+
+static void stream_fd_event_cb(cobalt_fd_t fd, cobalt_events_t events, void *user_data)
+{
+    cobalt_stream_t *stream = (cobalt_stream_t *)user_data;
+    if (!stream) {
+        return;
+    }
+
+    bool closed = false;
+
+    /* 1. Handle incoming data (POLLIN) */
+    if (events & POLLIN) {
+        int     err = 0;
+        ssize_t n   = cobalt_buffer_read_fd(stream->input_buffer, fd, &err);
+        if (n > 0) {
+            if (stream->on_read) {
+                stream->on_read(stream, stream->input_buffer, stream->user_data);
+            }
+        } else if (n == 0) {
+            closed = true;
+            if (stream->on_error) {
+                stream->on_error(stream, 0, stream->user_data);
+            }
+            return;
+        } else {
+            if (err != EAGAIN && err != EWOULDBLOCK && err != EINTR) {
+                closed = true;
+                if (stream->on_error) {
+                    stream->on_error(stream, err, stream->user_data);
+                }
+                return;
+            }
+        }
+    }
+
+    /* 2. Handle outgoing data (POLLOUT) */
+    if (!closed && (events & POLLOUT)) {
+        if (cobalt_buffer_readable_bytes(stream->output_buffer) > 0) {
+            int     err = 0;
+            ssize_t nw  = cobalt_buffer_write_fd(stream->output_buffer, fd, &err);
+            if (nw >= 0) {
+                if (cobalt_buffer_readable_bytes(stream->output_buffer) == 0) {
+                    stream->writing = false;
+                    cobalt_eventloop_mod_fd(stream->loop, fd, POLLIN, stream_fd_event_cb, stream);
+                    if (stream->on_write_complete) {
+                        stream->on_write_complete(stream, stream->user_data);
+                    }
+                }
+            } else {
+                if (err != EAGAIN && err != EWOULDBLOCK && err != EINTR) {
+                    if (stream->on_error) {
+                        stream->on_error(stream, err, stream->user_data);
+                    }
+                    return;
+                }
+            }
+        } else {
+            if (stream->writing) {
+                stream->writing = false;
+                cobalt_eventloop_mod_fd(stream->loop, fd, POLLIN, stream_fd_event_cb, stream);
+            }
+        }
+    }
+
+    /* 3. Handle errors */
+    if (!closed && (events & (POLLERR | POLLNVAL))) {
+        if (stream->on_error) {
+            stream->on_error(stream, EIO, stream->user_data);
+        }
+    }
+}
+
+cobalt_stream_t *cobalt_stream_create(cobalt_eventloop_t *loop, cobalt_fd_t fd, void *user_data)
+{
+    if (!loop || fd < 0) {
+        return NULL;
+    }
+
+#ifndef _WIN32
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (flags >= 0) {
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    }
+#endif
+
+    cobalt_stream_t *stream =
+        (cobalt_stream_t *)loop->alloc->alloc(loop->alloc, sizeof(cobalt_stream_t));
+    if (!stream) {
+        return NULL;
+    }
+    memset(stream, 0, sizeof(*stream));
+    stream->loop      = loop;
+    stream->fd        = fd;
+    stream->user_data = user_data;
+
+    stream->input_buffer = cobalt_buffer_create_with_alloc(
+        COBALT_BUFFER_DEFAULT_INITIAL_CAPACITY, COBALT_BUFFER_DEFAULT_PREPEND_SIZE, loop->alloc);
+    stream->output_buffer = cobalt_buffer_create_with_alloc(
+        COBALT_BUFFER_DEFAULT_INITIAL_CAPACITY, COBALT_BUFFER_DEFAULT_PREPEND_SIZE, loop->alloc);
+    if (!stream->input_buffer || !stream->output_buffer) {
+        if (stream->input_buffer) {
+            cobalt_buffer_destroy(stream->input_buffer);
+        }
+        if (stream->output_buffer) {
+            cobalt_buffer_destroy(stream->output_buffer);
+        }
+        loop->alloc->free(loop->alloc, stream);
+        return NULL;
+    }
+
+    if (cobalt_eventloop_add_fd(loop, fd, POLLIN, stream_fd_event_cb, stream) != 0) {
+        cobalt_buffer_destroy(stream->input_buffer);
+        cobalt_buffer_destroy(stream->output_buffer);
+        loop->alloc->free(loop->alloc, stream);
+        return NULL;
+    }
+
+    return stream;
+}
+
+void cobalt_stream_destroy(cobalt_stream_t *stream)
+{
+    if (!stream) {
+        return;
+    }
+    cobalt_eventloop_del_fd(stream->loop, stream->fd);
+    if (stream->input_buffer) {
+        cobalt_buffer_destroy(stream->input_buffer);
+        stream->input_buffer = NULL;
+    }
+    if (stream->output_buffer) {
+        cobalt_buffer_destroy(stream->output_buffer);
+        stream->output_buffer = NULL;
+    }
+    cobalt_allocator_t *alloc = stream->loop->alloc;
+    alloc->free(alloc, stream);
+}
+
+void cobalt_stream_set_callbacks(cobalt_stream_t                *stream,
+                                 cobalt_stream_read_fn           on_read,
+                                 cobalt_stream_write_complete_fn on_write_complete,
+                                 cobalt_stream_error_fn          on_error)
+{
+    if (!stream) {
+        return;
+    }
+    stream->on_read           = on_read;
+    stream->on_write_complete = on_write_complete;
+    stream->on_error          = on_error;
+}
+
+int cobalt_stream_send(cobalt_stream_t *stream, const void *data, size_t len)
+{
+    if (!stream || !data) {
+        return -1;
+    }
+    if (len == 0) {
+        return 0;
+    }
+
+    size_t pending = cobalt_buffer_readable_bytes(stream->output_buffer);
+    if (pending == 0) {
+        ssize_t n = write(stream->fd, data, len);
+        if (n >= 0) {
+            size_t written = (size_t)n;
+            if (written == len) {
+                return 0;
+            }
+            int ret = cobalt_buffer_append(
+                stream->output_buffer, (const char *)data + written, len - written);
+            if (ret != 0) {
+                return -1;
+            }
+            if (!stream->writing) {
+                stream->writing = true;
+                cobalt_eventloop_mod_fd(
+                    stream->loop, stream->fd, POLLIN | POLLOUT, stream_fd_event_cb, stream);
+            }
+            return 0;
+        } else {
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                int ret = cobalt_buffer_append(stream->output_buffer, data, len);
+                if (ret != 0) {
+                    return -1;
+                }
+                if (!stream->writing) {
+                    stream->writing = true;
+                    cobalt_eventloop_mod_fd(
+                        stream->loop, stream->fd, POLLIN | POLLOUT, stream_fd_event_cb, stream);
+                }
+                return 0;
+            } else {
+                if (stream->on_error) {
+                    stream->on_error(stream, errno, stream->user_data);
+                }
+                return -1;
+            }
+        }
+    } else {
+        int ret = cobalt_buffer_append(stream->output_buffer, data, len);
+        if (ret != 0) {
+            return -1;
+        }
+        if (!stream->writing) {
+            stream->writing = true;
+            cobalt_eventloop_mod_fd(
+                stream->loop, stream->fd, POLLIN | POLLOUT, stream_fd_event_cb, stream);
+        }
+        return 0;
+    }
+}
+
+int cobalt_stream_send_buffer(cobalt_stream_t *stream, cobalt_buffer_t *buf)
+{
+    if (!stream || !buf) {
+        return -1;
+    }
+    size_t len = cobalt_buffer_readable_bytes(buf);
+    if (len == 0) {
+        return 0;
+    }
+    int ret = cobalt_stream_send(stream, cobalt_buffer_peek(buf), len);
+    if (ret == 0) {
+        cobalt_buffer_retrieve_all(buf);
+    }
+    return ret;
+}
+
+cobalt_buffer_t *cobalt_stream_get_input_buffer(cobalt_stream_t *stream)
+{
+    return stream ? stream->input_buffer : NULL;
+}
+
+cobalt_buffer_t *cobalt_stream_get_output_buffer(cobalt_stream_t *stream)
+{
+    return stream ? stream->output_buffer : NULL;
+}

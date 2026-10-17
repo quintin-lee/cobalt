@@ -7,6 +7,7 @@
 #include "cobalt/platform/thread.h"
 #include "test_framework.h"
 #include <stdatomic.h>
+#include <stdbool.h>
 #ifndef _WIN32
 #include <fcntl.h>
 #include <poll.h>
@@ -66,6 +67,7 @@ void test_eventloop_timing_wheel_stress(void);
 void test_eventloop_timing_wheel_cascade(void);
 void test_eventloop_timing_wheel_repeating(void);
 void test_eventloop_cross_thread_post(void);
+void test_eventloop_stream_echo(void);
 #ifndef _WIN32
 void test_eventloop_unix_socket(void);
 
@@ -560,6 +562,7 @@ void test_eventloop(void)
     test_eventloop_timing_wheel_cascade();
     test_eventloop_timing_wheel_repeating();
     test_eventloop_cross_thread_post();
+    test_eventloop_stream_echo();
     printf("  Eventloop tests completed\n");
 }
 
@@ -916,5 +919,123 @@ void test_eventloop_cross_thread_post(void)
     printf("  Eventloop cross-thread post test passed\n");
 #else
     printf("  Skipping cross-thread post test on Windows\n");
+#endif
+}
+
+#ifndef _WIN32
+typedef struct {
+    size_t   total_sent;
+    size_t   total_received;
+    uint32_t send_crc;
+    uint32_t recv_crc;
+    bool     write_complete_fired;
+} stream_echo_ctx_t;
+
+static void
+on_server_stream_read(cobalt_stream_t *stream, cobalt_buffer_t *read_buf, void *user_data)
+{
+    (void)user_data;
+    /* Server echoes everything directly back using send_buffer */
+    cobalt_stream_send_buffer(stream, read_buf);
+}
+
+static void
+on_client_stream_read(cobalt_stream_t *stream, cobalt_buffer_t *read_buf, void *user_data)
+{
+    (void)stream;
+    stream_echo_ctx_t *ctx      = (stream_echo_ctx_t *)user_data;
+    size_t             readable = cobalt_buffer_readable_bytes(read_buf);
+    if (readable > 0) {
+        const char *data = cobalt_buffer_peek(read_buf);
+        for (size_t i = 0; i < readable; i++) {
+            ctx->recv_crc = ctx->recv_crc * 31 + (uint8_t)data[i];
+        }
+        ctx->total_received += readable;
+        cobalt_buffer_retrieve_all(read_buf);
+    }
+}
+
+static void on_client_stream_write_complete(cobalt_stream_t *stream, void *user_data)
+{
+    (void)stream;
+    stream_echo_ctx_t *ctx    = (stream_echo_ctx_t *)user_data;
+    ctx->write_complete_fired = true;
+}
+#endif
+
+void test_eventloop_stream_echo(void)
+{
+#ifndef _WIN32
+    printf("Testing cobalt_stream_t async buffered stream (10MB echo)...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    int fds[2];
+    int ret = socketpair(AF_UNIX, SOCK_STREAM, 0, fds);
+    TEST_ASSERT(ret == 0);
+
+    stream_echo_ctx_t ctx = {0};
+
+    cobalt_stream_t *client = cobalt_stream_create(loop, fds[0], &ctx);
+    cobalt_stream_t *server = cobalt_stream_create(loop, fds[1], NULL);
+    TEST_ASSERT(client != NULL);
+    TEST_ASSERT(server != NULL);
+
+    TEST_ASSERT(cobalt_stream_get_input_buffer(client) != NULL);
+    TEST_ASSERT(cobalt_stream_get_output_buffer(client) != NULL);
+
+    cobalt_stream_set_callbacks(server, on_server_stream_read, NULL, NULL);
+    cobalt_stream_set_callbacks(
+        client, on_client_stream_read, on_client_stream_write_complete, NULL);
+
+    /* Edge case check: NULL / zero length */
+    TEST_ASSERT(cobalt_stream_send(client, "", 0) == 0);
+    TEST_ASSERT(cobalt_stream_send(NULL, "a", 1) == -1);
+
+    const size_t total_payload = 10 * 1024 * 1024; /* 10 MB */
+    const size_t chunk_size    = 65536;            /* 64 KB */
+    char        *chunk         = (char *)malloc(chunk_size);
+    TEST_ASSERT(chunk != NULL);
+
+    /* Stream 10MB across in bursts of 512KB to exercise partial write buffering and POLLOUT */
+    size_t sent = 0;
+    while (sent < total_payload || ctx.total_received < total_payload) {
+        size_t burst = 0;
+        while (sent < total_payload && burst < 512 * 1024) {
+            size_t to_send = total_payload - sent;
+            if (to_send > chunk_size) {
+                to_send = chunk_size;
+            }
+            for (size_t i = 0; i < to_send; i++) {
+                chunk[i]     = (char)((sent + i) & 0xFF);
+                ctx.send_crc = ctx.send_crc * 31 + (uint8_t)chunk[i];
+            }
+            int sret = cobalt_stream_send(client, chunk, to_send);
+            TEST_ASSERT(sret == 0);
+            sent += to_send;
+            burst += to_send;
+            ctx.total_sent = sent;
+        }
+
+        cobalt_eventloop_iteration(loop);
+    }
+
+    free(chunk);
+
+    TEST_ASSERT(ctx.total_sent == total_payload);
+    TEST_ASSERT(ctx.total_received == total_payload);
+    TEST_ASSERT(ctx.send_crc == ctx.recv_crc);
+    TEST_ASSERT(ctx.write_complete_fired == true);
+
+    cobalt_stream_destroy(client);
+    cobalt_stream_destroy(server);
+    close(fds[0]);
+    close(fds[1]);
+
+    cobalt_eventloop_destroy(loop);
+    printf("  cobalt_stream_t 10MB echo test passed\n");
+#else
+    printf("  Skipping stream echo test on Windows\n");
 #endif
 }

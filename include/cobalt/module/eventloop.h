@@ -8,6 +8,7 @@
  * listening to file descriptor (FD) events.
  */
 
+#include <cobalt/container/buffer.h>
 #include <cobalt/memory/allocator.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -217,6 +218,99 @@ int cobalt_eventloop_accept(cobalt_eventloop_t *loop,
                             cobalt_events_t     events,
                             fd_handler_t        callback,
                             void               *user_data);
+
+/* -------------------------------------------------------------------------- */
+/* Asynchronous Stream Abstraction                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * @brief Opaque structure for asynchronous buffered stream
+ */
+typedef struct cobalt_stream cobalt_stream_t;
+
+/**
+ * @brief Callback invoked when new data is received and readable in input_buf
+ * @param stream Stream instance
+ * @param read_buf Input buffer containing readable bytes
+ * @param user_data User data passed to stream
+ */
+typedef void (*cobalt_stream_read_fn)(cobalt_stream_t *stream,
+                                      cobalt_buffer_t *read_buf,
+                                      void            *user_data);
+
+/**
+ * @brief Callback invoked when output buffer has been completely drained
+ * @param stream Stream instance
+ * @param user_data User data passed to stream
+ */
+typedef void (*cobalt_stream_write_complete_fn)(cobalt_stream_t *stream, void *user_data);
+
+/**
+ * @brief Callback invoked on socket error or peer disconnect
+ * @param stream Stream instance
+ * @param err_code System errno or 0 on EOF
+ * @param user_data User data passed to stream
+ */
+typedef void (*cobalt_stream_error_fn)(cobalt_stream_t *stream, int err_code, void *user_data);
+
+/**
+ * @brief Create a new asynchronous stream wrapping a file descriptor
+ * @param loop Event loop owning the stream
+ * @param fd File descriptor (set to non-blocking automatically)
+ * @param user_data User data associated with this stream
+ * @return Returns newly created stream or NULL on error
+ */
+cobalt_stream_t *cobalt_stream_create(cobalt_eventloop_t *loop, cobalt_fd_t fd, void *user_data);
+
+/**
+ * @brief Destroy an asynchronous stream and free its buffers
+ * @param stream Stream to destroy
+ * @note Unregisters fd from loop, but does not close fd. Caller retains ownership.
+ */
+void cobalt_stream_destroy(cobalt_stream_t *stream);
+
+/**
+ * @brief Set event callbacks for the stream
+ * @param stream Stream instance
+ * @param on_read Read callback (or NULL)
+ * @param on_write_complete Write complete callback (or NULL)
+ * @param on_error Error/EOF callback (or NULL)
+ */
+void cobalt_stream_set_callbacks(cobalt_stream_t                *stream,
+                                 cobalt_stream_read_fn           on_read,
+                                 cobalt_stream_write_complete_fn on_write_complete,
+                                 cobalt_stream_error_fn          on_error);
+
+/**
+ * @brief Send raw data over the stream (fast-path direct write + auto buffering)
+ * @param stream Stream instance
+ * @param data Pointer to data bytes
+ * @param len Number of bytes to send
+ * @return 0 on success, -1 on fatal error
+ */
+int cobalt_stream_send(cobalt_stream_t *stream, const void *data, size_t len);
+
+/**
+ * @brief Send all readable data from a buffer over the stream
+ * @param stream Stream instance
+ * @param buf Buffer whose readable bytes will be transferred
+ * @return 0 on success, -1 on fatal error
+ */
+int cobalt_stream_send_buffer(cobalt_stream_t *stream, cobalt_buffer_t *buf);
+
+/**
+ * @brief Get the internal input buffer of the stream
+ * @param stream Stream instance
+ * @return Pointer to input buffer
+ */
+cobalt_buffer_t *cobalt_stream_get_input_buffer(cobalt_stream_t *stream);
+
+/**
+ * @brief Get the internal output buffer of the stream
+ * @param stream Stream instance
+ * @return Pointer to output buffer
+ */
+cobalt_buffer_t *cobalt_stream_get_output_buffer(cobalt_stream_t *stream);
 
 /** @} */
 
