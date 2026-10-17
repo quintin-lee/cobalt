@@ -37,6 +37,7 @@ static void test_redos_immunity(void)
     int    res     = cobalt_regex_search(re, pathological, NULL, 0);
     double elapsed = current_time_ms() - start;
 
+    (void)res;
     assert(res == 0); /* Must correctly fail to match */
     printf("  ^(a+)+$ on 30 'a's + 'X': elapsed = %.4f ms (must be < 1.0 ms)\n", elapsed);
     assert(elapsed < 1.0); /* Strict ReDoS immunity check */

@@ -20,13 +20,18 @@
 #include "cobalt/module/json.h"
 #include "cobalt/module/json_sax.h"
 #include "cobalt/module/parallel_sort.h"
+#include "cobalt/module/shm_channel.h"
 #include "cobalt/module/taskgraph.h"
 #include "cobalt/module/threadpool.h"
+#include "cobalt/platform/shm.h"
 #include "cobalt/utils/benchmark.h"
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 #define BENCH_ITERS 100000
 
@@ -524,6 +529,63 @@ static void bench_lfskiplist_ops(void)
     cobalt_lfskiplist_destroy(sl);
 }
 
+static void cleanup_runner_shm(const char *name)
+{
+    if (!name) {
+        return;
+    }
+    cobalt_shm_unlink(name);
+#ifndef _WIN32
+    char        path[256];
+    const char *p = name;
+    while (*p == '/') {
+        p++;
+    }
+    snprintf(path, sizeof(path), "/dev/shm/%s_notif", p);
+    unlink(path);
+    snprintf(path, sizeof(path), "/tmp/%s_notif", p);
+    unlink(path);
+#endif
+}
+
+static void bench_shm_channel_ops(void)
+{
+    const char *name = "/cobalt_bench_runner_shm";
+    cleanup_runner_shm(name);
+
+    cobalt_shm_config_t cfg = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_SPIN,
+        .capacity          = 65536,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 1000,
+    };
+
+    cobalt_shm_channel_t *chan = cobalt_shm_channel_create(&cfg);
+    if (!chan) {
+        return;
+    }
+
+    uint64_t val = 42;
+    for (int i = 0; i < 50000; i++) {
+        void *wptr = NULL;
+        cobalt_shm_channel_reserve(chan, sizeof(val), &wptr);
+        *(uint64_t *)wptr = val;
+        cobalt_shm_channel_commit(chan, 1, sizeof(val));
+
+        uint16_t    type = 0;
+        const void *rptr = NULL;
+        size_t      len  = 0;
+        cobalt_shm_channel_peek(chan, &type, &rptr, &len);
+        cobalt_shm_channel_consume(chan);
+    }
+
+    cobalt_shm_channel_destroy(chan);
+    cleanup_runner_shm(name);
+}
+
 int main(int argc, char *argv[])
 {
     int json_mode = 0;
@@ -596,7 +658,9 @@ int main(int argc, char *argv[])
         cobalt_bench_run("regex_ipv4", 3, bench_regex_ipv4, &results[27]);
         results[28].name = "lfskiplist_ops";
         cobalt_bench_run("lfskiplist_ops", 3, bench_lfskiplist_ops, &results[28]);
-        results[29].name = NULL;
+        results[29].name = "shm_channel_ops";
+        cobalt_bench_run("shm_channel_ops", 3, bench_shm_channel_ops, &results[29]);
+        results[30].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         free(g_bench_random_ints);
@@ -665,6 +729,9 @@ int main(int argc, char *argv[])
 
     printf("--- Lock-Free SkipList ---\n");
     BENCH_RUN("lfskiplist put/get (50k)", 3, bench_lfskiplist_ops);
+
+    printf("--- Shared Memory IPC ---\n");
+    BENCH_RUN("shm spsc channel (50k)", 3, bench_shm_channel_ops);
 
     printf("\nBenchmark suite complete.\n");
     free(g_bench_random_ints);

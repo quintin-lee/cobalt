@@ -94,7 +94,9 @@ static void bench_read_heavy(void)
         args[i].num_ops   = ops_per_thread;
         args[i].read_pct  = 90;
         args[i].key_range = 10000;
-        assert(cobalt_thread_create(bench_worker, &args[i], &threads[i]) == 0);
+        int trc           = cobalt_thread_create(bench_worker, &args[i], &threads[i]);
+        (void)trc;
+        assert(trc == 0);
     }
 
     for (int i = 0; i < num_threads; i++) {
@@ -136,7 +138,9 @@ static void bench_balanced(void)
         args[i].num_ops   = ops_per_thread;
         args[i].read_pct  = 50;
         args[i].key_range = 5000;
-        assert(cobalt_thread_create(bench_worker, &args[i], &threads[i]) == 0);
+        int trc           = cobalt_thread_create(bench_worker, &args[i], &threads[i]);
+        (void)trc;
+        assert(trc == 0);
     }
 
     for (int i = 0; i < num_threads; i++) {
@@ -250,7 +254,9 @@ static void bench_lockfree_vs_mutex(void)
         m_args[i].num_ops   = ops_per_thread;
         m_args[i].read_pct  = 80;
         m_args[i].key_range = 5000;
-        assert(cobalt_thread_create(mutex_worker, &m_args[i], &threads[i]) == 0);
+        int trc             = cobalt_thread_create(mutex_worker, &m_args[i], &threads[i]);
+        (void)trc;
+        assert(trc == 0);
     }
     for (int i = 0; i < num_threads; i++) {
         cobalt_thread_join(threads[i]);
@@ -276,7 +282,9 @@ static void bench_lockfree_vs_mutex(void)
         sl_args[i].num_ops   = ops_per_thread;
         sl_args[i].read_pct  = 80;
         sl_args[i].key_range = 5000;
-        assert(cobalt_thread_create(bench_string_worker, &sl_args[i], &threads[i]) == 0);
+        int trc              = cobalt_thread_create(bench_string_worker, &sl_args[i], &threads[i]);
+        (void)trc;
+        assert(trc == 0);
     }
     for (int i = 0; i < num_threads; i++) {
         cobalt_thread_join(threads[i]);

@@ -157,6 +157,11 @@ target_link_libraries(benchmark_lfskiplist cobalt pthread m)
 add_test(NAME bench_lfskiplist COMMAND benchmark_lfskiplist
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 
+add_executable(benchmark_shm benchmark/benchmark_shm.c)
+target_link_libraries(benchmark_shm cobalt pthread m)
+add_test(NAME bench_shm COMMAND benchmark_shm
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+
 # Unified benchmark runner
 add_executable(bench_runner benchmark/bench_runner.c)
 target_link_libraries(bench_runner cobalt pthread m)
