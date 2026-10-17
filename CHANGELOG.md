@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v2.6.0 (2026-10-17) — Multi-Core Parallel Sorting & Event-Driven DAG TaskGraph Scheduler
+
 ### Added
 - **Multi-Core Parallel Sorting Engine (`cobalt/module/parallel_sort.h`)**:
   - `cobalt_parallel_qsort` & `cobalt_parallel_qsort_with_cutoff`: Pure C11 in-place parallel PDQSort with adaptive cutoff (`max(4096, N / (4 * threads))`), Hoare multi-word partitioning, larger-partition threadpool task offloading, smaller-partition tail recursion, and Help-First WaitGroup stealing to completely eliminate recursive starvation deadlocks. Achieves up to 3.4x speedup on 8 threads.
