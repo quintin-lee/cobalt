@@ -17,6 +17,8 @@
 #include "cobalt/module/eventloop.h"
 #include "cobalt/module/json.h"
 #include "cobalt/module/json_sax.h"
+#include "cobalt/module/parallel_sort.h"
+#include "cobalt/module/taskgraph.h"
 #include "cobalt/module/threadpool.h"
 #include "cobalt/utils/benchmark.h"
 #include <stdatomic.h>
@@ -271,6 +273,79 @@ static void bench_stable_sort_random(void)
     free(arr);
 }
 
+static void bench_parallel_qsort_random(void)
+{
+    ensure_sort_bench_data();
+    int *arr = (int *)malloc(sizeof(int) * BENCH_ITERS);
+    if (!arr || !g_bench_random_ints) {
+        free(arr);
+        return;
+    }
+    memcpy(arr, g_bench_random_ints, sizeof(int) * BENCH_ITERS);
+    cobalt_threadpool_t *pool = cobalt_threadpool_create(4);
+    if (pool) {
+        cobalt_parallel_qsort(pool, arr, BENCH_ITERS, sizeof(int), bench_sort_cmp_int);
+        cobalt_threadpool_destroy(pool);
+    }
+    free(arr);
+}
+
+static void bench_parallel_stable_sort_random(void)
+{
+    ensure_sort_bench_data();
+    int *arr = (int *)malloc(sizeof(int) * BENCH_ITERS);
+    if (!arr || !g_bench_random_ints) {
+        free(arr);
+        return;
+    }
+    memcpy(arr, g_bench_random_ints, sizeof(int) * BENCH_ITERS);
+    cobalt_threadpool_t *pool = cobalt_threadpool_create(4);
+    if (pool) {
+        cobalt_parallel_stable_sort(pool, arr, BENCH_ITERS, sizeof(int), bench_sort_cmp_int);
+        cobalt_threadpool_destroy(pool);
+    }
+    free(arr);
+}
+
+static void bench_tg_increment(void *arg)
+{
+    atomic_int *counter = (atomic_int *)arg;
+    atomic_fetch_add_explicit(counter, 1, memory_order_relaxed);
+}
+
+static void bench_taskgraph_dag(void)
+{
+    cobalt_threadpool_t *pool = cobalt_threadpool_create(4);
+    if (!pool) {
+        return;
+    }
+    cobalt_taskgraph_t *g = cobalt_taskgraph_create();
+    if (!g) {
+        cobalt_threadpool_destroy(pool);
+        return;
+    }
+
+    atomic_int counter;
+    atomic_init(&counter, 0);
+
+    const int        tasks = 10000;
+    cobalt_task_id_t root  = cobalt_taskgraph_add_node(g, bench_tg_increment, &counter);
+    cobalt_task_id_t sink  = cobalt_taskgraph_add_node(g, bench_tg_increment, &counter);
+
+    for (int i = 0; i < tasks; i++) {
+        cobalt_task_id_t w = cobalt_taskgraph_add_node(g, bench_tg_increment, &counter);
+        cobalt_taskgraph_add_edge(g, root, w);
+        cobalt_taskgraph_add_edge(g, w, sink);
+    }
+
+    if (cobalt_taskgraph_compile(g) == 0) {
+        cobalt_taskgraph_run_and_wait(g, pool);
+    }
+
+    cobalt_taskgraph_destroy(g);
+    cobalt_threadpool_destroy(pool);
+}
+
 static void bench_tp_noop_task(void *arg)
 {
     atomic_int *counter = (atomic_int *)arg;
@@ -441,7 +516,14 @@ int main(int argc, char *argv[])
         cobalt_bench_run("eventloop_post", 3, bench_eventloop_post, &results[20]);
         results[21].name = "buffer_throughput";
         cobalt_bench_run("buffer_throughput", 3, bench_buffer_throughput, &results[21]);
-        results[22].name = NULL;
+        results[22].name = "parallel_qsort_random";
+        cobalt_bench_run("parallel_qsort_random", 3, bench_parallel_qsort_random, &results[22]);
+        results[23].name = "parallel_stable_sort_random";
+        cobalt_bench_run(
+            "parallel_stable_sort_random", 3, bench_parallel_stable_sort_random, &results[23]);
+        results[24].name = "taskgraph_dag";
+        cobalt_bench_run("taskgraph_dag", 3, bench_taskgraph_dag, &results[24]);
+        results[25].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         free(g_bench_random_ints);
@@ -490,10 +572,13 @@ int main(int argc, char *argv[])
     BENCH_RUN("qsort random (100k)", 3, bench_qsort_random);
     BENCH_RUN("qsort sorted (100k)", 3, bench_qsort_sorted);
     BENCH_RUN("stable_sort random (100k)", 3, bench_stable_sort_random);
+    BENCH_RUN("parallel_qsort random (100k)", 3, bench_parallel_qsort_random);
+    BENCH_RUN("parallel_stable_sort random (100k)", 3, bench_parallel_stable_sort_random);
 
-    printf("--- ThreadPool ---\n");
+    printf("--- ThreadPool & TaskGraph ---\n");
     BENCH_RUN("threadpool throughput (50k)", 3, bench_threadpool_throughput);
     BENCH_RUN("threadpool parallel_for (100k)", 3, bench_threadpool_parallel_for);
+    BENCH_RUN("taskgraph DAG (10k tasks)", 3, bench_taskgraph_dag);
 
     printf("--- EventLoop & Buffer ---\n");
     BENCH_RUN("eventloop timing wheel (20k)", 3, bench_eventloop_tw);

@@ -133,6 +133,16 @@ add_test(NAME bench_threadpool COMMAND benchmark_threadpool
 add_test(NAME bench_eventloop COMMAND benchmark_eventloop
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 
+add_executable(benchmark_parallel_sort benchmark/benchmark_parallel_sort.c)
+target_link_libraries(benchmark_parallel_sort cobalt pthread m)
+add_test(NAME bench_parallel_sort COMMAND benchmark_parallel_sort
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+
+add_executable(benchmark_taskgraph benchmark/benchmark_taskgraph.c)
+target_link_libraries(benchmark_taskgraph cobalt pthread m)
+add_test(NAME bench_taskgraph COMMAND benchmark_taskgraph
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+
 # Unified benchmark runner
 add_executable(bench_runner benchmark/bench_runner.c)
 target_link_libraries(bench_runner cobalt pthread m)
