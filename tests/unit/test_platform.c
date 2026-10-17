@@ -25,11 +25,11 @@ void test_platform(void)
     }
     printf("  Platform handle is NULL (as expected)\n");
 
-#ifdef COBALT_PLATFORM_WINDOWS
+#ifdef COBALT_IS_WINDOWS
     printf("  Compiled with Windows platform macro defined\n");
-#elif COBALT_PLATFORM_MACOS
+#elif COBALT_IS_MACOS
     printf("  Compiled with macOS platform macro defined\n");
-#elif COBALT_PLATFORM_LINUX
+#elif COBALT_IS_LINUX
     printf("  Compiled with Linux platform macro defined\n");
 #else
     printf("  Compiled with unknown platform macro definition\n");

@@ -15,9 +15,9 @@
  */
 cobalt_platform_id_t cobalt_platform_get_id(void)
 {
-#ifdef COBALT_PLATFORM_WINDOWS
+#ifdef COBALT_IS_WINDOWS
     return 1; /* Return Windows platform identifier */
-#elif COBALT_PLATFORM_MACOS
+#elif COBALT_IS_MACOS
     return 2; /* Return macOS platform identifier */
 #else
     return 3; /* Return Linux platform identifier by default */

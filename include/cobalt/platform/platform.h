@@ -35,20 +35,23 @@ typedef void *cobalt_platform_handle_t;
 
 /* Platform detection macros */
 #ifdef _WIN32
-/** @brief Defines the current platform as Windows */
-#define COBALT_PLATFORM_WINDOWS 1
+/** @brief Defined when building for the Windows platform (compile-time feature macro) */
+#define COBALT_IS_WINDOWS 1
 #elif __APPLE__
-/** @brief Defines the current platform as macOS */
-#define COBALT_PLATFORM_MACOS 1
+/** @brief Defined when building for the macOS platform (compile-time feature macro) */
+#define COBALT_IS_MACOS 1
 #else
-/** @brief Defines the current platform as Linux */
-#define COBALT_PLATFORM_LINUX 1
+/** @brief Defined when building for the Linux platform (compile-time feature macro) */
+#define COBALT_IS_LINUX 1
 #endif
 
 /**
  * @brief Get the current platform identifier
  * @return cobalt_platform_id_t Enumeration value of the current platform
  * @note This function returns the platform identifier determined at compile time during runtime.
+ * Use the COBALT_IS_WINDOWS / COBALT_IS_MACOS / COBALT_IS_LINUX compile-time macros for
+ * preprocessor branching; they are intentionally not named after the enum members to avoid
+ * shadowing conflicts.
  */
 cobalt_platform_id_t cobalt_platform_get_id(void);
 
