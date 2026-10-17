@@ -316,7 +316,8 @@ int cobalt_shm_mpmc_init(void               *shm_addr,
                          cobalt_shm_mpmc_t **out_mpmc)
 {
     if (!shm_addr || !out_mpmc || capacity < 2 || (capacity & (capacity - 1)) != 0 ||
-        slot_size == 0 || ((uintptr_t)shm_addr % 64) != 0) {
+        slot_size == 0 || slot_size > UINT32_MAX - sizeof(cobalt_shm_mpmc_slot_t) ||
+        ((uintptr_t)shm_addr % 64) != 0) {
         return COBALT_ERROR_INVALID_ARGUMENT;
     }
 

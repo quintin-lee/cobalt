@@ -1052,6 +1052,17 @@ static void test_mpmc_invalid_args(void)
     TEST_ASSERT(rc == COBALT_SUCCESS);
     TEST_ASSERT(out_buf == 42);
 
+    /* pop: truncation check when buf_size < actual message size */
+    char test_msg[32] = "Truncation test message!";
+    rc                = cobalt_shm_mpmc_push(mpmc, test_msg, strlen(test_msg));
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    char small_buf[10];
+    memset(small_buf, 0, sizeof(small_buf));
+    rc = cobalt_shm_mpmc_pop(mpmc, small_buf, sizeof(small_buf) - 1, &out_len);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(out_len == strlen(test_msg));
+    TEST_ASSERT(strncmp(small_buf, "Truncatio", 9) == 0);
+
     /* getters on NULL handle */
     TEST_ASSERT(cobalt_shm_mpmc_capacity(NULL) == 0);
     TEST_ASSERT(cobalt_shm_mpmc_slot_size(NULL) == 0);
