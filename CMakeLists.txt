@@ -88,6 +88,8 @@ set(SOURCES
     src/module/json_sax.c
     src/module/eventloop.c
     src/module/threadpool.c
+    src/module/parallel_sort.c
+    src/module/taskgraph.c
     src/interface/iterator.c
     src/interface/map.c
     src/interface/sequence.c
