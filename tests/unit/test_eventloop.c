@@ -737,6 +737,7 @@ void test_eventloop_timing_wheel_stress(void)
     printf("  Timing wheel stress test passed\n");
 }
 
+#ifndef _WIN32
 typedef struct {
     uint64_t timer_id;
     int      fired;
@@ -754,6 +755,7 @@ static void on_tw_cascade_timer(uint64_t id, void *user_data)
         ctx->order = ++g_cascade_seq;
     }
 }
+#endif
 
 void test_eventloop_timing_wheel_cascade(void)
 {

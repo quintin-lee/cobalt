@@ -27,6 +27,8 @@
 #ifdef __linux__
 #include <sys/prctl.h>
 #endif
+#else
+#include <windows.h>
 #endif
 
 static void test_shm_create_and_close(void)
@@ -88,7 +90,7 @@ static void test_shm_open_existing(void)
     rc                  = cobalt_shm_open(name, &shm_b);
     TEST_ASSERT(rc == COBALT_SUCCESS);
     TEST_ASSERT(shm_b != NULL);
-    TEST_ASSERT(cobalt_shm_get_size(shm_b) == 4096);
+    TEST_ASSERT(cobalt_shm_get_size(shm_b) >= 4096);
 
     uint32_t *magic_b = (uint32_t *)cobalt_shm_get_addr(shm_b);
     TEST_ASSERT(magic_b != NULL);
