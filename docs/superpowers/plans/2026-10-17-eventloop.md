@@ -116,7 +116,7 @@ git commit -m "feat(buffer): ✨ implement Layer 4 dynamic zero-copy buffer engi
 - Modify: `src/module/eventloop.c`
 - Modify: `tests/unit/test_eventloop.c`
 
-- [ ] **Step 1: Replace binary min-heap with 4-level timing wheel in `src/module/eventloop.c`**
+- [x] **Step 1: Replace binary min-heap with 4-level timing wheel in `src/module/eventloop.c`**
 
 Implement:
 - Level 0: 256 slots, 1 ms per slot (0..255 ms).
@@ -129,7 +129,7 @@ Implement:
 - Bitwise cascade on tick overflow.
 - Dynamic `epoll_wait` timeout computation scanning Level 0.
 
-- [ ] **Step 2: Add comprehensive timing wheel tests in `tests/unit/test_eventloop.c`**
+- [x] **Step 2: Add comprehensive timing wheel tests in `tests/unit/test_eventloop.c`**
 
 Add tests:
 - 10,000 concurrent timers with varying delays across all 4 levels.
@@ -137,7 +137,7 @@ Add tests:
 - Repeating timer accuracy check.
 - Verify all existing eventloop tests continue to pass.
 
-- [ ] **Step 3: Build, verify tests & commit**
+- [x] **Step 3: Build, verify tests & commit**
 
 ```bash
 clang-format -i src/module/eventloop.c tests/unit/test_eventloop.c
