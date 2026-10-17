@@ -39,6 +39,12 @@ typedef void (*fd_handler_t)(cobalt_fd_t file_desc, cobalt_events_t events, void
 typedef void (*timer_handler_t)(uint64_t timer_id, void *user_data);
 
 /**
+ * @brief Cross-thread asynchronous dispatch task callback function
+ * @param arg User-supplied argument
+ */
+typedef void (*cobalt_loop_task_fn_t)(void *arg);
+
+/**
  * @brief Opaque structure for event loop context
  */
 typedef struct cobalt_eventloop cobalt_eventloop_t;
@@ -144,6 +150,17 @@ void cobalt_eventloop_stop(cobalt_eventloop_t *loop);
  * @return Returns 0 on success, -1 on failure
  */
 int cobalt_eventloop_iteration(cobalt_eventloop_t *loop);
+
+/**
+ * @brief Post an asynchronous task to be executed on the event loop thread
+ * @details Thread-safe. Can be called concurrently by any external or worker thread.
+ *          Features lock-free queuing and kernel syscall coalescing via eventfd/pipe.
+ * @param loop Event loop object
+ * @param fn Callback function to execute
+ * @param arg User data passed to callback function
+ * @return 0 on success, -1 on invalid arguments or queue failure
+ */
+int cobalt_eventloop_post(cobalt_eventloop_t *loop, cobalt_loop_task_fn_t fn, void *arg);
 
 /**
  * @brief Register a signal handler that delivers events through the event loop

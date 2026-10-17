@@ -7,9 +7,13 @@
 #define _DEFAULT_SOURCE
 #endif
 #include "cobalt/module/eventloop.h"
+#include "cobalt/container/lfqueue.h"
 #include "cobalt/memory/allocator.h"
+#include "cobalt/platform/thread.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <signal.h>
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -18,8 +22,13 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifndef _WIN32
+#include <poll.h>
+#endif
+
 #ifdef __linux__
 #include <sys/epoll.h>
+#include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 #elif __APPLE__
@@ -53,9 +62,19 @@
 #define COBALT_TW_L2_SHIFT 14
 #define COBALT_TW_L3_SHIFT 20
 
+#define COBALT_EVENTLOOP_DEFAULT_POST_CAPACITY 65536
+
 /* -------------------------------------------------------------------------- */
 /* Internal types                                                             */
 /* -------------------------------------------------------------------------- */
+/**
+ * @brief Posted task wrapper stored in post_queue
+ */
+typedef struct {
+    cobalt_loop_task_fn_t fn;
+    void                 *arg;
+} cobalt_post_task_t;
+
 /**
  * @brief Intrusive timer node stored in the hierarchical timing wheel
  */
@@ -165,6 +184,14 @@ struct cobalt_eventloop {
     uint64_t              next_timer_id;
     int                   running;
     int                   stop_flag;
+    /* Cross-thread task dispatch and async wakeup */
+    cobalt_lfqueue_t *post_queue;
+    int               wakeup_fd;
+#ifndef __linux__
+    int wakeup_write_fd;
+#endif
+    fd_entry_t   wakeup_entry;
+    _Atomic bool is_sleeping;
     /* Close callback */
     fd_handler_t        close_callback;
     void               *close_user_data;
@@ -605,6 +632,81 @@ static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct tim
 #endif
 
 /* -------------------------------------------------------------------------- */
+/* Cross-Thread Task Dispatch & Wakeup Helpers                                */
+/* -------------------------------------------------------------------------- */
+/**
+ * @brief Drain any bytes pending in the wakeup file descriptor.
+ */
+static void drain_wakeup_fd(cobalt_eventloop_t *loop)
+{
+#if defined(__linux__)
+    if (loop->wakeup_fd >= 0) {
+        uint64_t val;
+        while (read(loop->wakeup_fd, &val, sizeof(val)) > 0) {
+        }
+    }
+#elif !defined(_WIN32)
+    if (loop->wakeup_fd >= 0) {
+        char buf[128];
+        while (read(loop->wakeup_fd, buf, sizeof(buf)) > 0) {
+        }
+    }
+#else
+    (void)loop;
+#endif
+}
+
+/**
+ * @brief Dequeue and execute all tasks posted to the loop's lock-free queue.
+ */
+static void drain_post_queue(cobalt_eventloop_t *loop)
+{
+    if (!loop->post_queue) {
+        return;
+    }
+    void *item = NULL;
+    while (cobalt_lfqueue_dequeue(loop->post_queue, &item) == 0 && item != NULL) {
+        cobalt_post_task_t *task = (cobalt_post_task_t *)item;
+        if (task->fn) {
+            task->fn(task->arg);
+        }
+        loop->alloc->free(loop->alloc, task);
+    }
+}
+
+/**
+ * @brief Wakeup handler invoked when wakeup_fd becomes readable.
+ */
+static void on_wakeup_event(cobalt_fd_t fd, cobalt_events_t events, void *user_data)
+{
+    (void)fd;
+    (void)events;
+    cobalt_eventloop_t *loop = (cobalt_eventloop_t *)user_data;
+    drain_wakeup_fd(loop);
+    drain_post_queue(loop);
+}
+
+/**
+ * @brief Signal the kernel wakeup descriptor to unblock platform_wait.
+ */
+static void wakeup_loop(cobalt_eventloop_t *loop)
+{
+#if defined(__linux__)
+    if (loop->wakeup_fd >= 0) {
+        uint64_t one = 1;
+        (void)write(loop->wakeup_fd, &one, sizeof(one));
+    }
+#elif !defined(_WIN32)
+    if (loop->wakeup_write_fd >= 0) {
+        char b = 1;
+        (void)write(loop->wakeup_write_fd, &b, 1);
+    }
+#else
+    (void)loop;
+#endif
+}
+
+/* -------------------------------------------------------------------------- */
 /* Platform-specific FD management                                            */
 /* -------------------------------------------------------------------------- */
 /**
@@ -846,6 +948,53 @@ static cobalt_eventloop_t *cobalt_eventloop_create_with_alloc(cobalt_allocator_t
     memset(&loop->timer_table, 0, sizeof(loop->timer_table));
     loop->timer_count = 0;
 
+    /* Initialize post queue and wakeup descriptor */
+    loop->post_queue =
+        cobalt_lfqueue_create_with_allocator(COBALT_EVENTLOOP_DEFAULT_POST_CAPACITY, alloc);
+    atomic_init(&loop->is_sleeping, false);
+    loop->wakeup_fd = -1;
+#ifndef __linux__
+    loop->wakeup_write_fd = -1;
+#endif
+
+#if defined(__linux__)
+    loop->wakeup_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    if (loop->wakeup_fd >= 0) {
+        loop->wakeup_entry.fd        = loop->wakeup_fd;
+        loop->wakeup_entry.events    = POLLIN;
+        loop->wakeup_entry.callback  = on_wakeup_event;
+        loop->wakeup_entry.user_data = loop;
+
+        struct epoll_event ev = {0};
+        ev.events             = EPOLLIN;
+        ev.data.ptr           = &loop->wakeup_entry;
+        epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, loop->wakeup_fd, &ev);
+    }
+#elif !defined(_WIN32)
+    int pfd[2];
+    if (pipe(pfd) == 0) {
+        int flags0 = fcntl(pfd[0], F_GETFL, 0);
+        fcntl(pfd[0], F_SETFL, (flags0 >= 0 ? flags0 : 0) | O_NONBLOCK);
+        int flags1 = fcntl(pfd[1], F_GETFL, 0);
+        fcntl(pfd[1], F_SETFL, (flags1 >= 0 ? flags1 : 0) | O_NONBLOCK);
+        loop->wakeup_fd       = pfd[0];
+        loop->wakeup_write_fd = pfd[1];
+
+        loop->wakeup_entry.fd        = loop->wakeup_fd;
+        loop->wakeup_entry.events    = POLLIN;
+        loop->wakeup_entry.callback  = on_wakeup_event;
+        loop->wakeup_entry.user_data = loop;
+
+#if defined(__APPLE__)
+        struct kevent kev;
+        EV_SET(&kev, loop->wakeup_fd, EVFILT_READ, EV_ADD, 0, 0, &loop->wakeup_entry);
+        kevent(loop->kq, &kev, 1, NULL, 0, NULL);
+#else
+        platform_add_fd(loop, loop->wakeup_fd, POLLIN);
+#endif
+    }
+#endif
+
     return loop;
 }
 
@@ -928,6 +1077,35 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
         }
     }
     timer_table_destroy(loop->alloc, &loop->timer_table);
+
+    /* Drain and free remaining posted tasks and destroy post queue */
+    if (loop->post_queue) {
+        void *item = NULL;
+        while (cobalt_lfqueue_dequeue(loop->post_queue, &item) == 0 && item != NULL) {
+            loop->alloc->free(loop->alloc, item);
+        }
+        cobalt_lfqueue_destroy(loop->post_queue);
+        loop->post_queue = NULL;
+    }
+
+    /* Close wakeup descriptors */
+#if defined(__linux__)
+    if (loop->wakeup_fd >= 0) {
+        epoll_ctl(loop->epoll_fd, EPOLL_CTL_DEL, loop->wakeup_fd, NULL);
+        close(loop->wakeup_fd);
+        loop->wakeup_fd = -1;
+    }
+#elif !defined(_WIN32)
+    if (loop->wakeup_fd >= 0) {
+        platform_del_fd(loop, loop->wakeup_fd);
+        close(loop->wakeup_fd);
+        loop->wakeup_fd = -1;
+    }
+    if (loop->wakeup_write_fd >= 0) {
+        close(loop->wakeup_write_fd);
+        loop->wakeup_write_fd = -1;
+    }
+#endif
 
     /* Invoke close callback */
     if (loop->close_callback) {
@@ -1270,9 +1448,23 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
     wheel_advance(loop, now_ms);
     cobalt_drain_signals(loop);
 
+    /* Drain any posted tasks before possibly sleeping */
+    drain_post_queue(loop);
+
+    /* Mark as sleeping before platform_wait */
+    atomic_store_explicit(&loop->is_sleeping, true, memory_order_seq_cst);
+    /* Re-check if tasks arrived right before setting is_sleeping */
+    if (!cobalt_lfqueue_is_empty(loop->post_queue)) {
+        atomic_store_explicit(&loop->is_sleeping, false, memory_order_relaxed);
+        drain_post_queue(loop);
+    }
+
     int   event_count = 0;
     void *entries     = NULL;
     platform_wait(loop, &event_count, &entries, 0);
+
+    /* Loop thread has unblocked */
+    atomic_store_explicit(&loop->is_sleeping, false, memory_order_relaxed);
 
 #ifdef __linux__
     for (int i = 0; i < event_count; i++) {
@@ -1285,7 +1477,11 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
 #elif __APPLE__
     struct kevent *events = (struct kevent *)entries;
     for (int i = 0; i < event_count; i++) {
-        int         fd    = (int)events[i].ident;
+        int fd = (int)events[i].ident;
+        if (fd == loop->wakeup_fd) {
+            on_wakeup_event(fd, 0, loop);
+            continue;
+        }
         fd_entry_t *entry = loop->fd_head;
         while (entry && entry->fd != fd) {
             entry = entry->next;
@@ -1305,7 +1501,11 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
         if (pfds[i].revents == 0) {
             continue;
         }
-        int         fd    = pfds[i].fd;
+        int fd = pfds[i].fd;
+        if (fd == loop->wakeup_fd) {
+            on_wakeup_event(fd, 0, loop);
+            continue;
+        }
         fd_entry_t *entry = loop->fd_head;
         while (entry && entry->fd != fd) {
             entry = entry->next;
@@ -1317,9 +1517,55 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
     }
 #endif
 
+    /* Drain posted tasks after I/O callbacks */
+    drain_post_queue(loop);
+
     get_time_now(&now);
     now_ms = (uint64_t)now.tv_sec * 1000ULL + (uint64_t)now.tv_nsec / 1000000ULL;
     wheel_advance(loop, now_ms);
+
+    return 0;
+}
+
+/**
+ * @brief Post an asynchronous task to be executed on the event loop thread
+ *
+ * @param loop Event loop object
+ * @param fn Callback function to execute
+ * @param arg User data passed to callback function
+ * @return 0 on success, -1 on invalid arguments or queue failure
+ */
+int cobalt_eventloop_post(cobalt_eventloop_t *loop, cobalt_loop_task_fn_t fn, void *arg)
+{
+    if (!loop || !fn || !loop->post_queue) {
+        return -1;
+    }
+
+    cobalt_post_task_t *task =
+        (cobalt_post_task_t *)loop->alloc->alloc(loop->alloc, sizeof(cobalt_post_task_t));
+    if (!task) {
+        return -1;
+    }
+    task->fn  = fn;
+    task->arg = arg;
+
+    int ret = -1;
+    for (int retry = 0; retry < 1000; retry++) {
+        ret = cobalt_lfqueue_enqueue(loop->post_queue, task);
+        if (ret == 0) {
+            break;
+        }
+        cobalt_thread_yield();
+    }
+    if (ret != 0) {
+        loop->alloc->free(loop->alloc, task);
+        return -1;
+    }
+
+    /* Syscall coalescing: only issue kernel write if loop thread is sleeping */
+    if (atomic_exchange_explicit(&loop->is_sleeping, false, memory_order_seq_cst)) {
+        wakeup_loop(loop);
+    }
 
     return 0;
 }

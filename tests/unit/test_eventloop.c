@@ -4,7 +4,9 @@
  */
 
 #include "cobalt/module/eventloop.h"
+#include "cobalt/platform/thread.h"
 #include "test_framework.h"
+#include <stdatomic.h>
 #ifndef _WIN32
 #include <fcntl.h>
 #include <poll.h>
@@ -63,6 +65,7 @@ void test_eventloop_rapid_signals(void);
 void test_eventloop_timing_wheel_stress(void);
 void test_eventloop_timing_wheel_cascade(void);
 void test_eventloop_timing_wheel_repeating(void);
+void test_eventloop_cross_thread_post(void);
 #ifndef _WIN32
 void test_eventloop_unix_socket(void);
 
@@ -556,6 +559,7 @@ void test_eventloop(void)
     test_eventloop_timing_wheel_stress();
     test_eventloop_timing_wheel_cascade();
     test_eventloop_timing_wheel_repeating();
+    test_eventloop_cross_thread_post();
     printf("  Eventloop tests completed\n");
 }
 
@@ -845,5 +849,72 @@ void test_eventloop_timing_wheel_repeating(void)
     printf("  Timing wheel repeating timer test passed\n");
 #else
     printf("  Skipping repeating timer test on Windows\n");
+#endif
+}
+
+#ifndef _WIN32
+typedef struct {
+    cobalt_eventloop_t *loop;
+    int                 count;
+    atomic_int         *target_counter;
+} post_worker_arg_t;
+
+static void post_task_cb(void *arg)
+{
+    atomic_int *counter = (atomic_int *)arg;
+    atomic_fetch_add_explicit(counter, 1, memory_order_relaxed);
+}
+
+static void *post_worker_thread(void *arg)
+{
+    post_worker_arg_t *w = (post_worker_arg_t *)arg;
+    for (int i = 0; i < w->count; i++) {
+        while (cobalt_eventloop_post(w->loop, post_task_cb, w->target_counter) != 0) {
+            cobalt_thread_yield();
+        }
+    }
+    return NULL;
+}
+#endif
+
+void test_eventloop_cross_thread_post(void)
+{
+#ifndef _WIN32
+    printf("Testing eventloop cross-thread post and eventfd wakeup...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    atomic_int counter;
+    atomic_init(&counter, 0);
+
+    const int         num_threads = 4;
+    const int         per_thread  = 5000;
+    const int         total_tasks = num_threads * per_thread;
+    cobalt_thread_t   threads[4];
+    post_worker_arg_t args[4];
+
+    for (int i = 0; i < num_threads; i++) {
+        args[i].loop           = loop;
+        args[i].count          = per_thread;
+        args[i].target_counter = &counter;
+        int ret                = cobalt_thread_create(post_worker_thread, &args[i], &threads[i]);
+        TEST_ASSERT(ret == 0);
+    }
+
+    while (atomic_load_explicit(&counter, memory_order_relaxed) < total_tasks) {
+        cobalt_eventloop_iteration(loop);
+    }
+
+    for (int i = 0; i < num_threads; i++) {
+        cobalt_thread_join(threads[i]);
+    }
+
+    TEST_ASSERT(atomic_load_explicit(&counter, memory_order_relaxed) == total_tasks);
+
+    cobalt_eventloop_destroy(loop);
+    printf("  Eventloop cross-thread post test passed\n");
+#else
+    printf("  Skipping cross-thread post test on Windows\n");
 #endif
 }
