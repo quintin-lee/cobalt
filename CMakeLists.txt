@@ -96,6 +96,7 @@ set(SOURCES
     src/module/threadpool.c
     src/module/parallel_sort.c
     src/module/taskgraph.c
+    src/module/shm_channel.c
     src/interface/iterator.c
     src/interface/map.c
     src/interface/sequence.c

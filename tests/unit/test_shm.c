@@ -4,6 +4,8 @@
  */
 
 #include "cobalt/container/shm_ring.h"
+#include "cobalt/module/eventloop.h"
+#include "cobalt/module/shm_channel.h"
 #include "cobalt/platform/notifier.h"
 #include "cobalt/platform/shm.h"
 #include "cobalt/platform/thread.h"
@@ -15,6 +17,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#ifndef _WIN32
+#include <unistd.h>
+#endif
 
 static void test_shm_create_and_close(void)
 {
@@ -1076,6 +1082,374 @@ static void test_mpmc_invalid_args(void)
     printf("  MPMC invalid arguments test passed\n");
 }
 
+static void test_channel_spsc_lifecycle_and_send_recv(void)
+{
+    printf("Testing cobalt_shm_channel SPSC lifecycle and send/recv...\n");
+
+    const char *name = "/cobalt_test_chan_spsc";
+    cobalt_shm_unlink(name);
+
+    cobalt_shm_config_t cfg = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 4096,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 1000,
+    };
+
+    cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(server != NULL);
+    TEST_ASSERT(cobalt_shm_channel_get_mode(server) == COBALT_SHM_MODE_SPSC);
+    TEST_ASSERT(cobalt_shm_channel_get_wait_policy(server) == COBALT_SHM_WAIT_BLOCKING);
+    TEST_ASSERT(cobalt_shm_channel_get_read_fd(server) >= 0);
+
+    cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
+    TEST_ASSERT(client != NULL);
+    TEST_ASSERT(cobalt_shm_channel_get_mode(client) == COBALT_SHM_MODE_SPSC);
+    TEST_ASSERT(cobalt_shm_channel_get_wait_policy(client) == COBALT_SHM_WAIT_BLOCKING);
+
+    /* Send 50 messages from server to client */
+    for (int i = 0; i < 50; i++) {
+        char msg[32];
+        snprintf(msg, sizeof(msg), "spsc-msg-%03d", i);
+        int rc = cobalt_shm_channel_send(server, (uint16_t)(100 + i), msg, strlen(msg) + 1, 100);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    /* Recv 50 messages on client */
+    for (int i = 0; i < 50; i++) {
+        char     buf[32];
+        uint16_t type    = 0;
+        size_t   out_len = 0;
+        int      rc      = cobalt_shm_channel_recv(client, &type, buf, sizeof(buf), &out_len, 100);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        TEST_ASSERT(type == (uint16_t)(100 + i));
+        char expected[32];
+        snprintf(expected, sizeof(expected), "spsc-msg-%03d", i);
+        TEST_ASSERT(out_len == strlen(expected) + 1);
+        TEST_ASSERT(strcmp(buf, expected) == 0);
+    }
+
+    /* Test zero-copy reserve / commit / peek / consume */
+    void *wptr = NULL;
+    int   rc   = cobalt_shm_channel_reserve(server, 20, &wptr);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(wptr != NULL);
+    strcpy((char *)wptr, "zero-copy-test");
+    rc = cobalt_shm_channel_commit(server, 777, strlen("zero-copy-test") + 1);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    uint16_t    peek_type = 0;
+    const void *rptr      = NULL;
+    size_t      peek_len  = 0;
+    rc                    = cobalt_shm_channel_peek(client, &peek_type, &rptr, &peek_len);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(peek_type == 777);
+    TEST_ASSERT(peek_len == strlen("zero-copy-test") + 1);
+    TEST_ASSERT(strcmp((const char *)rptr, "zero-copy-test") == 0);
+
+    rc = cobalt_shm_channel_consume(client);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    /* Test cancel */
+    rc = cobalt_shm_channel_reserve(server, 20, &wptr);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    rc = cobalt_shm_channel_cancel(server);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_shm_channel_destroy(client);
+    cobalt_shm_channel_destroy(server);
+
+    printf("  SPSC channel lifecycle and send/recv test passed\n");
+}
+
+static void test_channel_mpmc_lifecycle_and_send_recv(void)
+{
+    printf("Testing cobalt_shm_channel MPMC lifecycle and send/recv...\n");
+
+    const char *name = "/cobalt_test_chan_mpmc";
+    cobalt_shm_unlink(name);
+
+    cobalt_shm_config_t cfg = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_MPMC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 64,
+        .slot_size         = 64,
+        .create_if_missing = true,
+        .spin_threshold    = 1000,
+    };
+
+    cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(server != NULL);
+    TEST_ASSERT(cobalt_shm_channel_get_mode(server) == COBALT_SHM_MODE_MPMC);
+    TEST_ASSERT(cobalt_shm_channel_get_wait_policy(server) == COBALT_SHM_WAIT_BLOCKING);
+    TEST_ASSERT(cobalt_shm_channel_get_read_fd(server) >= 0);
+
+    cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
+    TEST_ASSERT(client != NULL);
+    TEST_ASSERT(cobalt_shm_channel_get_mode(client) == COBALT_SHM_MODE_MPMC);
+
+    /* Send 50 messages from server */
+    for (int i = 0; i < 50; i++) {
+        char msg[32];
+        snprintf(msg, sizeof(msg), "mpmc-val-%03d", i);
+        int rc = cobalt_shm_channel_send(server, 0, msg, strlen(msg) + 1, 100);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    /* Recv 50 messages on client */
+    for (int i = 0; i < 50; i++) {
+        char     buf[32];
+        uint16_t type    = 0;
+        size_t   out_len = 0;
+        int      rc      = cobalt_shm_channel_recv(client, &type, buf, sizeof(buf), &out_len, 100);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        char expected[32];
+        snprintf(expected, sizeof(expected), "mpmc-val-%03d", i);
+        TEST_ASSERT(out_len == strlen(expected) + 1);
+        TEST_ASSERT(strcmp(buf, expected) == 0);
+    }
+
+    /* SPSC zero-copy functions should return error on MPMC */
+    void *dummy_ptr = NULL;
+    TEST_ASSERT(cobalt_shm_channel_reserve(server, 10, &dummy_ptr) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_channel_commit(server, 1, 10) == COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_channel_cancel(server) == COBALT_ERROR_INVALID_ARGUMENT);
+    const void *dummy_cptr = NULL;
+    size_t      dummy_len  = 0;
+    uint16_t    dummy_type = 0;
+    TEST_ASSERT(cobalt_shm_channel_peek(server, &dummy_type, &dummy_cptr, &dummy_len) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_channel_consume(server) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    cobalt_shm_channel_destroy(client);
+    cobalt_shm_channel_destroy(server);
+
+    printf("  MPMC channel lifecycle and send/recv test passed\n");
+}
+
+typedef struct {
+    cobalt_shm_channel_t *chan;
+    int                   sleep_ms;
+    int                   val;
+} delayed_sender_arg_t;
+
+static void *delayed_sender_worker(void *arg)
+{
+    delayed_sender_arg_t *a = (delayed_sender_arg_t *)arg;
+#ifdef _WIN32
+    Sleep(a->sleep_ms);
+#else
+    struct timespec req;
+    req.tv_sec  = a->sleep_ms / 1000;
+    req.tv_nsec = (long)(a->sleep_ms % 1000) * 1000000L;
+    nanosleep(&req, NULL);
+#endif
+    cobalt_shm_channel_send(a->chan, 42, &a->val, sizeof(a->val), 1000);
+    return NULL;
+}
+
+static void test_channel_wait_policies(void)
+{
+    printf("Testing cobalt_shm_channel wait policies (SPIN, BLOCKING, ADAPTIVE)...\n");
+
+    /* 1. SPIN policy with timeout 0 and positive timeout */
+    const char         *name_spin = "/cobalt_test_wait_spin";
+    cobalt_shm_config_t cfg_spin  = {
+        .name              = name_spin,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_SPIN,
+        .capacity          = 1024,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 100,
+    };
+    cobalt_shm_unlink(name_spin);
+    cobalt_shm_channel_t *chan_spin = cobalt_shm_channel_create(&cfg_spin);
+    TEST_ASSERT(chan_spin != NULL);
+
+    char     buf[16];
+    uint16_t type    = 0;
+    size_t   out_len = 0;
+    int      rc      = cobalt_shm_channel_recv(chan_spin, &type, buf, sizeof(buf), &out_len, 0);
+    TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    rc = cobalt_shm_channel_recv(chan_spin, &type, buf, sizeof(buf), &out_len, 15);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    TEST_ASSERT(rc == COBALT_ERROR_TIMEOUT);
+    long elapsed_ms = (t1.tv_sec - t0.tv_sec) * 1000L + (t1.tv_nsec - t0.tv_nsec) / 1000000L;
+    TEST_ASSERT(elapsed_ms >= 10);
+    cobalt_shm_channel_destroy(chan_spin);
+
+    /* 2. BLOCKING policy with timeout */
+    const char         *name_block = "/cobalt_test_wait_block";
+    cobalt_shm_config_t cfg_block  = {
+        .name              = name_block,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 1024,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 100,
+    };
+    cobalt_shm_unlink(name_block);
+    cobalt_shm_channel_t *chan_block = cobalt_shm_channel_create(&cfg_block);
+    TEST_ASSERT(chan_block != NULL);
+
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    rc = cobalt_shm_channel_recv(chan_block, &type, buf, sizeof(buf), &out_len, 20);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    TEST_ASSERT(rc == COBALT_ERROR_TIMEOUT);
+    elapsed_ms = (t1.tv_sec - t0.tv_sec) * 1000L + (t1.tv_nsec - t0.tv_nsec) / 1000000L;
+    TEST_ASSERT(elapsed_ms >= 15);
+
+    /* 3. ADAPTIVE policy with timeout */
+    const char         *name_adapt = "/cobalt_test_wait_adapt";
+    cobalt_shm_config_t cfg_adapt  = {
+        .name              = name_adapt,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_ADAPTIVE,
+        .capacity          = 1024,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 500,
+    };
+    cobalt_shm_unlink(name_adapt);
+    cobalt_shm_channel_t *chan_adapt = cobalt_shm_channel_create(&cfg_adapt);
+    TEST_ASSERT(chan_adapt != NULL);
+
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    rc = cobalt_shm_channel_recv(chan_adapt, &type, buf, sizeof(buf), &out_len, 20);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+    TEST_ASSERT(rc == COBALT_ERROR_TIMEOUT);
+    elapsed_ms = (t1.tv_sec - t0.tv_sec) * 1000L + (t1.tv_nsec - t0.tv_nsec) / 1000000L;
+    TEST_ASSERT(elapsed_ms >= 15);
+    cobalt_shm_channel_destroy(chan_adapt);
+
+    /* 4. Cross-thread notification wakeup under BLOCKING */
+    cobalt_shm_channel_t *client_block =
+        cobalt_shm_channel_open(name_block, COBALT_SHM_WAIT_BLOCKING);
+    TEST_ASSERT(client_block != NULL);
+
+    delayed_sender_arg_t s_arg = {
+        .chan     = client_block,
+        .sleep_ms = 30,
+        .val      = 12345,
+    };
+    cobalt_thread_t s_thread;
+    int             trc = cobalt_thread_create(delayed_sender_worker, &s_arg, &s_thread);
+    TEST_ASSERT(trc == 0);
+
+    int recv_val = 0;
+    rc = cobalt_shm_channel_recv(chan_block, &type, &recv_val, sizeof(recv_val), &out_len, 1000);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(type == 42);
+    TEST_ASSERT(out_len == sizeof(int));
+    TEST_ASSERT(recv_val == 12345);
+
+    cobalt_thread_join(s_thread);
+
+    cobalt_shm_channel_destroy(client_block);
+    cobalt_shm_channel_destroy(chan_block);
+
+    printf("  Wait policies test passed\n");
+}
+
+typedef struct {
+    int                 count;
+    int                 expected_count;
+    cobalt_eventloop_t *loop;
+} ev_channel_test_ctx_t;
+
+static void on_ev_channel_msg(
+    cobalt_shm_channel_t *chan, uint16_t msg_type, const void *payload, size_t len, void *user_data)
+{
+    (void)chan;
+    ev_channel_test_ctx_t *ctx = (ev_channel_test_ctx_t *)user_data;
+    TEST_ASSERT(msg_type == (uint16_t)(200 + ctx->count));
+    TEST_ASSERT(len == sizeof(int));
+    int val = *(const int *)payload;
+    TEST_ASSERT(val == 1000 + ctx->count);
+    ctx->count++;
+    if (ctx->count >= ctx->expected_count) {
+        cobalt_eventloop_stop(ctx->loop);
+    }
+}
+
+static void on_ev_safety_timer(uint64_t timer_id, void *user_data)
+{
+    (void)timer_id;
+    cobalt_eventloop_t *loop = (cobalt_eventloop_t *)user_data;
+    cobalt_eventloop_stop(loop);
+}
+
+static void test_channel_eventloop_integration(void)
+{
+    printf("Testing cobalt_shm_channel EventLoop integration...\n");
+
+    const char *name = "/cobalt_test_shm_chan_ev";
+    cobalt_shm_unlink(name);
+
+    cobalt_shm_config_t cfg = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 4096,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 1000,
+    };
+
+    cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(server != NULL);
+
+    cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
+    TEST_ASSERT(client != NULL);
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    ev_channel_test_ctx_t ctx = {
+        .count          = 0,
+        .expected_count = 10,
+        .loop           = loop,
+    };
+
+    int rc = cobalt_shm_channel_attach_eventloop(server, loop, on_ev_channel_msg, &ctx);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    /* Send 10 messages from client handle */
+    for (int i = 0; i < 10; i++) {
+        int val = 1000 + i;
+        rc      = cobalt_shm_channel_send(client, (uint16_t)(200 + i), &val, sizeof(val), 100);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    /* Safety timer in case eventloop hangs */
+    uint64_t timer_id = cobalt_eventloop_add_timer(loop, 2000, 0, on_ev_safety_timer, loop);
+    TEST_ASSERT(timer_id > 0);
+
+    cobalt_eventloop_run(loop);
+
+    TEST_ASSERT(ctx.count == 10);
+
+    rc = cobalt_shm_channel_detach_eventloop(server);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_eventloop_del_timer(loop, timer_id);
+    cobalt_eventloop_destroy(loop);
+    cobalt_shm_channel_destroy(client);
+    cobalt_shm_channel_destroy(server);
+
+    printf("  EventLoop integration test passed\n");
+}
+
 void test_shm(void)
 {
     printf("Testing shared memory primitive (cobalt_shm_t)...\n");
@@ -1103,5 +1477,12 @@ void test_shm(void)
     test_mpmc_queue_full_and_empty();
     test_mpmc_multithreaded_contention();
     test_mpmc_invalid_args();
-    printf("  MPMC shared memory ring tests completed successfully!\n");
+    printf("  MPMC shared memory ring tests completed successfully!\n\n");
+
+    printf("Testing shared memory channel facade (cobalt_shm_channel_t)...\n");
+    test_channel_spsc_lifecycle_and_send_recv();
+    test_channel_mpmc_lifecycle_and_send_recv();
+    test_channel_wait_policies();
+    test_channel_eventloop_integration();
+    printf("  Shared memory channel facade tests completed successfully!\n");
 }

@@ -62,6 +62,7 @@
 #include <cobalt/module/json.h>
 #include <cobalt/module/json_sax.h>
 #include <cobalt/module/parallel_sort.h>
+#include <cobalt/module/shm_channel.h>
 #include <cobalt/module/taskgraph.h>
 #include <cobalt/module/threadpool.h>
 
