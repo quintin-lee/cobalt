@@ -2,8 +2,6 @@
 
 ## Unreleased
 
-## v2.8.0 (2026-10-17) — Lock-Free Zero-Copy Shared Memory IPC Channel & Multi-Process Reactor Integration
-
 ### Added
 - **Layer 8 Platform Shared Memory Primitive (`cobalt/platform/shm.h`)**:
   - Cross-platform shared memory mapping (`cobalt_shm_t`) with POSIX `shm_open`, `ftruncate`, `mmap`, `munmap`, `shm_unlink` and Windows `CreateFileMappingA`, `MapViewOfFile`, `UnmapViewOfFile`, `CloseHandle`.
@@ -41,6 +39,8 @@
 ### Changed
 - Total CTest suites expanded from 43 to 45 (44 unit test suites + `bench_shm`), maintaining 100% pass rate under Release, Debug, and AddressSanitizer/LeakSanitizer (`build-asan`).
 - Full clang-tidy pass across all IPC headers and sources with 0 warnings.
+
+## v2.7.0 (2026-10-17) — Lock-Free Concurrent SkipList, 3-Epoch EBR Engine & Linear Pike VM Regex Engine
 
 
 ### Added
