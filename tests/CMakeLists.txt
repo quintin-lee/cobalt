@@ -71,6 +71,7 @@ add_test(NAME test_buffer COMMAND cobalt_test --filter buffer)
 add_test(NAME test_parallel_sort COMMAND cobalt_test --filter parallel_sort)
 add_test(NAME test_taskgraph COMMAND cobalt_test --filter taskgraph)
 add_test(NAME test_regex COMMAND cobalt_test --filter regex)
+add_test(NAME test_ebr COMMAND cobalt_test --filter ebr)
 
 # Benchmarks
 add_executable(benchmark_hashmap benchmark/benchmark_hashmap.c)
