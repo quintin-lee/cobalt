@@ -17,6 +17,49 @@
 - Improved cross-platform test coverage with conditional compilation guards for Windows and POSIX-specific tests
 
 
+## v2.5.0 (2026-10-17) — High-Performance Sorting, Work-Stealing Scheduler & Async Buffer/EventLoop Engine
+
+### Added
+- **Pure C11 Pattern-Defeating QuickSort (`cobalt_qsort`)**:
+  - Implemented Tukey's ninther and median-of-3 pivot selection.
+  - Dutch National Flag (DNF) 3-way partitioning (`< pivot`, `== pivot`, `> pivot`) delivering $O(N)$ performance on duplicate-heavy inputs.
+  - Introspective Heapsort fallback on excessive recursion depth ($2 \lfloor \log_2 N \rfloor$).
+  - In-place multi-word byte swap (`cobalt_swap_bytes`) executing word-aligned exchanges with zero heap allocations.
+- **In-Place Introspective Heapsort (`cobalt_heapsort`)**:
+  - Standalone max-heap sift-down sorting with zero dynamic allocations and guaranteed $O(N \log N)$ worst-case time complexity.
+- **Adaptive Run MergeSort (`cobalt_stable_sort`, `cobalt_stable_sort_with_alloc`)**:
+  - Natural run detection, in-place descending run reversal, and bidirectional scratch buffer merging with 100% stability.
+  - Custom allocator injection via `cobalt_allocator_t`.
+- **Zero-Alloc Partitioning (`cobalt_partition`, `cobalt_partition_with_alloc`)**:
+  - Optimized Hoare partitioning with zero heap allocations on the default path while maintaining custom allocator tracking.
+- **Lock-Free Work-Stealing Thread Pool (`cobalt_threadpool_t`)**:
+  - Hybrid task scheduling: per-worker Chase-Lev SPMC lock-free deques (LIFO local execution, FIFO remote work-stealing) plus global bounded MPMC queue (`cobalt_lfqueue_t`) for external submissions.
+  - Zero dynamic allocations on worker hot paths.
+  - Synchronization barriers (`cobalt_waitgroup_t`) with Help-First work stealing to prevent starvation deadlocks in recursive fork-join tasks.
+  - Dynamic chunked parallel loops (`cobalt_threadpool_parallel_for`).
+  - Adaptive 3-stage idle backoff (spin-yield → idle registration → condvar wait).
+- **Layer 4 Dynamic Zero-Copy Stream Buffer (`cobalt_buffer_t`)**:
+  - 3-zone contiguous ring/slice buffer (prependable, readable, writable) with in-place defragmentation (`memmove`) and geometric expansion.
+  - Zero-copy slicing via `cobalt_buffer_peek()` and `cobalt_buffer_retrieve()`.
+  - Two-segment vectorized `readv` with 64KB stack buffer spillover in `cobalt_buffer_read_fd()`.
+- **4-Level Hierarchical Timing Wheel**:
+  - Replaced $O(\log N)$ min-heap with 4-level bitwise timing wheel (256 + 64 + 64 + 64 slots) with 1ms tick base resolution covering ~18.64 hours.
+  - Intrusive doubly-linked timer nodes and Thomas Wang 64-bit mix hash table delivering strict $O(1)$ add and $O(1)$ cancellation.
+  - Dynamic `epoll_wait` timeout computation scanning Level 0.
+- **Cross-Thread Event Loop Task Dispatch (`cobalt_eventloop_post`)**:
+  - Asynchronous task posting via lock-free queue with `eventfd` (Linux) / self-pipe (macOS/POSIX) wakeup.
+  - Atomic syscall coalescing (`atomic_bool is_sleeping`) eliminating redundant write syscalls when the loop is already running.
+- **High-Level Asynchronous Stream Abstraction (`cobalt_stream_t`)**:
+  - Automatic `POLLOUT` event toggling on partial writes.
+  - Direct-write fast path when output buffer is empty.
+  - Callback hooks for read, write complete, and error/EOF handling.
+- **Dedicated Benchmark Suite**:
+  - Added `benchmark_sort`, `benchmark_threadpool`, and `benchmark_eventloop` executables, wired into unified `bench_runner` (supporting human-readable and `--json` outputs).
+
+### Changed
+- Total test count expanded from 41 to 50 tests, passing with 100% success under both standard CTest and AddressSanitizer/LeakSanitizer (ASan/LSan).
+- Header `cobalt/cobalt.h` now includes `cobalt/container/buffer.h`.
+
 ## v2.4.0 (2026-09-05) — Allocator Support, OOM Fixes & Test Cleanup Release
 
 ### Added

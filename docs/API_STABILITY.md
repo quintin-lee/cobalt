@@ -26,14 +26,14 @@ Cobalt follows [Semantic Versioning](https://semver.org/) (MAJOR.MINOR.PATCH).
 
 ### Opaque Types
 
-- All container types (`cobalt_vector_t`, `cobalt_hashmap_t`, etc.) are opaque handles.
+- All container types (`cobalt_vector_t`, `cobalt_hashmap_t`, `cobalt_buffer_t`, `cobalt_lfqueue_t`, etc.) are opaque handles.
 - Internal fields must not be accessed directly.
 - Use the provided getter/setter/iterator APIs.
 
-### Module-level APIs (L2: JSON, EventLoop)
+### Module-level APIs (L2: JSON, EventLoop, ThreadPool)
 
 - JSON parsing/serialization API is stable but the internal `json_node_t` representation is opaque.
-- Event loop API (`cobalt_eventloop_*`) is stable within a MAJOR version.
+- Event loop API (`cobalt_eventloop_*`, `cobalt_stream_*`) and ThreadPool API (`cobalt_threadpool_*`, `cobalt_waitgroup_*`) are stable within a MAJOR version.
 
 ## What is NOT Covered
 

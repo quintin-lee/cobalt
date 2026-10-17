@@ -1,24 +1,140 @@
 # API Reference — Container Module (Layer 4)
 
-**Module:** `include/cobalt/container/`
+**Module:** `include/cobalt/container/`  
 **Dependencies:** `interface/sequence.h`, `interface/map.h`, `interface/iterator.h`
 
 ## Overview
 
-The container module provides 8 sequence and map containers. All containers store `void*` pointers — they do not own or free the pointed-to data. Users are responsible for managing the lifetime of the data.
+The Container module provides 10 industrial-grade data structures. Sequential and associative containers store `void *` pointers without taking data ownership. The stream buffer (`cobalt_buffer_t`) provides dynamic contiguous byte storage, and the lock-free queue (`cobalt_lfqueue_t`) provides ultra-high-throughput concurrent pointer exchange.
 
 | Container | Type | Time Complexity | Notes |
-|-----------|------|----------------|-------|
-| Vector | Dynamic array | O(1) push/get, O(n) insert/remove | 2x growth strategy |
-| List | Doubly-linked | O(1) push/pop ends, O(n) random access | Bidirectional traversal |
-| Stack | LIFO | O(1) push/pop/peek | Singly-linked list |
-| Queue | FIFO | O(1) enqueue/dequeue/peek | Singly-linked list |
-| Deque | Double-ended | O(1) push/pop both ends | Doubly-linked list |
-| HashMap | Hash table | O(1) avg put/get/remove | Separate chaining, auto-resize at 75% |
-| TreeMap | BST | O(log n) avg put/get/remove | String-keyed, ordered |
-| Set | Hash set | O(1) avg insert/contains/remove | String-keyed only |
+|:---|:---|:---:|:---|
+| **Vector** | Dynamic array | $O(1)$ push/get, $O(N)$ insert/remove | 2x growth strategy, contiguous memory |
+| **List** | Doubly-linked | $O(1)$ push/pop ends, $O(N)$ access | Bidirectional traversal, node stability |
+| **Stack** | LIFO | $O(1)$ push/pop/peek | Singly-linked list |
+| **Queue** | FIFO | $O(1)$ enqueue/dequeue/peek | Singly-linked list with tail pointer |
+| **Deque** | Double-ended | $O(1)$ push/pop both ends | Doubly-linked list |
+| **HashMap** | Hash table | $O(1)$ avg put/get/remove | Separate chaining, auto-rehash at 75% |
+| **TreeMap** | Red-Black Tree | $O(\log N)$ put/get/remove | Self-balancing BST, sorted key traversal |
+| **Set** | Hash set | $O(1)$ avg insert/contains/remove | Unique items, backed by hash table |
+| **Buffer** | Stream buffer | $O(1)$ append/prepend/peek | 3-zone sliding layout, vectorized `readv` |
+| **LFQueue** | Lock-free queue | $O(1)$ lock-free enqueue/dequeue | Bounded MPMC, 64-byte cache alignment |
 
-## Vector
+---
+
+## 1. Zero-Copy Stream Buffer (`cobalt_buffer_t`)
+
+**Header:** `include/cobalt/container/buffer.h`
+
+```c
+#define COBALT_BUFFER_DEFAULT_INITIAL_CAPACITY 1024
+#define COBALT_BUFFER_DEFAULT_PREPEND_SIZE 8
+
+typedef struct cobalt_buffer cobalt_buffer_t;
+```
+
+### Lifecycle
+
+```c
+cobalt_buffer_t *cobalt_buffer_create(size_t initial_capacity);
+cobalt_buffer_t *cobalt_buffer_create_with_alloc(size_t initial_capacity, size_t prepend_size, cobalt_allocator_t *alloc);
+void             cobalt_buffer_destroy(cobalt_buffer_t *buf);
+```
+
+| Function | Description |
+|:---|:---|
+| `cobalt_buffer_create(cap)` | Allocates buffer with `cap` writable bytes (0 = 1024) and 8-byte prepend space using system allocator. |
+| `cobalt_buffer_create_with_alloc` | Allocates buffer with custom prepend size and allocator. |
+| `cobalt_buffer_destroy(buf)` | Frees buffer and internal memory. Safe with NULL. |
+
+### Capacity & Inspection
+
+```c
+size_t      cobalt_buffer_readable_bytes(const cobalt_buffer_t *buf);
+size_t      cobalt_buffer_writable_bytes(const cobalt_buffer_t *buf);
+size_t      cobalt_buffer_prependable_bytes(const cobalt_buffer_t *buf);
+const char *cobalt_buffer_peek(const cobalt_buffer_t *buf);
+```
+
+- **`cobalt_buffer_readable_bytes`**: Returns count of unread payload bytes ($write\_pos - read\_pos$).
+- **`cobalt_buffer_writable_bytes`**: Returns count of free writable bytes without resizing ($capacity - write\_pos$).
+- **`cobalt_buffer_prependable_bytes`**: Returns count of bytes reserved before $read\_pos$.
+- **`cobalt_buffer_peek`**: Direct read-only pointer to readable payload cursor. Returns NULL if empty.
+
+### Reading & Consuming
+
+```c
+int  cobalt_buffer_retrieve(cobalt_buffer_t *buf, size_t len);
+void cobalt_buffer_retrieve_all(cobalt_buffer_t *buf);
+int  cobalt_buffer_read(cobalt_buffer_t *buf, void *dst, size_t len);
+```
+
+- **`cobalt_buffer_retrieve`**: Consumes and advances read cursor by `len` bytes without copying. Returns 0 on success, -1 if `len > readable`.
+- **`cobalt_buffer_retrieve_all`**: Resets `read_pos` and `write_pos` to initial prepend offset, retaining buffer allocation.
+- **`cobalt_buffer_read`**: Copies `len` bytes into `dst` and advances read cursor.
+
+### Appending & Prepending
+
+```c
+int cobalt_buffer_ensure_writable(cobalt_buffer_t *buf, size_t len);
+int cobalt_buffer_append(cobalt_buffer_t *buf, const void *data, size_t len);
+int cobalt_buffer_prepend(cobalt_buffer_t *buf, const void *data, size_t len);
+```
+
+- **`cobalt_buffer_ensure_writable`**: Guarantees at least `len` writable bytes. Performs in-place defragmentation (compacting readable bytes left) if possible; expands buffer dynamically only if capacity is insufficient.
+- **`cobalt_buffer_append`**: Appends bytes to the end of readable payload.
+- **`cobalt_buffer_prepend`**: Writes header bytes directly into the prependable zone before `read_pos`. Returns 0 on success, -1 if `len > prependable`.
+
+### Vectorized Socket I/O
+
+```c
+ssize_t cobalt_buffer_read_fd(cobalt_buffer_t *buf, int fd, int *out_err);
+ssize_t cobalt_buffer_write_fd(cobalt_buffer_t *buf, int fd, int *out_err);
+```
+
+- **`cobalt_buffer_read_fd`**: Uses two-segment `readv` (internal writable slice + 64KB stack buffer) to read maximum available socket data non-blockingly with zero unnecessary allocations. Returns bytes read, or -1 on error.
+- **`cobalt_buffer_write_fd`**: Writes readable bytes directly to non-blocking descriptor and advances read cursor. Returns bytes written, or -1 on error.
+
+---
+
+## 2. Lock-Free Bounded MPMC Queue (`cobalt_lfqueue_t`)
+
+**Header:** `include/cobalt/container/lfqueue.h`
+
+```c
+typedef struct cobalt_lfqueue cobalt_lfqueue_t;
+```
+
+### Lifecycle
+
+```c
+cobalt_lfqueue_t *cobalt_lfqueue_create(size_t capacity);
+cobalt_lfqueue_t *cobalt_lfqueue_create_with_allocator(size_t capacity, cobalt_allocator_t *alloc);
+void              cobalt_lfqueue_destroy(cobalt_lfqueue_t *queue);
+```
+
+- Capacity is automatically rounded up to the nearest power of two ($2^k$, minimum 2).
+- Internal producer and consumer cursors are 64-byte aligned (`_Alignas(64)`) to eliminate false sharing.
+
+### Non-Blocking Operations
+
+```c
+int    cobalt_lfqueue_enqueue(cobalt_lfqueue_t *queue, void *data);
+int    cobalt_lfqueue_dequeue(cobalt_lfqueue_t *queue, void **out_data);
+size_t cobalt_lfqueue_size(const cobalt_lfqueue_t *queue);
+int    cobalt_lfqueue_is_empty(const cobalt_lfqueue_t *queue);
+int    cobalt_lfqueue_is_full(const cobalt_lfqueue_t *queue);
+size_t cobalt_lfqueue_capacity(const cobalt_lfqueue_t *queue);
+```
+
+- **`cobalt_lfqueue_enqueue`**: Enqueues item non-blockingly using Dmitry Vyukov's algorithm. Returns 0 on success, -1 if full or invalid arguments.
+- **`cobalt_lfqueue_dequeue`**: Dequeues item non-blockingly. Stores dequeued pointer into `*out_data`. Returns 0 on success, -1 if empty.
+
+---
+
+## 3. Vector
+
+**Header:** `include/cobalt/container/vector.h`
 
 ```c
 cobalt_vector_t *cobalt_vector_create(size_t initial_capacity);
@@ -30,171 +146,102 @@ size_t           cobalt_vector_size(cobalt_vector_t *vec);
 int              cobalt_vector_is_empty(cobalt_vector_t *vec);
 ```
 
-**Behavior:**
-- `cobalt_vector_create(0)` allocates a zero-capacity vector that grows on first push
-- `cobalt_vector_push` doubles capacity when full (1 → 2 → 4 → ...)
-- `cobalt_vector_get` returns NULL with `COBALT_ERROR_OUT_OF_BOUNDS` if index ≥ size
-- `cobalt_vector_set` returns -1 with `COBALT_ERROR_INVALID_ARGUMENT` if index ≥ size
-- Vector implements `cobalt_sequence_t` — use `(cobalt_sequence_t *)vec` for polymorphic ops
-- **Memory note:** `destroy` frees internal array but NOT the data pointed to by elements
+---
 
-## HashMap (Advanced APIs)
+## 4. List & Deque
+
+**Headers:** `include/cobalt/container/list.h`, `include/cobalt/container/deque.h`
 
 ```c
-cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t              initial_buckets,
-                                            cobalt_hash_func_t  hash_func,
-                                            cobalt_equal_func_t equal_func,
-                                            cobalt_allocator_t *alloc);
-int cobalt_hashmap_set_funcs(cobalt_hashmap_t   *map,
-                             cobalt_hash_func_t  hash_func,
-                             cobalt_equal_func_t equal_func);
-int cobalt_hashmap_put_ext(cobalt_hashmap_t *map, const void *key, size_t key_len, void *value);
-void *cobalt_hashmap_get_ext(const cobalt_hashmap_t *map, const void *key, size_t key_len);
-int cobalt_hashmap_remove_ext(cobalt_hashmap_t *map, const void *key, size_t key_len);
-```
+/* List */
+cobalt_list_t *cobalt_list_create(void);
+void           cobalt_list_destroy(cobalt_list_t *list);
+int            cobalt_list_push_front(cobalt_list_t *list, void *item);
+int            cobalt_list_push_back(cobalt_list_t *list, void *item);
+void          *cobalt_list_pop_front(cobalt_list_t *list);
+void          *cobalt_list_pop_back(cobalt_list_t *list);
+void          *cobalt_list_get(cobalt_list_t *list, size_t index);
+size_t         cobalt_list_size(cobalt_list_t *list);
+int            cobalt_list_remove(cobalt_list_t *list, void *item);
 
-**`cobalt_hashmap_create_ext`**: Creates a hashmap with custom hash/equal functions and allocator.  
-**`cobalt_hashmap_set_funcs`**: Replaces hash and equality callbacks at runtime on an existing hashmap. Changes only affect future operations — existing entries are not rehashed.  
-**`*_ext` variants**: Accept binary keys (`void *` + `size_t`) instead of NUL-terminated strings.
+/* Deque */
+cobalt_deque_t *cobalt_deque_create(void);
+void            cobalt_deque_destroy(cobalt_deque_t *deque);
+int             cobalt_deque_push_front(cobalt_deque_t *deque, void *item);
+int             cobalt_deque_push_back(cobalt_deque_t *deque, void *item);
+void           *cobalt_deque_pop_front(cobalt_deque_t *deque);
+void           *cobalt_deque_pop_back(cobalt_deque_t *deque);
+void           *cobalt_deque_peek_front(cobalt_deque_t *deque);
+void           *cobalt_deque_peek_back(cobalt_deque_t *deque);
+size_t          cobalt_deque_size(cobalt_deque_t *deque);
+```
 
 ---
 
-## List
+## 5. Stack & Queue
+
+**Headers:** `include/cobalt/container/stack.h`, `include/cobalt/container/queue.h`
 
 ```c
-cobalt_list_t   *cobalt_list_create(void);
-void             cobalt_list_destroy(cobalt_list_t *list);
-int              cobalt_list_push_front(cobalt_list_t *list, void *item);
-int              cobalt_list_push_back(cobalt_list_t *list, void *item);
-void            *cobalt_list_pop_front(cobalt_list_t *list);
-void            *cobalt_list_pop_back(cobalt_list_t *list);
-void            *cobalt_list_get(cobalt_list_t *list, size_t index);
-size_t           cobalt_list_size(cobalt_list_t *list);
-int              cobalt_list_is_empty(cobalt_list_t *list);
-cobalt_iterator_t *cobalt_list_iterator_create(cobalt_list_t *list);
-int              cobalt_list_remove(cobalt_list_t *list, void *item);
+/* Stack */
+cobalt_stack_t *cobalt_stack_create(void);
+void            cobalt_stack_destroy(cobalt_stack_t *stack);
+int             cobalt_stack_push(cobalt_stack_t *stack, void *item);
+void           *cobalt_stack_pop(cobalt_stack_t *stack);
+void           *cobalt_stack_peek(cobalt_stack_t *stack);
+size_t          cobalt_stack_size(cobalt_stack_t *stack);
+
+/* Queue */
+cobalt_queue_t *cobalt_queue_create(void);
+void            cobalt_queue_destroy(cobalt_queue_t *queue);
+int             cobalt_queue_enqueue(cobalt_queue_t *queue, void *item);
+void           *cobalt_queue_dequeue(cobalt_queue_t *queue);
+void           *cobalt_queue_peek(cobalt_queue_t *queue);
+size_t          cobalt_queue_size(cobalt_queue_t *queue);
 ```
 
-**Behavior:**
-- `cobalt_list_get` traverses from head or tail (whichever is closer) — at most n/2 hops
-- `cobalt_list_remove` uses pointer equality (not value comparison)
-- List implements `cobalt_sequence_t` — supports polymorphic `add`/`remove`
-- `cobalt_list_pop_front`/`pop_back` return NULL on empty list (no error set)
+---
 
-## Stack
+## 6. Associative Containers (HashMap, TreeMap, Set)
+
+**Headers:** `container/hashmap.h`, `container/treemap.h`, `container/set.h`
 
 ```c
-cobalt_stack_t  *cobalt_stack_create(void);
-void             cobalt_stack_destroy(cobalt_stack_t *stack);
-int              cobalt_stack_push(cobalt_stack_t *stack, void *item);
-void            *cobalt_stack_pop(cobalt_stack_t *stack);
-void            *cobalt_stack_peek(cobalt_stack_t *stack);
-size_t           cobalt_stack_size(cobalt_stack_t *stack);
-int              cobalt_stack_is_empty(cobalt_stack_t *stack);
-```
-
-**Behavior:**
-- LIFO — push and pop both operate on the top
-- `cobalt_stack_pop` on empty returns NULL, sets no error
-- Stack is singly-linked internally
-
-## Queue
-
-```c
-cobalt_queue_t  *cobalt_queue_create(void);
-void             cobalt_queue_destroy(cobalt_queue_t *queue);
-int              cobalt_queue_enqueue(cobalt_queue_t *queue, void *item);
-void            *cobalt_queue_dequeue(cobalt_queue_t *queue);
-void            *cobalt_queue_peek(cobalt_queue_t *queue);
-size_t           cobalt_queue_size(cobalt_queue_t *queue);
-int              cobalt_queue_is_empty(cobalt_queue_t *queue);
-```
-
-**Behavior:**
-- FIFO — enqueue at tail, dequeue from head
-- `cobalt_queue_dequeue` on empty returns NULL, sets no error
-
-## Deque
-
-```c
-cobalt_deque_t  *cobalt_deque_create(void);
-void             cobalt_deque_destroy(cobalt_deque_t *deque);
-int              cobalt_deque_push_front(cobalt_deque_t *deque, void *item);
-int              cobalt_deque_push_back(cobalt_deque_t *deque, void *item);
-void            *cobalt_deque_pop_front(cobalt_deque_t *deque);
-void            *cobalt_deque_pop_back(cobalt_deque_t *deque);
-void            *cobalt_deque_peek_front(cobalt_deque_t *deque);
-void            *cobalt_deque_peek_back(cobalt_deque_t *deque);
-size_t           cobalt_deque_size(cobalt_deque_t *deque);
-int              cobalt_deque_is_empty(cobalt_deque_t *deque);
-```
-
-**Behavior:**
-- Doubly-linked list implementation
-- All operations are O(1)
-- `pop_front`/`pop_back` on empty return NULL
-
-## HashMap
-
-```c
+/* HashMap */
 cobalt_hashmap_t *cobalt_hashmap_create(size_t initial_buckets);
+cobalt_hashmap_t *cobalt_hashmap_create_ext(size_t initial_buckets, cobalt_hash_func_t hash_func, cobalt_equal_func_t equal_func, cobalt_allocator_t *alloc);
 void              cobalt_hashmap_destroy(cobalt_hashmap_t *map);
 int               cobalt_hashmap_put(cobalt_hashmap_t *map, const char *key, void *value);
 void             *cobalt_hashmap_get(cobalt_hashmap_t *map, const char *key);
 int               cobalt_hashmap_remove(cobalt_hashmap_t *map, const char *key);
 size_t            cobalt_hashmap_size(cobalt_hashmap_t *map);
-size_t            cobalt_hashmap_capacity(const cobalt_hashmap_t *map);
-```
 
-**Behavior:**
-- Keys are C-strings — an internal copy is made and stored
-- `cobalt_hashmap_put` replaces existing value for same key (returns 0)
-- Load factor threshold: 0.75 — triggers 2x rehash automatically
-- `cobalt_hashmap_get` returns NULL (sets `COBALT_ERROR_NOT_FOUND`) if key not found
-- `cobalt_hashmap_remove` returns -1 if key not found
-- **String-keyed only** — not generic
-
-## TreeMap
-
-```c
+/* TreeMap */
 cobalt_treemap_t *cobalt_treemap_create(void);
-```c
 cobalt_treemap_t *cobalt_treemap_create_ext(cobalt_compare_func_t compare_func);
-```
-
-**`cobalt_treemap_create_ext`**: Creates a TreeMap with a custom comparison function. Use `NULL` for default `strcmp` behavior (same as `cobalt_treemap_create()`). The comparator receives `(const void *a, const void *b)` and must return `< 0`, `0`, or `> 0`.
-
 void              cobalt_treemap_destroy(cobalt_treemap_t *map);
 int               cobalt_treemap_put(cobalt_treemap_t *map, const char *key, void *value);
 void             *cobalt_treemap_get(cobalt_treemap_t *map, const char *key);
 int               cobalt_treemap_remove(cobalt_treemap_t *map, const char *key);
-const char        *cobalt_treemap_min_key(cobalt_treemap_t *map);
-const char        *cobalt_treemap_max_key(cobalt_treemap_t *map);
 size_t            cobalt_treemap_size(cobalt_treemap_t *map);
+
+/* Set */
+cobalt_set_t *cobalt_set_create(size_t initial_capacity);
+void          cobalt_set_destroy(cobalt_set_t *set);
+int           cobalt_set_insert(cobalt_set_t *set, void *item);
+int           cobalt_set_remove(cobalt_set_t *set, void *item);
+int           cobalt_set_contains(cobalt_set_t *set, void *item);
+size_t        cobalt_set_size(cobalt_set_t *set);
 ```
 
-**Behavior:**
-- Keys are C-strings compared lexicographically via `strcmp`
-- `min_key`/`max_key` return NULL when tree is empty
-- `cobalt_treemap_put` replaces existing value for same key
-- True Red-Black tree — O(log n) worst case, O(log n) average
-- **String-keyed only**
+---
 
-## Sequence Interface (Vector, List, Deque)
+## 7. Polymorphic Interfaces & Iterators
 
-Vector, List, and Deque implement `cobalt_sequence_t` as their first member, enabling polymorphic use:
-
+### Sequence Interface (`Vector`, `List`, `Deque`)
+Embeds `cobalt_sequence_t` as first member:
 ```c
-cobalt_sequence_t *seq = (cobalt_sequence_t *)cobalt_vector_create(4);
-cobalt_sequence_add(seq, &item);
-cobalt_sequence_remove(seq, &item);
-size_t n = cobalt_sequence_size(seq);
-int empty = cobalt_sequence_is_empty(seq);
-```
-
-### Iterator API
-
-```c
+cobalt_sequence_t *seq = (cobalt_sequence_t *)vec;
 cobalt_iterator_t *iter = cobalt_iterator_new(seq);
 while (cobalt_iterator_has_next(iter)) {
     void *item = cobalt_iterator_next(iter);
@@ -202,93 +249,21 @@ while (cobalt_iterator_has_next(iter)) {
 cobalt_iterator_destroy(iter);
 ```
 
-### Convenience API
-
-All sequence operations have standalone convenience functions that accept `cobalt_sequence_t *`:
-`cobalt_sequence_add`, `cobalt_sequence_remove`, `cobalt_sequence_size`, `cobalt_sequence_is_empty`.
-
----
-
-## Map Interface (HashMap, TreeMap, Set)
-
-All three map containers embed `cobalt_map_t` as their first member, enabling polymorphic use:
-
+### Map Interface (`HashMap`, `TreeMap`, `Set`)
+Embeds `cobalt_map_t` as first member:
 ```c
-cobalt_map_t *map = (cobalt_map_t *)cobalt_hashmap_create(8);
-cobalt_map_put(map, "key", 4, value);
-cobalt_map_get(map, "key", 4);
-cobalt_map_remove(map, "key", 4);
-cobalt_map_contains(map, "key", 4);
-cobalt_map_clear(map);
-cobalt_map_size(map);
-cobalt_map_is_empty(map);
-```
-
-### Iterator API
-
-```c
+cobalt_map_t *map = (cobalt_map_t *)hmap;
 cobalt_map_iterator_t *iter = cobalt_map_iterator_create(map);
 while (cobalt_map_iterator_has_next(iter)) {
     cobalt_map_pair_t pair = cobalt_map_iterator_next(iter);
-    // pair.key   — pointer to key data
-    // pair.value — pointer to value data
+    // pair.key, pair.value
 }
 cobalt_map_iterator_destroy(iter);
 ```
 
-### Concrete-type iterator factories
-
-```c
-cobalt_map_iterator_t *cobalt_hashmap_iterator_create(cobalt_hashmap_t *map);
-cobalt_map_iterator_t *cobalt_treemap_iterator_create(cobalt_treemap_t *map);
-cobalt_map_iterator_t *cobalt_set_iterator_create(cobalt_set_t *set);
-```
-
-### Convenience API
-
-All map operations have standalone convenience functions that accept `cobalt_map_t *`:
-`cobalt_map_get`, `cobalt_map_put`, `cobalt_map_remove`, `cobalt_map_contains`,
-`cobalt_map_clear`, `cobalt_map_size`, `cobalt_map_is_empty`.
-
 ---
 
-## Set
-
-```c
-cobalt_set_t *cobalt_set_create(size_t initial_capacity);
-void          cobalt_set_destroy(cobalt_set_t *set);
-int           cobalt_set_insert(cobalt_set_t *set, void *item);
-int           cobalt_set_remove(cobalt_set_t *set, void *item);
-int           cobalt_set_contains(cobalt_set_t *set, void *item);
-size_t        cobalt_set_size(cobalt_set_t *set);
-int           cobalt_set_is_empty(cobalt_set_t *set);
-```
-
-**Behavior:**
-- Backed by HashMap — string-keyed only
-- `cobalt_set_insert` is idempotent — inserting existing item returns 0
-- `cobalt_set_contains` returns 1 if present, 0 otherwise
-- **Warning:** string-based `cobalt_set_insert`/`cobalt_set_remove` cast items to `const char*`. For generic types, use the `_ext` variants.
-- Implements `cobalt_map_t` — all map interface operations work polymorphically.
-
-## Error Codes
-
-All containers set errors via `cobalt_error_set()` on failure:
-
-| Error | Triggered by |
-|-------|-------------|
-| `COBALT_ERROR_OUT_OF_MEMORY` | Allocation failure in create/push/put |
-| `COBALT_ERROR_OUT_OF_BOUNDS` | `vector_get` with invalid index |
-| `COBALT_ERROR_INVALID_ARGUMENT` | NULL pointer, out-of-range index |
-| `COBALT_ERROR_NOT_FOUND` | `hashmap_get` key not found |
-
-## Thread Safety
-
-Containers themselves are **not thread-safe**. Concurrent access requires external synchronization. The `cobalt_sequence_t` interface methods (`add`, `remove`, `size`, `is_empty`, `iterator`) are atomic per-call but not safe for concurrent modification patterns.
-
----
-
-## String Utilities
+## 8. String Utilities
 
 **Header:** `include/cobalt/utils/string.h`
 
@@ -296,23 +271,4 @@ Containers themselves are **not thread-safe**. Concurrent access requires extern
 char **cobalt_split(const char *str, char delim, int *count);
 char  *cobalt_join(const char **parts, char delim);
 char  *cobalt_strip(const char *str);
-```
-
-| Function | Description |
-|----------|-------------|
-| `cobalt_split` | Split `str` by `delim`, store result in `**parts` (caller must free each element and the array). `count` receives the number of parts. |
-| `cobalt_join` | Join `parts` array with `delim`. Returns heap-allocated string (caller must `free`). |
-| `cobalt_strip` | Remove leading/trailing whitespace. Returns heap-allocated string (caller must `free`). Returns `NULL` on empty input. |
-
-**Example:**
-```c
-int count;
-char **parts = cobalt_split("a,b,c", ',', &count);
-// parts[0]="a", parts[1]="b", parts[2]="c", count=3
-char *joined = cobalt_join(parts, '|');  // "a|b|c"
-char *stripped = cobalt_strip("  hello  ");  // "hello"
-for (int i = 0; i < count; i++) free(parts[i]);
-free(parts);
-free(joined);
-free(stripped);
 ```

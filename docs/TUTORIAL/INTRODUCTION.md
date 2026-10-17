@@ -42,11 +42,11 @@ Cobalt follows an 8-layer modular architecture. Understanding these layers helps
 | L7b | Runtime | Error handling, logging/debug output |
 | L6 | Core Object System | Creating classes, objects, interfaces |
 | L5 | Container Interfaces | Working with sequences/maps generically |
-| L4 | Concrete Collections | Using vector, list, hashmap, treemap |
-| L3 | Algorithms | Sorting, searching, transforming data |
-| L2 | Modules | JSON serialization, event loops |
+| L4 | Concrete Collections | Using vector, list, hashmap, treemap, buffer, lfqueue |
+| L3 | Algorithms | Sorting (PDQSort/Heapsort/TimSort), searching, transforming data |
+| L2 | Modules | JSON serialization, event loops, thread pool scheduler |
 
-Most applications start at L6 (objects) and L4 (containers), then explore L2 (JSON/eventloop) as needed.
+Most applications start at L6 (objects) and L4 (containers), then explore L2 (JSON/eventloop/threadpool) as needed.
 
 ## Step 3: Your First Cobalt Program - "Hello World" with Objects
 

@@ -1,8 +1,8 @@
-# Cobalt C Framework v2.3.0 - Implementation Summary
+# Cobalt C Framework v2.5.0 - Implementation Summary
 
 ## Project Overview
 
-Cobalt is a comprehensive C11 framework providing object-oriented capabilities, memory management, and cross-platform abstractions with zero runtime dependencies.
+Cobalt is a comprehensive C11 framework providing object-oriented capabilities, memory management, high-performance concurrency primitives, and cross-platform abstractions with zero runtime dependencies.
 
 ## Architecture (8 Layers)
 
@@ -14,17 +14,17 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
                │
 ┌──────────────▼─────────────────────────────────────────────┐
 │          L2: Modules & Utilities                           │
-│           (JSON/XML serialization / Event loop / Signals)  │
+│     (JSON/SAX / Work-Stealing ThreadPool / EventLoop)      │
 └──────────────▲─────────────────────────────────────────────┘
                │
 ┌──────────────▼─────────────────────────────────────────────┐
 │          L3: Algorithms & Functional Streams              │
-│         (Generic sort / binary search / map/filter/fold)  │
+│       (PDQSort / Heapsort / TimSort / Map-Filter-Fold)     │
 └──────────────▲─────────────────────────────────────────────┘
                │
 ┌──────────────▼─────────────────────────────────────────────┐
 │          L4: Concrete Collections & Adapters              │
-│           (Vector / HashMap / TreeMap / Stack / Queue)    │
+│  (Vector / HashMap / TreeMap / Stack / Queue / Buffer / LF)│
 └──────────────▲─────────────────────────────────────────────┘
                │
 ┌──────────────▼─────────────────────────────────────────────┐
@@ -55,57 +55,59 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
 
 | Layer | Module | Files | Status |
 |-------|--------|-------|--------|
-| L8 | Platform | platform.c, atomic.h/.c | ✅ Complete |
-| L7a | Memory | allocator.c, arena.c | ✅ Complete |
+| L8 | Platform | platform.c, atomic.h/.c, thread.h/.c | ✅ Complete |
+| L7a | Memory | allocator.c, arena.c, pool.c, slab.c | ✅ Complete |
 | L7b | Runtime | error.c, logger.c | ✅ Complete |
 | L6 | Object | object.c, class.c, interface.c | ✅ Complete |
 | L5 | Interface | sequence.h, map.h, iterator.h | ✅ Complete |
-| L4 | Containers | vector.c, list.c, hashmap.c, treemap.c, stack.c, queue.c, set.c, deque.c | ✅ Complete |
+| L4 | Containers | vector.c, list.c, hashmap.c, treemap.c, stack.c, queue.c, set.c, deque.c, buffer.c, lfqueue.c | ✅ Complete |
 | L3 | Algorithms | sort.c, functional.c | ✅ Complete |
-| L2 | Modules | json.c, eventloop.c | ✅ Complete |
+| L2 | Modules | json.c, threadpool.c, eventloop.c | ✅ Complete |
 
 ## Code Statistics
 
-- **Header files**: 35
-- **Source files**: 33
-- **Test files**: 34
+- **Header files**: 40
+- **Source files**: 38
+- **Test files**: 54
 - **Documentation files**: 41
-- **Total lines of code**: 10,982
-- **Git commits**: 226
-- **Test modules passing**: 41/41
+- **Total lines of code (src + include)**: ~19,100
+- **Git commits**: 450+
+- **Test modules passing**: 50/50 (100%)
 
 ## Key Features
 
-1. **Object System**: Single inheritance with multi-interface support
-2. **Memory Management**: Arena-based allocation with automatic cleanup
-3. **Thread Safety**: Atomic operations with stdatomic.h
-4. **Cross-platform**: Linux (epoll), macOS (kqueue), Windows support
-5. **JSON**: Full parser and serializer with escape handling
-6. **Event Loop**: Real async I/O with timer support
-7. **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque
-8. **Algorithms**: QuickSort, InsertionSort, binary search, find_if, for_each, predicates
-9. **String Utilities**: split, join, strip via cobalt_split(), cobalt_join(), cobalt_strip()
-10. **HashMap Runtime APIs**: cobalt_hashmap_set_funcs() for runtime hash/equal replacement, cobalt_hashmap_create_ext()
-11. **TreeMap Custom Comparator**: cobalt_treemap_create_ext() with cobalt_compare_func_t
-12. **UNIX Domain Sockets**: cobalt_eventloop_create_unix_server() and cobalt_eventloop_accept() for local IPC
-13. **CI/CD**: GitHub Actions with format gate, clang-tidy, ASan, UBsan, Valgrind, and benchmark regression checks
+1. **Object System**: Single inheritance with multi-interface support and atomic reference counting
+2. **Memory Management**: Arena, Pool, Slab, and System allocators with custom allocator injection
+3. **Thread Safety**: Atomic operations with `stdatomic.h` and platform primitives
+4. **Cross-platform**: Linux (epoll, eventfd), macOS (kqueue), Windows support
+5. **JSON**: High-performance DOM and SAX streaming parser/serializer with escape handling
+6. **Thread Pool**: Work-stealing scheduler with Chase-Lev deques, Help-First waitgroup barriers, and parallel-for loops
+7. **Event Loop & Timing Wheel**: 4-level hierarchical timing wheel ($O(1)$ add/cancel), `eventfd` task dispatch, and `cobalt_stream_t` buffered async stream
+8. **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, LFQueue (lock-free MPMC queue), and Buffer (zero-copy dynamic stream buffer)
+9. **Algorithms**: Pattern-Defeating QuickSort (PDQSort), Introspective Heapsort, Adaptive Run MergeSort (TimSort-lite), binary search, find_if, for_each, predicates
+10. **String Utilities**: split, join, strip via `cobalt_split()`, `cobalt_join()`, `cobalt_strip()`
+11. **HashMap Runtime APIs**: `cobalt_hashmap_set_funcs()` for runtime hash/equal replacement, `cobalt_hashmap_create_ext()`
+12. **TreeMap Custom Comparator**: `cobalt_treemap_create_ext()` with `cobalt_compare_func_t`
+13. **UNIX Domain Sockets**: `cobalt_eventloop_create_unix_server()` and `cobalt_eventloop_accept()` for local IPC
+14. **CI/CD**: GitHub Actions with format gate, clang-tidy, ASan/LSan, UBsan, Valgrind, and benchmark regression checks
 
 ## Testing
 
 Run tests with:
 ```bash
 cd build
-./tests/cobalt_test
+ctest --output-on-failure
 ```
 
-All 41 test modules pass:
-- ✅ platform, atomic, allocator, arena
-- ✅ error, logger, object, class, interface
-- ✅ vector, list, hashmap, treemap, set, deque
-- ✅ sort, functional, json, eventloop
-- ✅ stack, queue, iterator, map, sequence
-- ✅ thread, thread_safety, allocator_inject
-- ✅ string, platform_utils, abi
+All 50 test targets pass (100%):
+- ✅ platform, atomic, allocator, arena, pool, slab
+- ✅ error, error_stack, logger, object, class, interface
+- ✅ vector, list, hashmap, treemap, string, functional, stream
+- ✅ json, json_sax, eventloop, stack, queue, lfqueue, set, deque
+- ✅ sequence, iterator, map, thread, platform_utils, abi
+- ✅ allocator_inject, thread_safety, threadsafewrapper, threadpool, buffer
+- ✅ bench_vector, bench_hashmap, bench_treemap, bench_set, bench_deque
+- ✅ bench_threadsafewrapper, bench_lfqueue, bench_json, bench_sort, bench_threadpool, bench_eventloop, bench_runner
 
 ## Documentation
 

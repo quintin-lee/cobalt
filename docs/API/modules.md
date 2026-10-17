@@ -1,8 +1,15 @@
 # API Reference — Module Layer (Layer 1-2)
 
-**Modules:** JSON processing (`module/json.h`), Event loop (`module/eventloop.h`)
+**Modules:**
+- JSON Processing (`include/cobalt/module/json.h`)
+- Event Loop Engine (`include/cobalt/module/eventloop.h`)
+- Work-Stealing Thread Pool (`include/cobalt/module/threadpool.h`)
 
-## JSON Module
+---
+
+## 1. JSON Module
+
+**Header:** `include/cobalt/module/json.h`
 
 ### Data Types
 
@@ -36,196 +43,199 @@ struct json_node {
 json_node_t *json_parse(const char *text);
 char        *json_serialize(json_node_t *node);
 void         json_destroy(json_node_t *node);
-```
 
-| Function | Behavior |
-|----------|----------|
-| `json_parse` | Parses JSON text into a node tree. Returns NULL on parse failure. Caller must `json_destroy` the result. |
-| `json_serialize` | Serializes node tree to JSON string. Returns heap-allocated string (caller must `free`). Returns `"{}"` on failure. |
-| `json_destroy` | Recursively frees all nodes and their string values. Safe to call with NULL. |
-
-### Custom Allocators
-
-```c
+/* Allocator-injectable variants */
 json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc);
 char        *json_serialize_with_alloc(json_node_t *node, cobalt_allocator_t *alloc);
 void         json_destroy_with_alloc(json_node_t *node, cobalt_allocator_t *alloc);
 ```
 
-Passing NULL for `alloc` falls back to the system allocator, making the
-`_with_alloc` variants drop-in replacements for the plain trio. A tree built by
-`json_parse_with_alloc` MUST be freed with `json_destroy_with_alloc` using the
-same allocator, and the string from `json_serialize_with_alloc` with that
-allocator's `free` (not plain `free`).
+| Function | Behavior |
+|:---|:---|
+| `json_parse` | Parses JSON string into a node tree using system allocator. Returns NULL on syntax error. |
+| `json_parse_with_alloc` | Parses JSON string using caller-supplied allocator. |
+| `json_serialize` | Serializes node tree into a heap-allocated JSON string (caller must `free`). |
+| `json_serialize_with_alloc` | Serializes node tree; returned buffer must be freed with `alloc->free`. |
+| `json_destroy` | Recursively frees all nodes, strings, and keys. Safe to pass NULL. |
 
-**Usage example:**
-
-```c
-cobalt_allocator_t *alloc = cobalt_allocator_get_system();
-json_node_t *root = json_parse_with_alloc("{\"a\": 1}", alloc);
-char *s = json_serialize_with_alloc(root, alloc);
-json_destroy_with_alloc(root, alloc);
-cobalt_allocator_free(alloc, s);
-```
-
-### Navigation
+### Navigation & Value Accessors
 
 ```c
 json_node_t *json_tree_get_child(json_node_t *parent, const char *key);
-```
-Finds child node by key in an object. Returns NULL if parent is not an object or key not found.
-
-### Value Accessors
-
-```c
-double  json_get_number(json_node_t *node);
-const char *json_get_string(json_node_t *node);
-int   json_is_null(json_node_t *node);
-int   json_is_object(json_node_t *node);
-int   json_is_array(json_node_t *node);
+double       json_get_number(json_node_t *node);
+const char  *json_get_string(json_node_t *node);
+int          json_is_null(json_node_t *node);
+int          json_is_object(json_node_t *node);
+int          json_is_array(json_node_t *node);
 ```
 
-**Usage example:**
-```c
-json_node_t *root = json_parse("{\"name\": \"Cobalt\", \"version\": 2}");
-json_node_t *name_node = json_tree_get_child(root, "name");
-const char *name = json_get_string(name_node);  // "Cobalt"
+---
 
-char *serialized = json_serialize(root);
-json_destroy(root);
-free(serialized);
-```
+## 2. Event Loop Engine
 
-## Event Loop Module
+**Header:** `include/cobalt/module/eventloop.h`
 
-### Type Aliases
+### Types & Callbacks
 
 ```c
 typedef int      cobalt_fd_t;          // File descriptor
 typedef short    cobalt_events_t;      // Event mask (POLLIN, POLLOUT, etc.)
-typedef uint64_t cobalt_timeout_ms_t;  // Timeout in milliseconds
-typedef uint64_t cobalt_interval_ms_t; // Timer interval in milliseconds
-```
+typedef uint64_t cobalt_timeout_ms_t;  // Delay in milliseconds
+typedef uint64_t cobalt_interval_ms_t; // Periodic interval in milliseconds
 
-### Callback Types
-
-```c
 typedef void (*fd_handler_t)(cobalt_fd_t fd, cobalt_events_t events, void *user_data);
 typedef void (*timer_handler_t)(uint64_t timer_id, void *user_data);
+typedef void (*cobalt_loop_task_fn_t)(void *arg);
+
+typedef struct cobalt_eventloop cobalt_eventloop_t;
 ```
 
-### Core API
+### Loop Lifecycle
 
 ```c
 cobalt_eventloop_t *cobalt_eventloop_create(void);
 void                cobalt_eventloop_destroy(cobalt_eventloop_t *loop);
-int                 cobalt_eventloop_run(cobalt_eventloop_t *loop);
+void                cobalt_eventloop_run(cobalt_eventloop_t *loop);
 void                cobalt_eventloop_stop(cobalt_eventloop_t *loop);
 int                 cobalt_eventloop_iteration(cobalt_eventloop_t *loop);
 ```
 
-| Function | Behavior |
-|----------|----------|
-| `cobalt_eventloop_create` | Creates new event loop. Uses epoll on Linux, kqueue on macOS. Returns NULL on failure. |
-| `cobalt_eventloop_destroy` | Destroys loop and all registered FDs/timers. |
-| `cobalt_eventloop_run` | Blocks until `cobalt_eventloop_stop` is called. Processes ready events. |
-| `cobalt_eventloop_stop` | Signals the loop to exit from another thread or timer callback. |
-| `cobalt_eventloop_iteration` | Non-blocking single iteration. Returns 0 on success, -1 on error. |
+| Function | Description |
+|:---|:---|
+| `cobalt_eventloop_create` | Creates a new event loop. Backed by `epoll` on Linux, `kqueue` on macOS/BSD. Returns NULL on failure. |
+| `cobalt_eventloop_destroy` | Cleans up registered timers, descriptors, and destroys the loop. |
+| `cobalt_eventloop_run` | Blocks caller thread, continuously dispatching ready I/O and timers until `cobalt_eventloop_stop` is called. |
+| `cobalt_eventloop_stop` | Signals running loop to terminate. Safe to call from signal handlers, timer callbacks, or other threads. |
+| `cobalt_eventloop_iteration` | Non-blocking or short-timeout single pass. Processes currently ready events and expired timers. |
 
-### FD Event Management
+### Descriptor Event Registration
 
 ```c
-int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop,
-                            cobalt_fd_t fd,
-                            cobalt_events_t events,
-                            fd_handler_t callback,
-                            void *user_data);
-
-int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop,
-                            cobalt_fd_t fd,
-                            cobalt_events_t events,
-                            fd_handler_t callback,
-                            void *user_data);
-
+int cobalt_eventloop_add_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd, cobalt_events_t events, fd_handler_t callback, void *user_data);
+int cobalt_eventloop_mod_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd, cobalt_events_t events, fd_handler_t callback, void *user_data);
 int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd);
 ```
 
-| Function | Behavior |
-|----------|----------|
-| `cobalt_eventloop_add_fd` | Register FD for event monitoring. Events mask: `POLLIN`, `POLLOUT`, or both. |
-| `cobalt_eventloop_mod_fd` | Update existing FD registration (events, callback, or user_data). |
-| `cobalt_eventloop_del_fd` | Remove FD registration. No-op if FD not registered. |
-
-### Timer Management
+### 4-Level Timing Wheel
 
 ```c
-uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t  *loop,
-                                    cobalt_timeout_ms_t  timeout_ms,
+uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t *loop,
+                                    cobalt_timeout_ms_t timeout_ms,
                                     cobalt_interval_ms_t interval_ms,
-                                    timer_handler_t      callback,
-                                    void                *user_data);
-
+                                    timer_handler_t callback,
+                                    void *user_data);
 int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id);
 ```
 
-| Parameter | Behavior |
-|-----------|----------|
-| `timeout_ms` | Delay before first trigger (0 = immediate) |
-| `interval_ms` | Interval between triggers (0 = one-shot, >0 = periodic) |
-| `timer_id` | Returned on success (>0), 0 on failure |
+- **Resolution & Range**: 1ms base tick across 4 wheels (256 + 64 + 64 + 64 slots), spanning up to ~18.64 hours without overflow.
+- **$O(1)$ Cancellation**: Timers are indexed in an internal Thomas Wang 64-bit integer hash table; deletion takes strictly $O(1)$ time.
+- **`timeout_ms`**: Delay before first trigger (0 = immediate expiration on next tick).
+- **`interval_ms`**: Repeat interval (0 = one-shot timer, > 0 = recurring periodic timer).
 
-**Usage example:**
+### Cross-Thread Task Dispatch (`cobalt_eventloop_post`)
+
 ```c
-cobalt_eventloop_t *loop = cobalt_eventloop_create();
-
-// Timer: print every second
-cobalt_eventloop_add_timer(loop, 1000, 1000, timer_cb, NULL);
-
-// FD: read from stdin
-cobalt_eventloop_add_fd(loop, 0, POLLIN, fd_cb, NULL);
-
-cobalt_eventloop_run(loop);
-cobalt_eventloop_destroy(loop);
+int cobalt_eventloop_post(cobalt_eventloop_t *loop, cobalt_loop_task_fn_t fn, void *arg);
 ```
 
-### Platform Backends
+- **Thread-Safety**: Concurrently callable from any thread at any time.
+- **Syscall Coalescing**: Uses an `atomic_bool is_sleeping` flag. An `eventfd` write is performed only if the loop is currently asleep in kernel polling (`epoll_wait`/`kevent`). If already awake, the syscall is skipped, achieving up to ~2,000,000 tasks/sec.
 
-| Platform | Backend | Header |
-|----------|---------|--------|
-| Linux | epoll | `<sys/epoll.h>` |
-| macOS | kqueue | `<sys/event.h>` |
-| Windows | IOCP (planned) | — |
+### Asynchronous Stream (`cobalt_stream_t`)
 
-#
-### UNIX Domain Sockets
+```c
+typedef struct cobalt_stream cobalt_stream_t;
+
+typedef void (*cobalt_stream_read_fn)(cobalt_stream_t *stream, cobalt_buffer_t *input_buf, void *user_data);
+typedef void (*cobalt_stream_write_complete_fn)(cobalt_stream_t *stream, void *user_data);
+typedef void (*cobalt_stream_error_fn)(cobalt_stream_t *stream, int err_code, void *user_data);
+
+cobalt_stream_t *cobalt_stream_create(cobalt_eventloop_t *loop, cobalt_fd_t fd, void *user_data);
+void             cobalt_stream_destroy(cobalt_stream_t *stream);
+void             cobalt_stream_set_callbacks(cobalt_stream_t *stream,
+                                             cobalt_stream_read_fn on_read,
+                                             cobalt_stream_write_complete_fn on_write_complete,
+                                             cobalt_stream_error_fn on_error);
+int              cobalt_stream_send(cobalt_stream_t *stream, const void *data, size_t len);
+int              cobalt_stream_send_buffer(cobalt_stream_t *stream, cobalt_buffer_t *buf);
+cobalt_buffer_t *cobalt_stream_get_input_buffer(cobalt_stream_t *stream);
+cobalt_buffer_t *cobalt_stream_get_output_buffer(cobalt_stream_t *stream);
+```
+
+- **Direct-Write Fast Path**: If the output buffer is empty, `cobalt_stream_send` attempts direct socket write.
+- **Zero-Copy Remainder Buffering**: Any unwritten data automatically queues into the stream's internal output `cobalt_buffer_t`.
+- **Automatic POLLOUT Toggling**: Automatically enables `POLLOUT` on partial writes and removes `POLLOUT` once the buffer drains, notifying `on_write_complete`.
+
+### UNIX Sockets & Signals
 
 ```c
 int cobalt_eventloop_create_unix_server(const char *path, cobalt_fd_t *sock_out);
-int cobalt_eventloop_accept(cobalt_eventloop_t *loop, cobalt_fd_t sock_fd,
-                            cobalt_event_cb_t callback, void *user_data,
-                            int events);
+cobalt_fd_t cobalt_eventloop_accept(cobalt_eventloop_t *loop, cobalt_fd_t server_fd);
+int cobalt_eventloop_add_signal(cobalt_eventloop_t *loop, int signum, fd_handler_t callback, void *user_data);
+```
+
+---
+
+## 3. Work-Stealing Thread Pool
+
+**Header:** `include/cobalt/module/threadpool.h`
+
+A lock-free task scheduler combining a global MPMC queue with per-worker Chase-Lev SPMC work-stealing deques.
+
+### Configuration & Lifecycle
+
+```c
+typedef struct {
+    size_t num_threads;        /**< Worker count (0 = auto-detect CPU cores) */
+    size_t local_queue_size;   /**< Per-worker deque capacity (default 1024, power of 2) */
+    size_t global_queue_size;  /**< Global MPMC queue capacity (default 65536, power of 2) */
+    cobalt_allocator_t *alloc; /**< Memory allocator (NULL = system allocator) */
+} cobalt_threadpool_config_t;
+
+cobalt_threadpool_t *cobalt_threadpool_create(size_t num_threads);
+cobalt_threadpool_t *cobalt_threadpool_create_with_config(const cobalt_threadpool_config_t *config);
+void                 cobalt_threadpool_destroy(cobalt_threadpool_t *pool);
 ```
 
 | Function | Description |
-|----------|-------------|
-| `cobalt_eventloop_create_unix_server` | Create a UNIX domain socket server. Binds to `path`, listens, and registers for `POLLIN`. Automatically removes stale socket file. Returns 0 on success. |
-| `cobalt_eventloop_accept` | Accept a pending connection on `sock_fd` and register it with the eventloop. Returns the new fd on success, -1 if no connection pending (non-blocking). |
+|:---|:---|
+| `cobalt_threadpool_create(N)` | Creates thread pool with $N$ worker threads. Passing $0$ auto-detects system CPU core count. |
+| `cobalt_threadpool_create_with_config` | Creates pool with custom queue sizes and allocator. |
+| `cobalt_threadpool_destroy` | Shuts down workers gracefully, draining all pending tasks before freeing resources. |
 
-**Usage pattern:**
+### Task Dispatch & Parallel Loops
+
 ```c
-cobalt_fd_t server_fd;
-cobalt_eventloop_create_unix_server("/tmp/cobalt.sock", &server_fd);
+typedef void (*cobalt_task_fn_t)(void *arg);
+typedef void (*cobalt_parallel_for_fn_t)(size_t index, void *arg);
 
-// In the server callback:
-cobalt_fd_t client_fd = cobalt_eventloop_accept(loop, server_fd, client_handler, NULL, POLLIN);
-if (client_fd >= 0) {
-    // client_fd is now managed by the eventloop
-}
+int  cobalt_threadpool_submit(cobalt_threadpool_t *pool, cobalt_task_fn_t fn, void *arg);
+int  cobalt_threadpool_parallel_for(cobalt_threadpool_t *pool, size_t start, size_t end, size_t chunk_size, cobalt_parallel_for_fn_t fn, void *arg);
+void cobalt_threadpool_wait_idle(cobalt_threadpool_t *pool);
 ```
 
-## Error Handling
+- **`cobalt_threadpool_submit`**: Submits a closure. When called from a worker thread, pushes directly to the worker's local Chase-Lev deque with zero allocations. When called from an external thread, enqueues into the global lock-free MPMC queue.
+- **`cobalt_threadpool_parallel_for`**: Partitions $[start, end)$ into chunks and executes in parallel. Calling thread assists in running chunks. Blocks until all iterations finish.
+- **`cobalt_threadpool_wait_idle`**: Blocks until all queued and active tasks complete.
 
-- All API functions set `COBALT_ERROR_OUT_OF_MEMORY` on allocation failure
-- `cobalt_eventloop_add_fd` returns -1 for invalid FD or OOM
-- `cobalt_eventloop_add_timer` returns 0 on failure
-- Event loop is single-threaded — callbacks must not block
+### Introspection
+
+```c
+size_t cobalt_threadpool_thread_count(const cobalt_threadpool_t *pool);
+size_t cobalt_threadpool_active_tasks(const cobalt_threadpool_t *pool);
+```
+
+### WaitGroup Synchronization Barrier
+
+```c
+typedef struct cobalt_waitgroup cobalt_waitgroup_t;
+
+cobalt_waitgroup_t *cobalt_waitgroup_create(void);
+void                cobalt_waitgroup_add(cobalt_waitgroup_t *wg, int64_t delta);
+void                cobalt_waitgroup_done(cobalt_waitgroup_t *wg);
+void                cobalt_waitgroup_wait(cobalt_waitgroup_t *wg);
+void                cobalt_waitgroup_destroy(cobalt_waitgroup_t *wg);
+```
+
+#### Help-First Work-Stealing Guarantee
+When a worker thread calls `cobalt_waitgroup_wait(wg)`, it does **not** sleep on an OS condition variable. Instead, it enters an active execution loop, popping local tasks and stealing tasks from peer workers until the counter drops to zero. This completely prevents thread-starvation deadlocks in recursive fork-join task graphs.

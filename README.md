@@ -4,32 +4,33 @@ A lightweight, zero-dependency C11 framework providing object-oriented capabilit
 
 ## Features
 
-- **8-Layer Architecture**: Clean separation of concerns
-- **Object System**: Single inheritance + multi-interface support
-- **Memory Management**: Arena allocator with automatic cleanup
-- **Thread Safety**: Atomic operations with stdatomic.h
-- **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque
-- **Algorithms**: Sort, binary search, find_if, for_each, predicates
-- **Modules**: JSON parser/serializer, event loop (epoll/kqueue)
-- **Cross-platform**: Linux, macOS, Windows support
+- **8-Layer Architecture**: Strict upward-only dependency model
+- **Object System**: Single inheritance + multi-interface support with reference counting
+- **Memory Management**: System, Arena, Pool, and Slab allocators with custom allocator injection
+- **Thread Safety**: Atomic operations with `stdatomic.h` and platform primitives
+- **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, LFQueue (lock-free MPMC queue), and Buffer (zero-copy dynamic stream buffer)
+- **Algorithms**: Pattern-Defeating QuickSort (PDQSort), Introspective Heapsort, Adaptive Run MergeSort (TimSort-lite), binary search, find_if, for_each, predicates
+- **Thread Pool**: Work-stealing task scheduler with Chase-Lev lock-free deques, waitgroups, and dynamic parallel-for loops
+- **Event Loop & Asynchronous I/O**: High-performance reactor with 4-level hierarchical timing wheel ($O(1)$ add/cancel), `eventfd` async task dispatch, and buffered stream abstraction (`cobalt_stream_t`)
+- **Modules**: JSON DOM & SAX parser/serializer, Work-Stealing Thread Pool, Event loop (epoll/kqueue)
+- **Cross-platform**: Linux (epoll, eventfd), macOS (kqueue), Windows support
 - **String utilities**: Split, join, and strip with `cobalt_split()`, `cobalt_join()`, `cobalt_strip()`
 - **HashMap runtime replacement**: Swap hash/equal functions at runtime via `cobalt_hashmap_set_funcs()`
 - **TreeMap custom comparator**: Generic key comparison with `cobalt_treemap_create_ext()`
 - **UNIX domain sockets**: Local IPC with `cobalt_eventloop_create_unix_server()` and `cobalt_eventloop_accept()`
-- **Security fix**: Heap-buffer-overflow patched in `cobalt_split()` (CWE-122)
 
 ## Architecture
 
 ```
-L8  Platform       → Platform detection, atomic operations
-L7a Memory         → System allocator, Arena allocator
-L7b Runtime        → Error handling, Structured logging
-L6  Core           → Object system, Class system, Interface
-L5  Interface      → Sequence, Map, Iterator protocols
-L4  Container      → Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque
-L3  Algorithm      → Sort algorithms, Predicate functions
-L2  Module         → JSON parser/serializer, Event loop
-L1  Application    → Example applications
+L8  Platform       → Platform detection, atomic operations, thread primitives
+L7a Memory         → System allocator, Arena allocator, Pool, Slab
+L7b Runtime        → Error handling, Structured logging, Thread-local state
+L6  Core           → Object system, Class system, Interface tables
+L5  Interface      → Sequence, Map, Set, Iterator protocols
+L4  Container      → Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, Buffer, LFQueue
+L3  Algorithm      → PDQSort, Heapsort, TimSort, Search, Predicates, Functional stream operators
+L2  Module         → JSON (DOM/SAX), Work-Stealing Thread Pool, Event Loop (Timing Wheel, Async Stream)
+L1  Application    → Example applications, Benchmarks
 ```
 
 ```bash
@@ -103,7 +104,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 41/41 tests passing
+ctest --output-on-failure  # 50/50 tests passing (100%)
 # or with verbose output
 ctest --verbose
 ```
@@ -152,18 +153,19 @@ cd build
 
 | Category | Count |
 |----------|-------|
-| Source files (.c) | 33 |
-| Header files (.h) | 35 |
-| Test files (.c) | 34 |
-| Benchmark files (.c) | 8 |
-| Example files (.c) | 17 |
-| Documentation (.md) | 41 |
+| Source files (`src/**/*.c`) | 38 |
+| Header files (`include/**/*.h`) | 40 |
+| Test files (`tests/**/*.c`) | 54 |
+| Benchmark files (`tests/benchmark/*.c`) | 11 |
+| Example files (`examples/*.c`) | 17 |
+| Documentation files (`docs/**/*.md`, `*.md`) | 41 |
 
 | Metric | Value |
 |--------|-------|
-| Total lines of code | 10,982 |
-| Git commits | 226 |
-| 27/27 | 27/27 |
+| Total lines of code (src + include) | ~19,100 |
+| Git commits | 450+ |
+| CTest status | 50/50 passing (100%) |
+| Sanitizer status | Clean (ASan/LSan 0 leaks, 0 errors) |
 
 
 ## CI/CD
@@ -194,29 +196,42 @@ Available via popular package managers:
 | Manager | Command |
 |---------|---------|
 | vcpkg | `vcpkg install cobalt` |
-| Conan | `conan install --requires=cobalt/2.4.0` |
+| Conan | `conan install --requires=cobalt/2.5.0` |
 | pkg-config | `pkg-config --cflags --libs cobalt` |
 
 ## Performance
 
-Benchmark results (Apple M2, clang 15, Release build, 100k operations, 3 iterations averaged):
+Benchmark results (x86_64 Linux, Release build, averaged across iterations):
 
-| Operation | Time | Notes |
-|-----------|------|-------|
-| Vector push (100k) | ~1.4 ms | Contiguous memory, cache-friendly |
-| Vector get (100k) | ~0.9 ms | O(1) random access |
-| HashMap put (100k) | ~140 ms | String key hashing overhead |
-| HashMap get (100k) | ~232 ms | Hash + pointer chase |
-| TreeMap put (100k) | ~321 ms | BST traversal, cache misses |
-| TreeMap get (100k) | ~460 ms | O(log n) lookup |
-| List push_back (100k) | ~17.8 ms | Linked list allocation overhead |
-| Deque push_front (100k) | ~17.4 ms | Efficient front insertion |
-| Stack push (100k) | ~17.5 ms | LIFO, minimal overhead |
-| Queue enqueue (100k) | ~15.0 ms | FIFO, circular buffer |
-| Set insert (100k) | ~5.2 ms | Hash-based deduplication |
+| Component / Operation | Workload / Size | Throughput / Time | Notes |
+|-----------------------|-----------------|-------------------|-------|
+| **Vector push** | 100k items | ~1.5 ms | Contiguous memory, cache-friendly |
+| **Vector get** | 100k items | ~2.0 ms | O(1) direct indexing |
+| **HashMap put** | 100k string keys | ~92 ms | Separate chaining, bucket masking |
+| **HashMap get** | 100k string keys | ~100 ms | Average O(1) hash table lookup |
+| **TreeMap put** | 100k string keys | ~173 ms | Red-Black self-balancing BST |
+| **TreeMap get** | 100k string keys | ~212 ms | Guaranteed O(log n) lookup |
+| **List push_back** | 100k items | ~10.8 ms | Doubly-linked node insertion |
+| **Deque push_front** | 100k items | ~8.9 ms | Constant time front insertion |
+| **Stack push** | 100k items | ~11.9 ms | LIFO singly-linked push |
+| **Queue enqueue** | 100k items | ~7.9 ms | FIFO circular buffer / list |
+| **Set insert** | 100k items | ~4.9 ms | Hash-based deduplication |
+| **LFQueue enqueue/dequeue** | 100k items | ~5.0 ms | Lock-free bounded MPMC queue |
+| **PDQSort (Random)** | 100k integers | ~69 ms | Introspective Pattern-Defeating QuickSort |
+| **PDQSort (Pre-sorted)** | 100k integers | ~46 ms | O(N) linear time on presorted data |
+| **Adaptive MergeSort** | 100k integers | ~43 ms | TimSort-lite 100% stable sorting |
+| **ThreadPool Task Dispatch** | 100k tasks (4 threads) | ~1.82M tasks/sec | Hybrid Chase-Lev work-stealing |
+| **ThreadPool Parallel-For** | 100k items | ~1.2 ms | Dynamic chunked parallel loop |
+| **Timing Wheel Add** | 100k timers | ~1.21M ops/sec | 4-level bitwise wheel (O(1) insert) |
+| **Timing Wheel Cancel** | 50k timers | ~2.47M ops/sec | Thomas Wang hash table (O(1) delete) |
+| **Cross-Thread Post** | 100k tasks | ~1.99M tasks/sec | Lock-free queue + eventfd wakeup |
+| **Zero-Copy Buffer Stream**| 488 MB streamed | ~9.26 GB/sec | 3-zone ring buffer, zero realloc |
 
 Run benchmarks locally:
 ```bash
 cd build && cmake .. -DCOBALT_RUN_TIDY=OFF -DCOBALT_RUN_FORMAT=OFF && make -j8
 ./tests/bench_runner
+./tests/benchmark_sort
+./tests/benchmark_threadpool
+./tests/benchmark_eventloop
 ```
