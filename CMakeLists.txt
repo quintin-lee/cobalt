@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(Cobalt VERSION 2.8.0 LANGUAGES C)
+project(Cobalt VERSION 2.7.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)

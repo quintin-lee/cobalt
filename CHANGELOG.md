@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## v2.8.0 (2026-10-17) — Lock-Free Concurrent SkipList & 3-Epoch Safe Memory Reclamation (EBR) Engine
+## v2.7.0 (2026-10-17) — Lock-Free Concurrent SkipList, 3-Epoch EBR Engine & Linear Pike VM Regex Engine
 
 ### Added
 - **3-Epoch Safe Memory Reclamation Engine (`cobalt/memory/ebr.h`)**:
@@ -21,19 +21,6 @@
   - $O(\log N)$ concurrent insertions (`cobalt_lfskiplist_insert`, `cobalt_lfskiplist_put`) with Level-0 CAS linearization and bottom-up tower elevation.
   - Ordered range iterators (`cobalt_lfskiplist_iter_create`, `cobalt_lfskiplist_iter_next`, `cobalt_lfskiplist_iter_destroy`) pinning EBR epochs to enable safe concurrent traversal without holding container-wide locks.
   - Transparent support for arbitrary key types (integers, strings, arbitrary structs) with user-defined `compare_func_t` comparator.
-- **Dedicated Benchmark & Stress Suite (`tests/benchmark/benchmark_lfskiplist.c`)**:
-  - Multi-threaded Read-Heavy (90% read / 10% write) benchmark reaching > 3.0M ops/sec.
-  - Balanced (50% read / 50% write) benchmark reaching > 2.7M ops/sec.
-  - Head-to-head comparison demonstrating 4.7x speedup over mutex-protected `cobalt_treemap`.
-  - 8-thread concurrency stress test (200,000 mixed operations) integrated into unit test suite.
-  - Integrated into the unified `bench_runner` tool.
-
-### Changed
-- Total CTest count expanded from 56 to 59 tests, maintaining 100% pass rate under standard compilation and AddressSanitizer/LeakSanitizer (ASan/LSan).
-
-## v2.7.0 (2026-10-17) — Linear Pike VM Regular Expression Engine with Mathematical ReDoS Immunity
-
-### Added
 - **Linear Pike VM Regular Expression Engine (`cobalt/algorithm/regex.h`)**:
   - Pure C11 deterministic $O(N \times M)$ linear time execution engine, providing mathematical immunity against ReDoS (Regular Expression Denial of Service) catastrophic backtracking.
   - Comprehensive regular expression grammar: literals, alternations (`|`), wildcards (`.`), anchors (`^`, `$`, `\b`, `\B`), 256-bit character class bitmaps (`[...]`, `[^...]`, ranges `a-z`, shorthand `\d`, `\D`, `\w`, `\W`, `\s`, `\S`), quantifiers (`*`, `+`, `?`, `{m,n}`) with greedy and non-greedy (`?`) semantics.
@@ -44,9 +31,10 @@
   - Stack Fast-Path: Zero dynamic heap allocations during matching for patterns with $\le 64$ instructions.
   - Full custom memory allocator support (`cobalt_allocator_t`).
   - Convenient one-shot test API (`cobalt_regex_test`) and exact-match API (`cobalt_regex_match_exact`).
-- **Dedicated Benchmark & Stress Suite (`tests/benchmark/benchmark_regex.c`)**:
-  - ReDoS vulnerability immunity test on pathological pattern `^(a+)+$` vs `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX"`, executing in $< 0.05$ ms (~100k ops/sec).
-  - High-throughput industrial workloads: IPv4 extraction over server logs, email validation (126,000+ ops/sec), and URL routing extraction (40,000+ ops/sec).
+- **Dedicated Benchmarks & Stress Suites**:
+  - `tests/benchmark/benchmark_lfskiplist.c`: Multi-threaded Read-Heavy (>3.0M ops/sec), Balanced (>2.7M ops/sec), and 4.77x speedup over mutex-locked `cobalt_treemap`.
+  - `tests/benchmark/benchmark_regex.c`: ReDoS vulnerability immunity test on pathological pattern `^(a+)+$` ($< 0.05$ ms, ~100k ops/sec) and industrial workloads (IPv4, email 126k+ ops/sec).
+  - 8-thread SkipList concurrency stress test (200,000 mixed operations) integrated into unit test suite.
   - Integrated into the unified `bench_runner` benchmark tool.
 
 ### Fixed
@@ -56,7 +44,7 @@
   - Replaced `memcpy` with `memmove` in `jrealloc` to prevent memory overlap warnings during arena-backed buffer expansions.
 
 ### Changed
-- Total CTest count expanded from 54 to 56 tests, maintaining 100% pass rate under standard compilation and AddressSanitizer/LeakSanitizer (ASan/LSan).
+- Total CTest count expanded from 54 to 59 tests, maintaining 100% pass rate under standard compilation and AddressSanitizer/LeakSanitizer (ASan/LSan).
 
 ## v2.6.0 (2026-10-17) — Multi-Core Parallel Sorting & Event-Driven DAG TaskGraph Scheduler
 

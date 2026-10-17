@@ -3,7 +3,7 @@
 **Date:** 2026-10-17  
 **Scope:** Layer 7 Memory (`cobalt_ebr_t`) & Layer 4 Container (`cobalt_lfskiplist_t`)  
 **Status:** Approved — Ready for Implementation Planning  
-**Target Version:** Cobalt v2.8.0  
+**Target Version:** Cobalt v2.7.0  
 
 ---
 

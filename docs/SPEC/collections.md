@@ -7,7 +7,7 @@
 
 The Concrete Collection layer implements robust, high-performance data structures built on top of Layer 5 interface contracts (`Sequence`, `Map`, `Iterator`) and Layer 7 memory allocators.
 
-As of Cobalt v2.8.0, the container family encompasses 11 specialized data structures:
+As of Cobalt v2.7.0, the container family encompasses 11 specialized data structures:
 - **Sequential**: Vector (dynamic array), List (doubly-linked), Deque (double-ended list), Stack (LIFO), Queue (FIFO)
 - **Associative**: HashMap (chaining hash table), TreeMap (red-black tree), Set (hash set)
 - **High-Performance Stream & Concurrency**:
