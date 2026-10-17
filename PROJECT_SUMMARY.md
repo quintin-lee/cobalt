@@ -55,41 +55,45 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
 
 | Layer | Module | Files | Status |
 |-------|--------|-------|--------|
-| L8 | Platform | platform.c, atomic.h/.c, thread.h/.c | ✅ Complete |
-| L7a | Memory | allocator.c, arena.c, pool.c, slab.c | ✅ Complete |
-| L7b | Runtime | error.c, logger.c | ✅ Complete |
+| L8 | Platform | platform.c, atomic.h/.c, thread.h/.c, shm.c, notifier.c | ✅ Complete |
+| L7a | Memory | allocator.c, arena.c, pool.c, slab.c, ebr.c | ✅ Complete |
+| L7b | Runtime | error.c, error_stack.c, logger.c | ✅ Complete |
 | L6 | Object | object.c, class.c, interface.c | ✅ Complete |
 | L5 | Interface | sequence.h, map.h, iterator.h | ✅ Complete |
-| L4 | Containers | vector.c, list.c, hashmap.c, treemap.c, stack.c, queue.c, set.c, deque.c, buffer.c, lfqueue.c | ✅ Complete |
-| L3 | Algorithms | sort.c, functional.c | ✅ Complete |
-| L2 | Modules | json.c, threadpool.c, eventloop.c | ✅ Complete |
+| L4 | Containers | vector.c, list.c, hashmap.c, treemap.c, stack.c, queue.c, set.c, deque.c, buffer.c, lfqueue.c, lfskiplist.c, shm_ring.c | ✅ Complete |
+| L3 | Algorithms | sort.c, functional.c, stream.c, regex.c | ✅ Complete |
+| L2 | Modules | json.c, json_parse.c, json_serialize.c, json_sax.c, threadpool.c, eventloop.c, parallel_sort.c, taskgraph.c, shm_channel.c | ✅ Complete |
 
 ## Code Statistics
 
-- **Header files**: 40
-- **Source files**: 38
-- **Test files**: 54
-- **Documentation files**: 41
-- **Total lines of code (src + include)**: ~19,100
-- **Git commits**: 450+
-- **Test modules passing**: 50/50 (100%)
+- **Header files**: 49 (`include/cobalt/**/*.h`)
+- **Source files**: 48 (`src/**/*.c`)
+- **Unit test files**: 45 (`tests/unit/test_*.c`)
+- **Benchmark files**: 19 (`tests/benchmark/*.c`)
+- **Example files**: 17 (`examples/*.c`)
+- **Total lines of code (src + include)**: ~26,200
+- **Git commits**: 470+
+- **CTest targets passing**: 61/61 (100%: 45 unit suites + 16 benchmarks)
 
 ## Key Features
 
 1. **Object System**: Single inheritance with multi-interface support and atomic reference counting
-2. **Memory Management**: Arena, Pool, Slab, and System allocators with custom allocator injection
+2. **Memory Management**: Arena, Pool, Slab, and System allocators with custom allocator injection, plus 3-Epoch Safe Memory Reclamation (`cobalt_ebr_t`) for lock-free data structures
 3. **Thread Safety**: Atomic operations with `stdatomic.h` and platform primitives
 4. **Cross-platform**: Linux (epoll, eventfd), macOS (kqueue), Windows support
 5. **JSON**: High-performance DOM and SAX streaming parser/serializer with escape handling
 6. **Thread Pool**: Work-stealing scheduler with Chase-Lev deques, Help-First waitgroup barriers, and parallel-for loops
 7. **Event Loop & Timing Wheel**: 4-level hierarchical timing wheel ($O(1)$ add/cancel), `eventfd` task dispatch, and `cobalt_stream_t` buffered async stream
-8. **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, LFQueue (lock-free MPMC queue), and Buffer (zero-copy dynamic stream buffer)
-9. **Algorithms**: Pattern-Defeating QuickSort (PDQSort), Introspective Heapsort, Adaptive Run MergeSort (TimSort-lite), binary search, find_if, for_each, predicates
-10. **String Utilities**: split, join, strip via `cobalt_split()`, `cobalt_join()`, `cobalt_strip()`
-11. **HashMap Runtime APIs**: `cobalt_hashmap_set_funcs()` for runtime hash/equal replacement, `cobalt_hashmap_create_ext()`
-12. **TreeMap Custom Comparator**: `cobalt_treemap_create_ext()` with `cobalt_compare_func_t`
-13. **UNIX Domain Sockets**: `cobalt_eventloop_create_unix_server()` and `cobalt_eventloop_accept()` for local IPC
-14. **CI/CD**: GitHub Actions with format gate, clang-tidy, ASan/LSan, UBsan, Valgrind, and benchmark regression checks
+8. **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, LFQueue (lock-free MPMC queue), Buffer (zero-copy dynamic stream buffer), Lock-Free SkipList (`lfskiplist.c`), and Shared Memory Rings (`shm_ring.c`: SPSC & Vyukov MPMC)
+9. **Algorithms**: Pattern-Defeating QuickSort (PDQSort), Introspective Heapsort, Adaptive Run MergeSort (TimSort-lite), binary search, find_if, for_each, predicates, Pike VM regex engine, functional streams (map/filter/fold)
+10. **Parallel Algorithms**: In-place parallel PDQSort (`cobalt_parallel_qsort`) and stable parallel MergeSort (`cobalt_parallel_stable_sort`) with help-first work-stealing barriers
+11. **TaskGraph DAG Scheduler**: Event-driven DAG task scheduler (`cobalt_taskgraph_t`) with Kahn cycle detection and atomic in-degree dispatch (~4.64M tasks/s on 10k pipeline DAG)
+12. **Shared Memory IPC Channel**: Zero-copy cross-process channel (`cobalt_shm_channel_t`) with SPSC/MPMC topologies, spin/blocking/adaptive wait policies, and kernel syscall coalescing (~214 ns spin RTT, >20M msg/s streaming)
+13. **String Utilities**: split, join, strip via `cobalt_split()`, `cobalt_join()`, `cobalt_strip()`
+14. **HashMap Runtime APIs**: `cobalt_hashmap_set_funcs()` for runtime hash/equal replacement, `cobalt_hashmap_create_ext()`
+15. **TreeMap Custom Comparator**: `cobalt_treemap_create_ext()` with `cobalt_compare_func_t`
+16. **UNIX Domain Sockets**: `cobalt_eventloop_create_unix_server()` and `cobalt_eventloop_accept()` for local IPC
+17. **CI/CD**: GitHub Actions with format gate, clang-tidy, ASan/LSan, UBsan, Valgrind, benchmark regression checks, and ABI snapshot comparison
 
 ## Testing
 
@@ -99,15 +103,16 @@ cd build
 ctest --output-on-failure
 ```
 
-All 50 test targets pass (100%):
-- ✅ platform, atomic, allocator, arena, pool, slab
+All 61 CTest targets pass (100%): 45 unit suites + 16 benchmarks:
+- ✅ platform, atomic, allocator, arena, pool, slab, ebr
 - ✅ error, error_stack, logger, object, class, interface
-- ✅ vector, list, hashmap, treemap, string, functional, stream
-- ✅ json, json_sax, eventloop, stack, queue, lfqueue, set, deque
-- ✅ sequence, iterator, map, thread, platform_utils, abi
-- ✅ allocator_inject, thread_safety, threadsafewrapper, threadpool, buffer
-- ✅ bench_vector, bench_hashmap, bench_treemap, bench_set, bench_deque
-- ✅ bench_threadsafewrapper, bench_lfqueue, bench_json, bench_sort, bench_threadpool, bench_eventloop, bench_runner
+- ✅ vector, list, hashmap, treemap, string, functional, stream, regex, set, deque
+- ✅ json, json_sax, eventloop, stack, queue, lfqueue, lfskiplist, threadsafewrapper
+- ✅ sequence, iterator, map, thread, platform_utils, abi, shm
+- ✅ allocator_inject, thread_safety, threadpool, buffer, parallel_sort, taskgraph
+- ✅ bench_vector, bench_hashmap, bench_treemap, bench_set, bench_deque, bench_lfqueue
+- ✅ bench_threadsafewrapper, bench_json, bench_sort, bench_threadpool, bench_eventloop
+- ✅ bench_parallel_sort, bench_taskgraph, bench_regex, bench_lfskiplist, bench_shm, bench_runner
 
 ## Documentation
 

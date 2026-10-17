@@ -54,32 +54,37 @@ make install DESTDIR=/tmp/stage
 The default CMake configuration enables `-Wall -Wextra -Werror` to keep the codebase clean and portable.
 
 ```bash
-# Disable strict warnings if needed for a specific local build
-cmake .. -DCMAKE_BUILD_TYPE=Release -DCOBALT_STRICT_WARNINGS=OFF
+# Disable the clang-tidy / clang-format build gates for a specific local build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCOBALT_RUN_TIDY=OFF -DCOBALT_RUN_FORMAT=OFF
 ```
+
+> Note: `-Wall -Wextra -Werror` is always enabled for the library build. The optional
+> `COBALT_RUN_TIDY` / `COBALT_RUN_FORMAT` flags (default `ON`) control whether clang-tidy
+> and the clang-format POST_BUILD check are executed.
 
 ## Quick Start
 
 ```c
 #include <cobalt/cobalt.h>
 
-int main() {
+int main(void) {
     // Platform detection
     cobalt_platform_id_t platform = cobalt_platform_get_id();
-    
-    // Create a vector
-    cobalt_vector_t *vec = cobalt_vector_create(10);
+    (void)platform; // silence unused-variable warning
+
+    // Create a vector of ints with initial capacity 5
+    cobalt_vector_t *vec = cobalt_vector_create(5);
     int value = 42;
     cobalt_vector_push(vec, &value);
-    
-    // Create a hashmap
+
+    // Create a hashmap with 16 buckets
     cobalt_hashmap_t *map = cobalt_hashmap_create(16);
     cobalt_hashmap_put(map, "key", &value);
-    
+
     // Cleanup
     cobalt_vector_destroy(vec);
     cobalt_hashmap_destroy(map);
-    
+
     return 0;
 }
 ```
@@ -107,7 +112,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 59/59 tests passing (100%)
+ctest --output-on-failure  # 45 unit suites + 16 benchmarks passing (100%)
 # or with verbose output
 ctest --verbose
 ```
@@ -167,7 +172,7 @@ cd build
 |--------|-------|
 | Total lines of code (src + include) | ~23,000 |
 | Git commits | 470+ |
-| CTest status | 59/59 passing (100%) |
+| CTest status | 61/61 passing (100%: 45 unit suites + 16 benchmarks) |
 | Sanitizer status | Clean (ASan/LSan 0 leaks, 0 errors) |
 
 
