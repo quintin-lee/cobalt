@@ -10,6 +10,8 @@
 #include "cobalt/memory/allocator.h"
 #include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,27 +36,77 @@
 
 #define COBALT_EVENTLOOP_DEFAULT_CAPACITY 16
 #define COBALT_EVENTLOOP_TIMEOUT_MS 10
-#define COBALT_EVENTLOOP_TIMER_HEAP_INITIAL 16
 #define COBALT_SIGNAL_RING_SIZE 64
 #define COBALT_MILLIS_PER_SEC 1000ULL
 #define COBALT_NANOS_PER_MILLI 1000000ULL
 #define COBALT_NANOS_PER_SEC 1000000000LL
 
+#define COBALT_TW_L0_BITS 8
+#define COBALT_TW_L0_SIZE (1 << COBALT_TW_L0_BITS) /* 256 */
+#define COBALT_TW_L0_MASK (COBALT_TW_L0_SIZE - 1)
+
+#define COBALT_TW_LN_BITS 6
+#define COBALT_TW_LN_SIZE (1 << COBALT_TW_LN_BITS) /* 64 */
+#define COBALT_TW_LN_MASK (COBALT_TW_LN_SIZE - 1)
+
+#define COBALT_TW_L1_SHIFT 8
+#define COBALT_TW_L2_SHIFT 14
+#define COBALT_TW_L3_SHIFT 20
+
 /* -------------------------------------------------------------------------- */
 /* Internal types                                                             */
 /* -------------------------------------------------------------------------- */
 /**
- * @brief Timer entry stored in the expiry min-heap
+ * @brief Intrusive timer node stored in the hierarchical timing wheel
  */
-typedef struct timer_entry {
-    uint64_t        timer_id;    /**< Unique id returned to the caller */
-    uint64_t        timeout_ms;  /**< Initial delay before first fire */
-    uint64_t        interval_ms; /**< Repeat interval (0 for one-shot) */
-    timer_handler_t callback;    /**< Function invoked on expiry */
-    void           *user_data;   /**< Opaque callback argument */
-    int             active;      /**< Non-zero while the timer is armed */
-    struct timespec next_fire;   /**< Absolute monotonic time of next fire */
-} timer_entry_t;
+typedef struct cobalt_timer_node {
+    uint64_t                  timer_id;       /**< Unique id returned to the caller */
+    uint64_t                  expire_time_ms; /**< Monotonic target fire time in ms */
+    uint64_t                  interval_ms;    /**< Repeat interval (0 for one-shot) */
+    timer_handler_t           callback;       /**< Function invoked on expiry */
+    void                     *user_data;      /**< Opaque callback argument */
+    struct cobalt_timer_node *prev;           /**< Doubly-linked slot list prev */
+    struct cobalt_timer_node *next;           /**< Doubly-linked slot list next */
+    uint8_t                   level;          /**< Current timing wheel level (0..3) */
+    uint8_t                   slot;           /**< Current slot index within level */
+    bool                      active;         /**< True while the timer is armed */
+    bool                      firing;         /**< True while callback is executing */
+    bool                      deleted;        /**< True if cancelled during callback */
+} cobalt_timer_node_t;
+
+/**
+ * @brief Doubly-linked list head/tail for each slot
+ */
+typedef struct {
+    cobalt_timer_node_t *head;
+    cobalt_timer_node_t *tail;
+} timer_slot_t;
+
+/**
+ * @brief 4-level Hierarchical Timing Wheel structure
+ */
+typedef struct {
+    timer_slot_t slots_l0[COBALT_TW_L0_SIZE];
+    timer_slot_t slots_ln[3][COBALT_TW_LN_SIZE];
+    uint64_t     wheel_time_ms;
+} cobalt_timing_wheel_t;
+
+/**
+ * @brief Hash table entry mapping timer_id -> cobalt_timer_node_t* for O(1) cancel
+ */
+typedef struct {
+    uint64_t             timer_id;
+    cobalt_timer_node_t *node;
+} timer_table_entry_t;
+
+/**
+ * @brief Open-addressing hash table for O(1) timer cancellation
+ */
+typedef struct {
+    timer_table_entry_t *entries;
+    size_t               capacity;
+    size_t               count;
+} timer_table_t;
 
 /**
  * @brief File descriptor registration in the fd list
@@ -90,7 +142,7 @@ static signal_handler_entry_t g_signal_table[COBALT_MAX_SIGNAL_HANDLERS];
 /**
  * @brief Opaque event loop structure
  * @details Owns the platform wait handle (epoll/kqueue/poll), the fd list,
- *          the timer min-heap, and the signal dispatch table.
+ *          the hierarchical timing wheel, and the signal dispatch table.
  */
 struct cobalt_eventloop {
 #ifdef __linux__
@@ -105,14 +157,14 @@ struct cobalt_eventloop {
     struct pollfd *pollfds;
     int            pollfds_capacity;
 #endif
-    fd_entry_t     *fd_head;
-    fd_entry_t     *fd_tail;
-    timer_entry_t **timer_heap;
-    int             timer_count;
-    int             timer_capacity;
-    uint64_t        next_timer_id;
-    int             running;
-    int             stop_flag;
+    fd_entry_t           *fd_head;
+    fd_entry_t           *fd_tail;
+    cobalt_timing_wheel_t wheel;
+    timer_table_t         timer_table;
+    int                   timer_count;
+    uint64_t              next_timer_id;
+    int                   running;
+    int                   stop_flag;
     /* Close callback */
     fd_handler_t        close_callback;
     void               *close_user_data;
@@ -164,140 +216,9 @@ static void cobalt_drain_signals(cobalt_eventloop_t *loop)
     }
 }
 
+/*/* -------------------------------------------------------------------------- */
+/* Timing Wheel and Timer Table Operations                                    */
 /* -------------------------------------------------------------------------- */
-/* Heap operations                                                            */
-/* -------------------------------------------------------------------------- */
-/**
- * @brief Order two timers by fire time, breaking ties by timer id.
- *
- * @param a First timer entry.
- * @param b Second timer entry.
- * @return Negative if a fires first, positive if b fires first, zero if equal.
- */
-static int timer_compare(const timer_entry_t *a, const timer_entry_t *b)
-{
-    if (a->next_fire.tv_sec < b->next_fire.tv_sec) {
-        return -1;
-    }
-    if (a->next_fire.tv_sec > b->next_fire.tv_sec) {
-        return 1;
-    }
-    if (a->next_fire.tv_nsec < b->next_fire.tv_nsec) {
-        return -1;
-    }
-    if (a->next_fire.tv_nsec > b->next_fire.tv_nsec) {
-        return 1;
-    }
-    /* Tiebreak by timer_id for FIFO ordering of same-time timers */
-    if (a->timer_id < b->timer_id) {
-        return -1;
-    }
-    return a->timer_id > b->timer_id ? 1 : 0;
-}
-
-/**
- * @brief Restore the heap invariant by moving an entry up toward the root.
- *
- * @param heap Timer heap array.
- * @param idx Index of the entry to sift up.
- */
-static void heap_sift_up(timer_entry_t **heap, int idx)
-{
-    while (idx > 0) {
-        int parent = (idx - 1) / 2;
-        if (timer_compare(heap[parent], heap[idx]) <= 0) {
-            break;
-        }
-        timer_entry_t *tmp = heap[parent];
-        heap[parent]       = heap[idx];
-        heap[idx]          = tmp;
-        idx                = parent;
-    }
-}
-
-/**
- * @brief Restore the heap invariant by moving an entry down toward the leaves.
- *
- * @param heap Timer heap array.
- * @param count Number of entries in the heap.
- * @param idx Index of the entry to sift down.
- */
-static void heap_sift_down(timer_entry_t **heap, int count, int idx)
-{
-    while (1) {
-        int smallest = idx;
-        int left     = 2 * idx + 1;
-        int right    = 2 * idx + 2;
-        if (left < count && timer_compare(heap[left], heap[smallest]) < 0) {
-            smallest = left;
-        }
-        if (right < count && timer_compare(heap[right], heap[smallest]) < 0) {
-            smallest = right;
-        }
-        if (smallest == idx) {
-            break;
-        }
-        timer_entry_t *tmp = heap[idx];
-        heap[idx]          = heap[smallest];
-        heap[smallest]     = tmp;
-        idx                = smallest;
-    }
-}
-
-/**
- * @brief Insert a timer entry into the loop timer heap, growing it as needed.
- *
- * @param loop Event loop owning the timer heap.
- * @param entry Timer entry to insert.
- * @return 0 on success, -1 when heap growth fails.
- */
-static int heap_push(cobalt_eventloop_t *loop, timer_entry_t *entry)
-{
-    if (loop->timer_count >= loop->timer_capacity) {
-        int             new_cap  = loop->timer_capacity * 2;
-        timer_entry_t **new_heap = (timer_entry_t **)loop->alloc->realloc(
-            loop->alloc, loop->timer_heap, sizeof(timer_entry_t *) * new_cap);
-        if (!new_heap) {
-            return -1;
-        }
-        loop->timer_heap     = new_heap;
-        loop->timer_capacity = new_cap;
-    }
-    loop->timer_heap[loop->timer_count] = entry;
-    heap_sift_up(loop->timer_heap, loop->timer_count);
-    loop->timer_count++;
-    return 0;
-}
-
-/**
- * @brief Remove and return the earliest-firing timer from the heap.
- *
- * @param loop Event loop owning the timer heap.
- * @return Earliest timer entry, or NULL when the heap is empty.
- */
-static timer_entry_t *heap_pop_min(cobalt_eventloop_t *loop)
-{
-    if (loop->timer_count == 0) {
-        return NULL;
-    }
-    timer_entry_t *min = loop->timer_heap[0];
-    loop->timer_count--;
-    loop->timer_heap[0] = loop->timer_heap[loop->timer_count];
-    heap_sift_down(loop->timer_heap, loop->timer_count, 0);
-    return min;
-}
-
-/**
- * @brief Return the earliest-firing timer without removing it.
- *
- * @param loop Event loop owning the timer heap.
- * @return Earliest timer entry, or NULL when the heap is empty.
- */
-static timer_entry_t *heap_peek(const cobalt_eventloop_t *loop)
-{
-    return loop->timer_count > 0 ? loop->timer_heap[0] : NULL;
-}
-
 /**
  * @brief Sample the monotonic clock.
  *
@@ -309,74 +230,377 @@ static void get_time_now(struct timespec *ts)
 }
 
 /**
- * @brief Test whether fire time a has been reached relative to time b.
- *
- * @param a Timer fire time.
- * @param b Reference time.
- * @return Nonzero when a is at or before b, zero otherwise.
+ * @brief Return a pointer to the slot at the specified wheel level and index.
  */
-static int timer_expired(const struct timespec *a, const struct timespec *b)
+static inline timer_slot_t *
+wheel_get_slot(cobalt_timing_wheel_t *wheel, uint8_t level, uint8_t slot)
 {
-    long secs  = a->tv_sec - b->tv_sec;
-    long nsecs = a->tv_nsec - b->tv_nsec;
-    return secs < 0 || (secs == 0 && nsecs <= 0);
+    if (level == 0) {
+        return &wheel->slots_l0[slot];
+    }
+    if (level <= 3) {
+        return &wheel->slots_ln[level - 1][slot];
+    }
+    return NULL;
 }
 
 /**
- * @brief Fire due timers and requeue repeating ones.
- *
- * @param loop Event loop owning the timer heap.
- * @param now Current time used to decide which timers are due.
+ * @brief Append an intrusive timer node to the tail of a slot list.
  */
-static void process_expired_timers(cobalt_eventloop_t *loop, const struct timespec *now)
+static void slot_append(timer_slot_t *slot, cobalt_timer_node_t *node)
 {
-    while (loop->timer_count > 0) {
-        timer_entry_t *timer = heap_peek(loop);
-        if (!timer || !timer->active || !timer_expired(&timer->next_fire, now)) {
-            break;
-        }
+    node->next = NULL;
+    node->prev = slot->tail;
+    if (slot->tail) {
+        slot->tail->next = node;
+    } else {
+        slot->head = node;
+    }
+    slot->tail = node;
+}
 
-        heap_pop_min(loop);
+/**
+ * @brief Unlink an intrusive timer node from a slot list in O(1).
+ */
+static void slot_remove(timer_slot_t *slot, cobalt_timer_node_t *node)
+{
+    if (node->prev) {
+        node->prev->next = node->next;
+    } else {
+        slot->head = node->next;
+    }
+    if (node->next) {
+        node->next->prev = node->prev;
+    } else {
+        slot->tail = node->prev;
+    }
+    node->prev = NULL;
+    node->next = NULL;
+}
 
-        if (timer->callback) {
-            timer->callback(timer->timer_id, timer->user_data);
+/**
+ * @brief Thomas Wang's 64-bit integer mix hash function.
+ */
+static inline uint64_t timer_hash64(uint64_t key)
+{
+    key = (~key) + (key << 21);
+    key = key ^ (key >> 24);
+    key = (key + (key << 3)) + (key << 8);
+    key = key ^ (key >> 14);
+    key = (key + (key << 2)) + (key << 4);
+    key = key ^ (key >> 28);
+    key = key + (key << 31);
+    return key;
+}
+
+/**
+ * @brief Insert or update a timer node in the O(1) hash table.
+ */
+static int timer_table_insert(cobalt_eventloop_t  *loop,
+                              timer_table_t       *table,
+                              uint64_t             timer_id,
+                              cobalt_timer_node_t *node)
+{
+    if (table->capacity == 0 || table->count * 10 >= table->capacity * 7) {
+        size_t               new_cap     = table->capacity == 0 ? 64 : table->capacity * 2;
+        timer_table_entry_t *new_entries = (timer_table_entry_t *)loop->alloc->alloc(
+            loop->alloc, sizeof(timer_table_entry_t) * new_cap);
+        if (!new_entries) {
+            return -1;
         }
-        if (timer->interval_ms > 0) {
-            timer->next_fire.tv_sec += (long)(timer->interval_ms / COBALT_MILLIS_PER_SEC);
-            timer->next_fire.tv_nsec +=
-                (long)((timer->interval_ms % COBALT_MILLIS_PER_SEC) * COBALT_NANOS_PER_MILLI);
-            if (timer->next_fire.tv_nsec >= COBALT_NANOS_PER_SEC) {
-                timer->next_fire.tv_sec++;
-                timer->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
+        memset(new_entries, 0, sizeof(timer_table_entry_t) * new_cap);
+
+        for (size_t i = 0; i < table->capacity; i++) {
+            if (table->entries[i].node != NULL) {
+                size_t idx = (size_t)(timer_hash64(table->entries[i].timer_id) & (new_cap - 1));
+                while (new_entries[idx].node != NULL) {
+                    idx = (idx + 1) & (new_cap - 1);
+                }
+                new_entries[idx] = table->entries[i];
             }
-            heap_push(loop, timer);
-        } else {
-            loop->alloc->free(loop->alloc, timer);
         }
+        if (table->entries) {
+            loop->alloc->free(loop->alloc, table->entries);
+        }
+        table->entries  = new_entries;
+        table->capacity = new_cap;
+    }
+
+    size_t mask = table->capacity - 1;
+    size_t idx  = (size_t)(timer_hash64(timer_id) & mask);
+    while (table->entries[idx].node != NULL) {
+        if (table->entries[idx].timer_id == timer_id) {
+            table->entries[idx].node = node;
+            return 0;
+        }
+        idx = (idx + 1) & mask;
+    }
+    table->entries[idx].timer_id = timer_id;
+    table->entries[idx].node     = node;
+    table->count++;
+    return 0;
+}
+
+/**
+ * @brief Find a timer node by its id in O(1).
+ */
+static cobalt_timer_node_t *timer_table_find(const timer_table_t *table, uint64_t timer_id)
+{
+    if (!table->entries || table->count == 0) {
+        return NULL;
+    }
+    size_t mask = table->capacity - 1;
+    size_t idx  = (size_t)(timer_hash64(timer_id) & mask);
+    while (table->entries[idx].node != NULL) {
+        if (table->entries[idx].timer_id == timer_id) {
+            return table->entries[idx].node;
+        }
+        idx = (idx + 1) & mask;
+    }
+    return NULL;
+}
+
+/**
+ * @brief Remove a timer entry from the hash table using backward-shift deletion.
+ */
+static void timer_table_remove(timer_table_t *table, uint64_t timer_id)
+{
+    if (!table->entries || table->count == 0) {
+        return;
+    }
+    size_t mask = table->capacity - 1;
+    size_t idx  = (size_t)(timer_hash64(timer_id) & mask);
+    while (table->entries[idx].node != NULL) {
+        if (table->entries[idx].timer_id == timer_id) {
+            size_t curr = idx;
+            size_t next = (curr + 1) & mask;
+            while (table->entries[next].node != NULL) {
+                size_t natural   = (size_t)(timer_hash64(table->entries[next].timer_id) & mask);
+                int    can_shift = 0;
+                if (next > curr) {
+                    if (natural <= curr || natural > next) {
+                        can_shift = 1;
+                    }
+                } else {
+                    if (natural <= curr && natural > next) {
+                        can_shift = 1;
+                    }
+                }
+                if (can_shift) {
+                    table->entries[curr] = table->entries[next];
+                    curr                 = next;
+                }
+                next = (next + 1) & mask;
+            }
+            table->entries[curr].node     = NULL;
+            table->entries[curr].timer_id = 0;
+            table->count--;
+            return;
+        }
+        idx = (idx + 1) & mask;
+    }
+}
+
+/**
+ * @brief Release hash table storage.
+ */
+static void timer_table_destroy(cobalt_allocator_t *alloc, timer_table_t *table)
+{
+    if (table->entries) {
+        alloc->free(alloc, table->entries);
+        table->entries  = NULL;
+        table->capacity = 0;
+        table->count    = 0;
+    }
+}
+
+/**
+ * @brief Insert a timer node into the appropriate wheel level and slot.
+ */
+static void wheel_insert_node(cobalt_eventloop_t *loop, cobalt_timer_node_t *node)
+{
+    uint64_t cur = loop->wheel.wheel_time_ms;
+    uint64_t exp = node->expire_time_ms;
+
+    if (exp <= cur) {
+        uint8_t slot = (uint8_t)(cur & COBALT_TW_L0_MASK);
+        node->level  = 0;
+        node->slot   = slot;
+        slot_append(&loop->wheel.slots_l0[slot], node);
+        return;
+    }
+
+    uint64_t delta = exp - cur;
+
+    if (delta < (1ULL << COBALT_TW_L0_BITS)) {
+        /* Level 0: 0..255 ms */
+        uint8_t slot = (uint8_t)(exp & COBALT_TW_L0_MASK);
+        node->level  = 0;
+        node->slot   = slot;
+        slot_append(&loop->wheel.slots_l0[slot], node);
+    } else if (delta < (1ULL << COBALT_TW_L2_SHIFT)) {
+        /* Level 1: 256 ms .. 16383 ms (shift 8) */
+        uint8_t slot = (uint8_t)((exp >> COBALT_TW_L1_SHIFT) & COBALT_TW_LN_MASK);
+        node->level  = 1;
+        node->slot   = slot;
+        slot_append(&loop->wheel.slots_ln[0][slot], node);
+    } else if (delta < (1ULL << COBALT_TW_L3_SHIFT)) {
+        /* Level 2: ~16.38 s .. ~17.47 min (shift 14) */
+        uint8_t slot = (uint8_t)((exp >> COBALT_TW_L2_SHIFT) & COBALT_TW_LN_MASK);
+        node->level  = 2;
+        node->slot   = slot;
+        slot_append(&loop->wheel.slots_ln[1][slot], node);
+    } else {
+        /* Level 3: ~17.47 min .. ~18.64 hours (shift 20) */
+        uint8_t slot = (uint8_t)((exp >> COBALT_TW_L3_SHIFT) & COBALT_TW_LN_MASK);
+        node->level  = 3;
+        node->slot   = slot;
+        slot_append(&loop->wheel.slots_ln[2][slot], node);
+    }
+}
+
+/**
+ * @brief Cascade all timers in a higher-level slot down into lower levels.
+ */
+static void cascade_level(cobalt_eventloop_t *loop, uint8_t level, uint8_t slot)
+{
+    if (level < 1 || level > 3) {
+        return;
+    }
+    timer_slot_t        *s    = &loop->wheel.slots_ln[level - 1][slot];
+    cobalt_timer_node_t *node = s->head;
+    s->head                   = NULL;
+    s->tail                   = NULL;
+
+    while (node) {
+        cobalt_timer_node_t *next = node->next;
+        node->prev                = NULL;
+        node->next                = NULL;
+        wheel_insert_node(loop, node);
+        node = next;
+    }
+}
+
+/**
+ * @brief Fire all due timers in a Level 0 slot.
+ */
+static void process_slot_timers(cobalt_eventloop_t *loop, uint8_t slot_idx)
+{
+    timer_slot_t        *s    = &loop->wheel.slots_l0[slot_idx];
+    cobalt_timer_node_t *node = s->head;
+    s->head                   = NULL;
+    s->tail                   = NULL;
+
+    while (node) {
+        cobalt_timer_node_t *next = node->next;
+        node->prev                = NULL;
+        node->next                = NULL;
+
+        if (node->active && !node->deleted) {
+            uint64_t        timer_id  = node->timer_id;
+            timer_handler_t cb        = node->callback;
+            void           *user_data = node->user_data;
+            uint64_t        interval  = node->interval_ms;
+
+            node->firing = true;
+            if (cb) {
+                cb(timer_id, user_data);
+            }
+            node->firing = false;
+
+            if (interval > 0 && node->active && !node->deleted) {
+                node->expire_time_ms += interval;
+                if (node->expire_time_ms <= loop->wheel.wheel_time_ms) {
+                    node->expire_time_ms = loop->wheel.wheel_time_ms + interval;
+                }
+                wheel_insert_node(loop, node);
+            } else {
+                if (!node->deleted) {
+                    timer_table_remove(&loop->timer_table, timer_id);
+                    loop->timer_count--;
+                }
+                loop->alloc->free(loop->alloc, node);
+            }
+        } else {
+            if (!node->deleted) {
+                timer_table_remove(&loop->timer_table, node->timer_id);
+                loop->timer_count--;
+            }
+            loop->alloc->free(loop->alloc, node);
+        }
+
+        node = next;
+    }
+}
+
+/**
+ * @brief Advance the timing wheel tick-by-tick up to target_time_ms.
+ */
+static void wheel_advance(cobalt_eventloop_t *loop, uint64_t target_time_ms)
+{
+    while (loop->wheel.wheel_time_ms < target_time_ms) {
+        loop->wheel.wheel_time_ms++;
+        uint64_t cur    = loop->wheel.wheel_time_ms;
+        uint8_t  l0_idx = (uint8_t)(cur & COBALT_TW_L0_MASK);
+
+        /* Cascading from higher levels at wrap boundaries */
+        if (l0_idx == 0) {
+            uint8_t l1_idx = (uint8_t)((cur >> COBALT_TW_L1_SHIFT) & COBALT_TW_LN_MASK);
+            cascade_level(loop, 1, l1_idx);
+
+            if (l1_idx == 0) {
+                uint8_t l2_idx = (uint8_t)((cur >> COBALT_TW_L2_SHIFT) & COBALT_TW_LN_MASK);
+                cascade_level(loop, 2, l2_idx);
+
+                if (l2_idx == 0) {
+                    uint8_t l3_idx = (uint8_t)((cur >> COBALT_TW_L3_SHIFT) & COBALT_TW_LN_MASK);
+                    cascade_level(loop, 3, l3_idx);
+                }
+            }
+        }
+
+        process_slot_timers(loop, l0_idx);
     }
 }
 
 /**
  * @brief Compute how long the backend may block before the next timer fires.
  *
- * @param loop Event loop owning the timer heap.
- * @param now Current time, or NULL to use the default timeout.
+ * @param loop Event loop owning the timing wheel.
+ * @param now Current time, or NULL to sample the monotonic clock.
  * @return Milliseconds to wait; never negative.
  */
 #ifndef _WIN32
 static int calculate_timeout_ms(const cobalt_eventloop_t *loop, const struct timespec *now)
 {
-    int                  timeout_ms = COBALT_EVENTLOOP_TIMEOUT_MS;
-    const timer_entry_t *next       = heap_peek(loop);
-    if (next && now) {
-        long secs  = next->next_fire.tv_sec - now->tv_sec;
-        long nsecs = next->next_fire.tv_nsec - now->tv_nsec;
-        timeout_ms = (int)((secs * COBALT_MILLIS_PER_SEC) + (nsecs / COBALT_NANOS_PER_MILLI));
-        if (timeout_ms < 0) {
-            timeout_ms = 0;
+    if (loop->timer_count == 0) {
+        return COBALT_EVENTLOOP_TIMEOUT_MS;
+    }
+
+    uint64_t now_ms;
+    if (now) {
+        now_ms = (uint64_t)now->tv_sec * 1000ULL + (uint64_t)now->tv_nsec / 1000000ULL;
+    } else {
+        struct timespec ts;
+        get_time_now(&ts);
+        now_ms = (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
+    }
+
+    /* Scan Level 0 for the nearest non-empty slot */
+    for (uint32_t offset = 1; offset <= COBALT_TW_L0_SIZE; offset++) {
+        uint8_t slot = (uint8_t)((loop->wheel.wheel_time_ms + offset) & COBALT_TW_L0_MASK);
+        if (loop->wheel.slots_l0[slot].head != NULL) {
+            uint64_t target_ms = loop->wheel.wheel_time_ms + offset;
+            if (target_ms <= now_ms) {
+                return 0;
+            }
+            int diff = (int)(target_ms - now_ms);
+            return diff < COBALT_EVENTLOOP_TIMEOUT_MS ? diff : COBALT_EVENTLOOP_TIMEOUT_MS;
         }
     }
-    return timeout_ms;
+
+    /* Level 0 is empty: wait at most default short timeout */
+    return COBALT_EVENTLOOP_TIMEOUT_MS;
 }
 #endif
 
@@ -612,18 +836,15 @@ static cobalt_eventloop_t *cobalt_eventloop_create_with_alloc(cobalt_allocator_t
     }
 #endif
 
-    loop->timer_capacity = COBALT_EVENTLOOP_TIMER_HEAP_INITIAL;
-    loop->timer_heap =
-        (timer_entry_t **)alloc->alloc(alloc, sizeof(timer_entry_t *) * loop->timer_capacity);
-    if (!loop->timer_heap) {
-#ifdef __linux__
-        close(loop->epoll_fd);
-#elif __APPLE__
-        close(loop->kq);
-#endif
-        loop->alloc->free(loop->alloc, loop);
-        return NULL;
+    memset(&loop->wheel, 0, sizeof(loop->wheel));
+    struct timespec now;
+    get_time_now(&now);
+    loop->wheel.wheel_time_ms = (uint64_t)now.tv_sec * 1000ULL + (uint64_t)now.tv_nsec / 1000000ULL;
+    if (loop->wheel.wheel_time_ms > 0) {
+        loop->wheel.wheel_time_ms--;
     }
+    memset(&loop->timer_table, 0, sizeof(loop->timer_table));
+    loop->timer_count = 0;
 
     return loop;
 }
@@ -687,10 +908,26 @@ void cobalt_eventloop_destroy(cobalt_eventloop_t *loop)
         fd = next;
     }
 
-    for (int i = 0; i < loop->timer_count; i++) {
-        loop->alloc->free(loop->alloc, loop->timer_heap[i]);
+    /* Free all pending timers in the timing wheel */
+    for (int i = 0; i < COBALT_TW_L0_SIZE; i++) {
+        cobalt_timer_node_t *node = loop->wheel.slots_l0[i].head;
+        while (node) {
+            cobalt_timer_node_t *next = node->next;
+            loop->alloc->free(loop->alloc, node);
+            node = next;
+        }
     }
-    loop->alloc->free(loop->alloc, loop->timer_heap);
+    for (int lvl = 0; lvl < 3; lvl++) {
+        for (int i = 0; i < COBALT_TW_LN_SIZE; i++) {
+            cobalt_timer_node_t *node = loop->wheel.slots_ln[lvl][i].head;
+            while (node) {
+                cobalt_timer_node_t *next = node->next;
+                loop->alloc->free(loop->alloc, node);
+                node = next;
+            }
+        }
+    }
+    timer_table_destroy(loop->alloc, &loop->timer_table);
 
     /* Invoke close callback */
     if (loop->close_callback) {
@@ -893,7 +1130,7 @@ int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd)
 /**
  * @brief Arm a one-shot or repeating timer on the loop.
  *
- * @param loop Event loop owning the timer heap.
+ * @param loop Event loop owning the timing wheel.
  * @param timeout_ms Delay before the first firing.
  * @param interval_ms Repeat period; zero makes the timer one-shot.
  * @param callback Handler invoked with the timer id on each firing.
@@ -910,59 +1147,77 @@ uint64_t cobalt_eventloop_add_timer(cobalt_eventloop_t  *loop,
         return 0;
     }
 
-    uint64_t       timer_id = ++loop->next_timer_id;
-    timer_entry_t *entry = (timer_entry_t *)loop->alloc->alloc(loop->alloc, sizeof(timer_entry_t));
-    if (!entry) {
+    uint64_t timer_id = ++loop->next_timer_id;
+    if (timer_id == 0) {
+        timer_id = ++loop->next_timer_id;
+    }
+
+    cobalt_timer_node_t *node =
+        (cobalt_timer_node_t *)loop->alloc->alloc(loop->alloc, sizeof(cobalt_timer_node_t));
+    if (!node) {
         return 0;
     }
-    memset(entry, 0, sizeof(timer_entry_t));
+    memset(node, 0, sizeof(cobalt_timer_node_t));
 
-    entry->timer_id    = timer_id;
-    entry->timeout_ms  = timeout_ms;
-    entry->interval_ms = interval_ms;
-    entry->callback    = callback;
-    entry->user_data   = user_data;
-    entry->active      = 1;
+    node->timer_id    = timer_id;
+    node->interval_ms = interval_ms;
+    node->callback    = callback;
+    node->user_data   = user_data;
+    node->active      = true;
+    node->firing      = false;
+    node->deleted     = false;
 
-    struct timespec now;
-    get_time_now(&now);
-    entry->next_fire.tv_sec = now.tv_sec + (long)(timeout_ms / COBALT_MILLIS_PER_SEC);
-    entry->next_fire.tv_nsec =
-        (long)(now.tv_nsec + ((timeout_ms % COBALT_MILLIS_PER_SEC) * COBALT_NANOS_PER_MILLI));
-    if (entry->next_fire.tv_nsec >= COBALT_NANOS_PER_SEC) {
-        entry->next_fire.tv_sec++;
-        entry->next_fire.tv_nsec -= COBALT_NANOS_PER_SEC;
-    }
+    struct timespec ts;
+    get_time_now(&ts);
+    uint64_t now_ms = (uint64_t)ts.tv_sec * 1000ULL + (uint64_t)ts.tv_nsec / 1000000ULL;
 
-    if (heap_push(loop, entry) != 0) {
-        loop->alloc->free(loop->alloc, entry);
+    uint64_t base_time =
+        (now_ms > loop->wheel.wheel_time_ms) ? now_ms : (loop->wheel.wheel_time_ms + 1);
+    node->expire_time_ms = base_time + timeout_ms;
+
+    if (timer_table_insert(loop, &loop->timer_table, timer_id, node) != 0) {
+        loop->alloc->free(loop->alloc, node);
         return 0;
     }
+
+    wheel_insert_node(loop, node);
+    loop->timer_count++;
     return timer_id;
 }
 
 /**
- * @brief Cancel a timer and release its entry.
+ * @brief Cancel a timer and release its entry in O(1) time.
  *
- * @param loop Event loop owning the timer heap.
+ * @param loop Event loop owning the timing wheel.
  * @param timer_id Id returned by add_timer.
  * @return 0 on success, -1 when the id is not found.
  */
 int cobalt_eventloop_del_timer(cobalt_eventloop_t *loop, uint64_t timer_id)
 {
-    if (!loop) {
+    if (!loop || timer_id == 0) {
         return -1;
     }
-    for (int i = 0; i < loop->timer_count; i++) {
-        if (loop->timer_heap[i]->timer_id == timer_id) {
-            loop->timer_count--;
-            loop->timer_heap[i] = loop->timer_heap[loop->timer_count];
-            heap_sift_down(loop->timer_heap, loop->timer_count, i);
-            loop->alloc->free(loop->alloc, loop->timer_heap[loop->timer_count]);
-            return 0;
-        }
+
+    cobalt_timer_node_t *node = timer_table_find(&loop->timer_table, timer_id);
+    if (!node) {
+        return -1;
     }
-    return -1;
+
+    timer_table_remove(&loop->timer_table, timer_id);
+    loop->timer_count--;
+
+    if (node->firing) {
+        node->deleted = true;
+        node->active  = false;
+        return 0;
+    }
+
+    timer_slot_t *s = wheel_get_slot(&loop->wheel, node->level, node->slot);
+    if (s) {
+        slot_remove(s, node);
+    }
+    loop->alloc->free(loop->alloc, node);
+    return 0;
 }
 
 /**
@@ -1011,7 +1266,8 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
 
     struct timespec now;
     get_time_now(&now);
-    process_expired_timers(loop, &now);
+    uint64_t now_ms = (uint64_t)now.tv_sec * 1000ULL + (uint64_t)now.tv_nsec / 1000000ULL;
+    wheel_advance(loop, now_ms);
     cobalt_drain_signals(loop);
 
     int   event_count = 0;
@@ -1060,6 +1316,10 @@ int cobalt_eventloop_iteration(cobalt_eventloop_t *loop)
         }
     }
 #endif
+
+    get_time_now(&now);
+    now_ms = (uint64_t)now.tv_sec * 1000ULL + (uint64_t)now.tv_nsec / 1000000ULL;
+    wheel_advance(loop, now_ms);
 
     return 0;
 }

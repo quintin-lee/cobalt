@@ -20,9 +20,9 @@
 #include <string.h>
 #endif
 
-static int  timer_called  = 0;
+static int timer_called = 0;
 #ifndef _WIN32
-static int  fd_called     = 0;
+static int fd_called = 0;
 #endif
 static int *g_fired_order = NULL;
 static int  g_fire_idx    = 0;
@@ -60,6 +60,9 @@ void test_eventloop_timer_edge_cases(void);
 void test_eventloop_fd_edge_cases(void);
 void test_eventloop_timer_periodic(void);
 void test_eventloop_rapid_signals(void);
+void test_eventloop_timing_wheel_stress(void);
+void test_eventloop_timing_wheel_cascade(void);
+void test_eventloop_timing_wheel_repeating(void);
 #ifndef _WIN32
 void test_eventloop_unix_socket(void);
 
@@ -550,6 +553,9 @@ void test_eventloop(void)
     test_eventloop_rapid_signals();
 #endif
     test_eventloop_timer_periodic();
+    test_eventloop_timing_wheel_stress();
+    test_eventloop_timing_wheel_cascade();
+    test_eventloop_timing_wheel_repeating();
     printf("  Eventloop tests completed\n");
 }
 
@@ -638,5 +644,206 @@ void test_eventloop_unix_socket(void)
     printf("  UNIX socket test passed\n");
 #else
     printf("  Skipping UNIX socket test on Windows (POSIX-only)\n");
+#endif
+}
+
+/* -------------------------------------------------------------------------- */
+/* Timing Wheel Stress & Cascading Tests                                      */
+/* -------------------------------------------------------------------------- */
+
+typedef struct {
+    uint64_t timer_id;
+    int      fire_count;
+    int      cancelled;
+} tw_stress_item_t;
+
+static void on_tw_stress_timer(uint64_t id, void *user_data)
+{
+    (void)id;
+    tw_stress_item_t *item = (tw_stress_item_t *)user_data;
+    if (item) {
+        item->fire_count++;
+    }
+}
+
+void test_eventloop_timing_wheel_stress(void)
+{
+    printf("Testing timing wheel stress (10,000 timers across 4 levels + 5,000 cancels)...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    const int         total = 10000;
+    tw_stress_item_t *items = (tw_stress_item_t *)malloc(sizeof(tw_stress_item_t) * (size_t)total);
+    TEST_ASSERT(items != NULL);
+    memset(items, 0, sizeof(tw_stress_item_t) * (size_t)total);
+
+    /* 1. Add 10,000 timers spread across all 4 timing wheel levels */
+    for (int i = 0; i < total; i++) {
+        cobalt_timeout_ms_t delay;
+        int                 bucket = i % 4;
+        if (bucket == 0) {
+            /* Level 0: 1 .. 250 ms */
+            delay = (cobalt_timeout_ms_t)(1 + (i % 250));
+        } else if (bucket == 1) {
+            /* Level 1: 300 .. 15,000 ms */
+            delay = (cobalt_timeout_ms_t)(300 + ((i * 7) % 14000));
+        } else if (bucket == 2) {
+            /* Level 2: 20,000 .. 500,000 ms */
+            delay = (cobalt_timeout_ms_t)(20000 + ((i * 47) % 480000));
+        } else {
+            /* Level 3: 1,500,000 .. 50,000,000 ms */
+            delay = (cobalt_timeout_ms_t)(1500000 + (((uint64_t)i * 4999ULL) % 48000000ULL));
+        }
+
+        items[i].timer_id =
+            cobalt_eventloop_add_timer(loop, delay, 0, on_tw_stress_timer, &items[i]);
+        TEST_ASSERT(items[i].timer_id != 0);
+    }
+
+    /* 2. Mid-flight cancellation: delete 5,000 timers (all even indices) */
+    int cancelled_count = 0;
+    for (int i = 0; i < total; i += 2) {
+        int ret = cobalt_eventloop_del_timer(loop, items[i].timer_id);
+        TEST_ASSERT(ret == 0);
+        items[i].cancelled = 1;
+        cancelled_count++;
+
+        /* Verify double-deletion returns -1 */
+        int ret2 = cobalt_eventloop_del_timer(loop, items[i].timer_id);
+        TEST_ASSERT(ret2 == -1);
+    }
+    TEST_ASSERT(cancelled_count == 5000);
+
+    /* 3. Run a short iteration */
+    cobalt_eventloop_iteration(loop);
+
+    /* Verify cancelled timers NEVER fired */
+    for (int i = 0; i < total; i += 2) {
+        TEST_ASSERT(items[i].fire_count == 0);
+    }
+
+    /* 4. Clean up remaining 5,000 timers via destroy */
+    cobalt_eventloop_destroy(loop);
+    free(items);
+
+    printf("  Timing wheel stress test passed\n");
+}
+
+typedef struct {
+    uint64_t timer_id;
+    int      fired;
+    int      order;
+} tw_cascade_ctx_t;
+
+static int g_cascade_seq = 0;
+
+static void on_tw_cascade_timer(uint64_t id, void *user_data)
+{
+    (void)id;
+    tw_cascade_ctx_t *ctx = (tw_cascade_ctx_t *)user_data;
+    if (ctx) {
+        ctx->fired = 1;
+        ctx->order = ++g_cascade_seq;
+    }
+}
+
+void test_eventloop_timing_wheel_cascade(void)
+{
+#ifndef _WIN32
+    printf("Testing timing wheel cascading across levels...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    g_cascade_seq           = 0;
+    tw_cascade_ctx_t ctx_l0 = {0};
+    tw_cascade_ctx_t ctx_l1 = {0};
+    tw_cascade_ctx_t ctx_l2 = {0};
+
+    /* Timer 1: 5 ms (Level 0) */
+    ctx_l0.timer_id = cobalt_eventloop_add_timer(loop, 5, 0, on_tw_cascade_timer, &ctx_l0);
+    TEST_ASSERT(ctx_l0.timer_id != 0);
+
+    /* Timer 2: 260 ms (Level 1, crosses 256 ms boundary and cascades to Level 0) */
+    ctx_l1.timer_id = cobalt_eventloop_add_timer(loop, 260, 0, on_tw_cascade_timer, &ctx_l1);
+    TEST_ASSERT(ctx_l1.timer_id != 0);
+
+    /* Timer 3: 25,000 ms (Level 2, cancelled before cascade) */
+    ctx_l2.timer_id = cobalt_eventloop_add_timer(loop, 25000, 0, on_tw_cascade_timer, &ctx_l2);
+    TEST_ASSERT(ctx_l2.timer_id != 0);
+
+    /* Cancel Level 2 timer */
+    int ret = cobalt_eventloop_del_timer(loop, ctx_l2.timer_id);
+    TEST_ASSERT(ret == 0);
+
+    /* Fire Level 0 timer */
+    usleep(10000); /* 10 ms */
+    cobalt_eventloop_iteration(loop);
+    TEST_ASSERT(ctx_l0.fired == 1);
+    TEST_ASSERT(ctx_l1.fired == 0);
+
+    /* Sleep until Level 1 timer fires (>260 ms total) */
+    usleep(270000); /* 270 ms */
+    cobalt_eventloop_iteration(loop);
+    TEST_ASSERT(ctx_l1.fired == 1);
+    TEST_ASSERT(ctx_l2.fired == 0);
+
+    TEST_ASSERT(ctx_l0.order < ctx_l1.order);
+
+    cobalt_eventloop_destroy(loop);
+    printf("  Timing wheel cascade test passed\n");
+#else
+    printf("  Skipping cascade test on Windows\n");
+#endif
+}
+
+typedef struct {
+    uint64_t            timer_id;
+    int                 fire_count;
+    cobalt_eventloop_t *loop;
+} tw_repeat_ctx_t;
+
+static void on_tw_repeating_timer(uint64_t id, void *user_data)
+{
+    tw_repeat_ctx_t *ctx = (tw_repeat_ctx_t *)user_data;
+    if (ctx) {
+        ctx->fire_count++;
+        /* Delete self on 3rd firing */
+        if (ctx->fire_count == 3) {
+            int ret = cobalt_eventloop_del_timer(ctx->loop, id);
+            TEST_ASSERT(ret == 0);
+        }
+    }
+}
+
+void test_eventloop_timing_wheel_repeating(void)
+{
+#ifndef _WIN32
+    printf("Testing timing wheel repeating timer with in-callback deletion...\n");
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    tw_repeat_ctx_t ctx = {0};
+    ctx.loop            = loop;
+
+    /* Add repeating timer: timeout 5ms, interval 5ms */
+    ctx.timer_id = cobalt_eventloop_add_timer(loop, 5, 5, on_tw_repeating_timer, &ctx);
+    TEST_ASSERT(ctx.timer_id != 0);
+
+    /* Run several iterations with small sleeps */
+    for (int i = 0; i < 10; i++) {
+        usleep(6000); /* 6 ms */
+        cobalt_eventloop_iteration(loop);
+    }
+
+    /* It should have fired exactly 3 times because it deleted itself on the 3rd firing */
+    TEST_ASSERT(ctx.fire_count == 3);
+
+    cobalt_eventloop_destroy(loop);
+    printf("  Timing wheel repeating timer test passed\n");
+#else
+    printf("  Skipping repeating timer test on Windows\n");
 #endif
 }
