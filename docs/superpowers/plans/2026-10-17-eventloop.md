@@ -194,7 +194,7 @@ git commit -m "feat(eventloop): ✨ implement cross-thread post and eventfd wake
 - Modify: `src/module/eventloop.c`
 - Modify: `tests/unit/test_eventloop.c`
 
-- [ ] **Step 1: Declare `cobalt_stream_t` in `include/cobalt/module/eventloop.h`**
+- [x] **Step 1: Declare `cobalt_stream_t` in `include/cobalt/module/eventloop.h`**
 
 ```c
 #include "cobalt/container/buffer.h"
@@ -220,15 +220,15 @@ cobalt_buffer_t *cobalt_stream_get_input_buffer(cobalt_stream_t *stream);
 cobalt_buffer_t *cobalt_stream_get_output_buffer(cobalt_stream_t *stream);
 ```
 
-- [ ] **Step 2: Implement `cobalt_stream_t` in `src/module/eventloop.c`**
+- [x] **Step 2: Implement `cobalt_stream_t` in `src/module/eventloop.c`**
 
 Implement stream lifecycle, direct write fast-path, automatic `POLLOUT` toggle on partial writes, and read pipeline using `cobalt_buffer_read_fd`.
 
-- [ ] **Step 3: Add streaming echo tests in `tests/unit/test_eventloop.c`**
+- [x] **Step 3: Add streaming echo tests in `tests/unit/test_eventloop.c`**
 
 Create `socketpair`, stream 10MB across sender and receiver streams, verify data integrity, partial write buffering, and write completion callbacks.
 
-- [ ] **Step 4: Build, verify tests & commit**
+- [x] **Step 4: Build, verify tests & commit**
 
 ```bash
 clang-format -i include/cobalt/module/eventloop.h src/module/eventloop.c tests/unit/test_eventloop.c
