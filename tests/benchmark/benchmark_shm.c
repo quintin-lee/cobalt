@@ -86,6 +86,12 @@ static void *rtt_pong_worker(void *arg)
                 "rtt_pong_worker: open failed! req_rx=%p rsp_tx=%p\n",
                 (void *)req_rx,
                 (void *)rsp_tx);
+        if (req_rx) {
+            cobalt_shm_channel_destroy(req_rx);
+        }
+        if (rsp_tx) {
+            cobalt_shm_channel_destroy(rsp_tx);
+        }
         return NULL;
     }
 

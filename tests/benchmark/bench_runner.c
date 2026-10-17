@@ -25,6 +25,7 @@
 #include "cobalt/module/threadpool.h"
 #include "cobalt/platform/shm.h"
 #include "cobalt/utils/benchmark.h"
+#include <assert.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -571,15 +572,21 @@ static void bench_shm_channel_ops(void)
     uint64_t val = 42;
     for (int i = 0; i < 50000; i++) {
         void *wptr = NULL;
-        cobalt_shm_channel_reserve(chan, sizeof(val), &wptr);
+        int   rc   = cobalt_shm_channel_reserve(chan, sizeof(val), &wptr);
+        (void)rc;
+        assert(rc == COBALT_SUCCESS && wptr != NULL);
         *(uint64_t *)wptr = val;
         cobalt_shm_channel_commit(chan, 1, sizeof(val));
 
         uint16_t    type = 0;
         const void *rptr = NULL;
         size_t      len  = 0;
-        cobalt_shm_channel_peek(chan, &type, &rptr, &len);
-        cobalt_shm_channel_consume(chan);
+        rc               = cobalt_shm_channel_peek(chan, &type, &rptr, &len);
+        (void)rc;
+        assert(rc == COBALT_SUCCESS && rptr != NULL);
+        rc = cobalt_shm_channel_consume(chan);
+        (void)rc;
+        assert(rc == COBALT_SUCCESS);
     }
 
     cobalt_shm_channel_destroy(chan);
