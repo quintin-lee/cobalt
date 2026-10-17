@@ -11,13 +11,16 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+typedef struct cobalt_taskgraph cobalt_taskgraph_t;
+
 typedef struct {
-    cobalt_task_id_t id;
-    cobalt_task_fn_t fn;
-    void            *ctx;
-    size_t           static_in_degree;
-    _Atomic(size_t)  remaining_in_degree;
-    cobalt_vector_t *successors;
+    cobalt_taskgraph_t *graph;
+    cobalt_task_id_t    id;
+    cobalt_task_fn_t    fn;
+    void               *ctx;
+    size_t              static_in_degree;
+    _Atomic(size_t)     remaining_in_degree;
+    cobalt_vector_t    *successors;
 } cobalt_task_node_t;
 
 struct cobalt_taskgraph {
@@ -121,6 +124,7 @@ cobalt_taskgraph_add_node(cobalt_taskgraph_t *graph, cobalt_task_fn_t fn, void *
         return COBALT_INVALID_TASK_ID;
     }
 
+    node->graph            = graph;
     node->id               = cobalt_vector_size(graph->nodes);
     node->fn               = fn;
     node->ctx              = ctx;
@@ -258,18 +262,103 @@ int cobalt_taskgraph_compile(cobalt_taskgraph_t *graph)
     return 0;
 }
 
+static void taskgraph_node_worker(void *arg)
+{
+    cobalt_task_node_t *node  = (cobalt_task_node_t *)arg;
+    cobalt_taskgraph_t *graph = node->graph;
+
+    /* Execute the task callback */
+    node->fn(node->ctx);
+
+    /* Decrement remaining in-degree for all successors */
+    size_t succ_count = cobalt_vector_size(node->successors);
+    for (size_t i = 0; i < succ_count; i++) {
+        size_t              succ_id = (size_t)(uintptr_t)cobalt_vector_get(node->successors, i);
+        cobalt_task_node_t *succ_node =
+            (cobalt_task_node_t *)cobalt_vector_get(graph->nodes, succ_id);
+        size_t prev =
+            atomic_fetch_sub_explicit(&succ_node->remaining_in_degree, 1, memory_order_acq_rel);
+        if (prev == 1) {
+            /* All dependencies satisfied: submit to pool */
+            if (cobalt_threadpool_submit(graph->bound_pool, taskgraph_node_worker, succ_node) !=
+                0) {
+                /* Synchronous fallback */
+                taskgraph_node_worker(succ_node);
+            }
+        }
+    }
+
+    /* Signal completion on WaitGroup */
+    if (graph->wg) {
+        cobalt_waitgroup_done(graph->wg);
+    }
+}
+
 int cobalt_taskgraph_run(cobalt_taskgraph_t *graph, cobalt_threadpool_t *pool)
 {
-    (void)graph;
-    (void)pool;
-    return -1;
+    if (!graph || !pool || !graph->compiled) {
+        cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+        return -1;
+    }
+
+    size_t num_nodes = cobalt_vector_size(graph->nodes);
+    if (num_nodes == 0) {
+        return 0;
+    }
+
+    /* Reset dynamic runtime counters */
+    cobalt_taskgraph_reset(graph);
+
+    /* Bind threadpool */
+    graph->bound_pool = pool;
+
+    /* Set up WaitGroup */
+    if (graph->wg) {
+        cobalt_waitgroup_destroy(graph->wg);
+        graph->wg = NULL;
+    }
+    graph->wg = cobalt_waitgroup_create();
+    if (!graph->wg) {
+        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+        return -1;
+    }
+
+    cobalt_waitgroup_add(graph->wg, (int64_t)num_nodes);
+
+    /* Submit all root tasks (in-degree == 0) */
+    size_t num_roots = cobalt_vector_size(graph->root_nodes);
+    for (size_t i = 0; i < num_roots; i++) {
+        size_t              root_id = (size_t)(uintptr_t)cobalt_vector_get(graph->root_nodes, i);
+        cobalt_task_node_t *node = (cobalt_task_node_t *)cobalt_vector_get(graph->nodes, root_id);
+        if (cobalt_threadpool_submit(pool, taskgraph_node_worker, node) != 0) {
+            taskgraph_node_worker(node);
+        }
+    }
+
+    return 0;
 }
 
 int cobalt_taskgraph_run_and_wait(cobalt_taskgraph_t *graph, cobalt_threadpool_t *pool)
 {
-    (void)graph;
-    (void)pool;
-    return -1;
+    if (!graph || !pool || !graph->compiled) {
+        cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+        return -1;
+    }
+
+    size_t num_nodes = cobalt_vector_size(graph->nodes);
+    if (num_nodes == 0) {
+        return 0;
+    }
+
+    if (cobalt_taskgraph_run(graph, pool) != 0) {
+        return -1;
+    }
+
+    if (graph->wg) {
+        cobalt_waitgroup_wait(graph->wg);
+    }
+
+    return 0;
 }
 
 void cobalt_taskgraph_reset(cobalt_taskgraph_t *graph)
@@ -282,7 +371,7 @@ void cobalt_taskgraph_reset(cobalt_taskgraph_t *graph)
         cobalt_task_node_t *node = (cobalt_task_node_t *)cobalt_vector_get(graph->nodes, i);
         if (node) {
             atomic_store_explicit(
-                &node->remaining_in_degree, node->static_in_degree, memory_order_relaxed);
+                &node->remaining_in_degree, node->static_in_degree, memory_order_release);
         }
     }
 }
