@@ -104,6 +104,9 @@ target_link_libraries(benchmark_sort cobalt m)
 add_executable(benchmark_threadpool benchmark/benchmark_threadpool.c)
 target_link_libraries(benchmark_threadpool cobalt pthread m)
 
+add_executable(benchmark_eventloop benchmark/benchmark_eventloop.c)
+target_link_libraries(benchmark_eventloop cobalt pthread m)
+
 # Register benchmarks with CTest
 add_test(NAME bench_vector COMMAND benchmark_vector
          PASS_REGULAR_EXPRESSION "Benchmark completed")
@@ -125,10 +128,12 @@ add_test(NAME bench_sort COMMAND benchmark_sort
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 add_test(NAME bench_threadpool COMMAND benchmark_threadpool
          PASS_REGULAR_EXPRESSION "Benchmark completed")
+add_test(NAME bench_eventloop COMMAND benchmark_eventloop
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
 
 # Unified benchmark runner
 add_executable(bench_runner benchmark/bench_runner.c)
-target_link_libraries(bench_runner cobalt m)
+target_link_libraries(bench_runner cobalt pthread m)
 
 add_test(NAME bench_runner COMMAND bench_runner
          PASS_REGULAR_EXPRESSION "Benchmark suite complete")

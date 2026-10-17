@@ -4,6 +4,7 @@
  */
 
 #include "cobalt/algorithm/sort.h"
+#include "cobalt/container/buffer.h"
 #include "cobalt/container/deque.h"
 #include "cobalt/container/hashmap.h"
 #include "cobalt/container/lfqueue.h"
@@ -13,6 +14,7 @@
 #include "cobalt/container/stack.h"
 #include "cobalt/container/treemap.h"
 #include "cobalt/container/vector.h"
+#include "cobalt/module/eventloop.h"
 #include "cobalt/module/json.h"
 #include "cobalt/module/json_sax.h"
 #include "cobalt/module/threadpool.h"
@@ -315,6 +317,73 @@ static void bench_threadpool_parallel_for(void)
     cobalt_threadpool_destroy(pool);
 }
 
+/* ===== EventLoop & Buffer ===== */
+static void dummy_runner_timer_cb(uint64_t timer_id, void *user_data)
+{
+    (void)timer_id;
+    (void)user_data;
+}
+
+static void bench_eventloop_tw(void)
+{
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    if (!loop) {
+        return;
+    }
+    const int count = 20000;
+    uint64_t *ids   = (uint64_t *)malloc(sizeof(uint64_t) * count);
+    if (ids) {
+        for (int i = 0; i < count; i++) {
+            ids[i] = cobalt_eventloop_add_timer(
+                loop, (uint64_t)((i % 5000) + 1), 0, dummy_runner_timer_cb, NULL);
+        }
+        for (int i = 0; i < count / 2; i++) {
+            cobalt_eventloop_del_timer(loop, ids[i * 2]);
+        }
+        free(ids);
+    }
+    cobalt_eventloop_destroy(loop);
+}
+
+static void runner_post_cb(void *arg)
+{
+    atomic_int *counter = (atomic_int *)arg;
+    atomic_fetch_add_explicit(counter, 1, memory_order_relaxed);
+}
+
+static void bench_eventloop_post(void)
+{
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    if (!loop) {
+        return;
+    }
+    atomic_int counter;
+    atomic_init(&counter, 0);
+    const int n = 20000;
+    for (int i = 0; i < n; i++) {
+        cobalt_eventloop_post(loop, runner_post_cb, &counter);
+    }
+    while (atomic_load_explicit(&counter, memory_order_relaxed) < n) {
+        cobalt_eventloop_iteration(loop);
+    }
+    cobalt_eventloop_destroy(loop);
+}
+
+static void bench_buffer_throughput(void)
+{
+    cobalt_buffer_t *buf = cobalt_buffer_create(65536);
+    if (!buf) {
+        return;
+    }
+    char chunk[1024];
+    memset(chunk, 'X', sizeof(chunk));
+    for (int i = 0; i < 50000; i++) {
+        cobalt_buffer_append(buf, chunk, sizeof(chunk));
+        cobalt_buffer_retrieve(buf, sizeof(chunk));
+    }
+    cobalt_buffer_destroy(buf);
+}
+
 int main(int argc, char *argv[])
 {
     int json_mode = 0;
@@ -325,7 +394,7 @@ int main(int argc, char *argv[])
     }
 
     if (json_mode) {
-        cobalt_bench_result_t results[24];
+        cobalt_bench_result_t results[32];
         memset(results, 0, sizeof(results));
 
         results[0].name = "vector_push";
@@ -366,7 +435,13 @@ int main(int argc, char *argv[])
         cobalt_bench_run("threadpool_throughput", 3, bench_threadpool_throughput, &results[17]);
         results[18].name = "threadpool_parallel_for";
         cobalt_bench_run("threadpool_parallel_for", 3, bench_threadpool_parallel_for, &results[18]);
-        results[19].name = NULL;
+        results[19].name = "eventloop_tw";
+        cobalt_bench_run("eventloop_tw", 3, bench_eventloop_tw, &results[19]);
+        results[20].name = "eventloop_post";
+        cobalt_bench_run("eventloop_post", 3, bench_eventloop_post, &results[20]);
+        results[21].name = "buffer_throughput";
+        cobalt_bench_run("buffer_throughput", 3, bench_buffer_throughput, &results[21]);
+        results[22].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         free(g_bench_random_ints);
@@ -419,6 +494,11 @@ int main(int argc, char *argv[])
     printf("--- ThreadPool ---\n");
     BENCH_RUN("threadpool throughput (50k)", 3, bench_threadpool_throughput);
     BENCH_RUN("threadpool parallel_for (100k)", 3, bench_threadpool_parallel_for);
+
+    printf("--- EventLoop & Buffer ---\n");
+    BENCH_RUN("eventloop timing wheel (20k)", 3, bench_eventloop_tw);
+    BENCH_RUN("eventloop post tasks (20k)", 3, bench_eventloop_post);
+    BENCH_RUN("buffer append/retrieve (50MB)", 3, bench_buffer_throughput);
 
     printf("\nBenchmark suite complete.\n");
     free(g_bench_random_ints);
