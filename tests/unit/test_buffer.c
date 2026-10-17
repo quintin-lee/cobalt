@@ -153,6 +153,7 @@ static void test_buffer_defragment_and_expand(void)
     printf("  buffer defragment/expand: OK\n");
 }
 
+#ifndef _WIN32
 static void test_buffer_read_write_fd(void)
 {
     printf("Testing buffer vectorized read_fd and write_fd with pipe...\n");
@@ -206,6 +207,7 @@ static void test_buffer_read_write_fd(void)
     close(pipe2[1]);
     printf("  buffer read_fd/write_fd: OK\n");
 }
+#endif
 
 /* Custom mock allocator test */
 static size_t g_mock_alloc_count = 0;
@@ -264,7 +266,9 @@ void test_buffer(void)
     test_buffer_append_read_retrieve();
     test_buffer_prepend();
     test_buffer_defragment_and_expand();
+#ifndef _WIN32
     test_buffer_read_write_fd();
+#endif
     test_buffer_custom_alloc();
     printf("  Buffer tests completed\n");
 }

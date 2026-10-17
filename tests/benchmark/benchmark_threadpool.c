@@ -3,7 +3,12 @@
  * @brief Benchmark suite for Cobalt work-stealing thread pool and task scheduler
  */
 
-#define _POSIX_C_SOURCE 199309L
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
 
 #include "cobalt/module/threadpool.h"
 #include <stdatomic.h>

@@ -3,7 +3,12 @@
  * @brief Benchmark suite for Cobalt event loop, timing wheel, and zero-copy buffer
  */
 
-#define _POSIX_C_SOURCE 199309L
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
 
 #include "cobalt/container/buffer.h"
 #include "cobalt/module/eventloop.h"

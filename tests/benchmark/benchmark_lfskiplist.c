@@ -3,7 +3,12 @@
  * @brief Benchmark suite for Layer 4 Lock-Free SkipList with EBR
  */
 
-#define _POSIX_C_SOURCE 199309L
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
 
 #include "cobalt/container/lfskiplist.h"
 #include "cobalt/container/treemap.h"

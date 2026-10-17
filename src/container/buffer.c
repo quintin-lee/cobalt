@@ -12,8 +12,12 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef _WIN32
 #include <sys/uio.h>
 #include <unistd.h>
+#else
+#include <io.h>
+#endif
 
 struct cobalt_buffer {
     char               *data;
@@ -207,6 +211,7 @@ int cobalt_buffer_prepend(cobalt_buffer_t *buf, const void *data, size_t len)
     return 0;
 }
 
+#ifndef _WIN32
 ssize_t cobalt_buffer_read_fd(cobalt_buffer_t *buf, int fd, int *out_err)
 {
     if (!buf || fd < 0) {
@@ -274,3 +279,64 @@ ssize_t cobalt_buffer_write_fd(cobalt_buffer_t *buf, int fd, int *out_err)
     cobalt_buffer_retrieve(buf, (size_t)n);
     return n;
 }
+#else
+ssize_t cobalt_buffer_read_fd(cobalt_buffer_t *buf, int fd, int *out_err)
+{
+    if (!buf || fd < 0) {
+        if (out_err) {
+            *out_err = EINVAL;
+        }
+        return -1;
+    }
+
+    size_t writable = cobalt_buffer_writable_bytes(buf);
+    if (writable < 4096) {
+        if (cobalt_buffer_ensure_writable(buf, 4096) != 0) {
+            if (out_err) {
+                *out_err = ENOMEM;
+            }
+            return -1;
+        }
+        writable = cobalt_buffer_writable_bytes(buf);
+    }
+
+    int n =
+        _read(fd, buf->data + buf->write_pos, (unsigned int)(writable > 65536 ? 65536 : writable));
+    if (n < 0) {
+        if (out_err) {
+            *out_err = errno;
+        }
+        return -1;
+    }
+
+    buf->write_pos += (size_t)n;
+    return (ssize_t)n;
+}
+
+ssize_t cobalt_buffer_write_fd(cobalt_buffer_t *buf, int fd, int *out_err)
+{
+    if (!buf || fd < 0) {
+        if (out_err) {
+            *out_err = EINVAL;
+        }
+        return -1;
+    }
+
+    size_t readable = cobalt_buffer_readable_bytes(buf);
+    if (readable == 0) {
+        return 0;
+    }
+
+    int n =
+        _write(fd, buf->data + buf->read_pos, (unsigned int)(readable > 65536 ? 65536 : readable));
+    if (n < 0) {
+        if (out_err) {
+            *out_err = errno;
+        }
+        return -1;
+    }
+
+    cobalt_buffer_retrieve(buf, (size_t)n);
+    return (ssize_t)n;
+}
+#endif

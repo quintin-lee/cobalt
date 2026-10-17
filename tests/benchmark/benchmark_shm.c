@@ -4,7 +4,12 @@
  * @details Measures Round-Trip Latency (RTT) and Throughput across wait policies and payload sizes.
  */
 
-#define _POSIX_C_SOURCE 199309L
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
 
 #include "cobalt/module/shm_channel.h"
 #include "cobalt/platform/shm.h"

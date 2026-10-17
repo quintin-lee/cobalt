@@ -3,7 +3,12 @@
  * @brief Benchmark suite for parallel sort algorithms against sequential baselines
  */
 
-#define _POSIX_C_SOURCE 199309L
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE
+#endif
 
 #include "cobalt/algorithm/sort.h"
 #include "cobalt/module/parallel_sort.h"

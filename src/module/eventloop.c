@@ -37,6 +37,18 @@
 #include <sys/un.h>
 #elif defined(_WIN32)
 /* MinGW does not provide poll.h; Windows backend is not supported. */
+#ifndef POLLIN
+#define POLLIN 0x0001
+#endif
+#ifndef POLLOUT
+#define POLLOUT 0x0004
+#endif
+#ifndef POLLERR
+#define POLLERR 0x0008
+#endif
+#ifndef POLLNVAL
+#define POLLNVAL 0x0020
+#endif
 #else
 #include <poll.h>
 #include <sys/socket.h>
@@ -674,6 +686,7 @@ static void drain_post_queue(cobalt_eventloop_t *loop)
     }
 }
 
+#ifndef _WIN32
 /**
  * @brief Wakeup handler invoked when wakeup_fd becomes readable.
  */
@@ -685,6 +698,7 @@ static void on_wakeup_event(cobalt_fd_t fd, cobalt_events_t events, void *user_d
     drain_wakeup_fd(loop);
     drain_post_queue(loop);
 }
+#endif
 
 /**
  * @brief Signal the kernel wakeup descriptor to unblock platform_wait.
@@ -694,12 +708,14 @@ static void wakeup_loop(cobalt_eventloop_t *loop)
 #if defined(__linux__)
     if (loop->wakeup_fd >= 0) {
         uint64_t one = 1;
-        (void)write(loop->wakeup_fd, &one, sizeof(one));
+        ssize_t  n   = write(loop->wakeup_fd, &one, sizeof(one));
+        (void)n;
     }
 #elif !defined(_WIN32)
     if (loop->wakeup_write_fd >= 0) {
-        char b = 1;
-        (void)write(loop->wakeup_write_fd, &b, 1);
+        char    b = 1;
+        ssize_t n = write(loop->wakeup_write_fd, &b, 1);
+        (void)n;
     }
 #else
     (void)loop;
