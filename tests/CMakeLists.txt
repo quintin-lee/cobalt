@@ -73,6 +73,7 @@ add_test(NAME test_taskgraph COMMAND cobalt_test --filter taskgraph)
 add_test(NAME test_regex COMMAND cobalt_test --filter regex)
 add_test(NAME test_ebr COMMAND cobalt_test --filter ebr)
 add_test(NAME test_lfskiplist COMMAND cobalt_test --filter lfskiplist)
+add_test(NAME test_shm COMMAND cobalt_test --filter shm)
 
 # Benchmarks
 add_executable(benchmark_hashmap benchmark/benchmark_hashmap.c)

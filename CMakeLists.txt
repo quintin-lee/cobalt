@@ -58,6 +58,7 @@ set(SOURCES
     src/platform/platform.c
     src/platform/atomic.c
     src/platform/thread.c
+    src/platform/shm.c
     src/memory/allocator.c
     src/memory/arena.c
     src/memory/pool.c
@@ -110,6 +111,13 @@ target_include_directories(cobalt PUBLIC
     $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+
+if(UNIX AND NOT APPLE)
+    find_library(RT_LIB rt)
+    if(RT_LIB)
+        target_link_libraries(cobalt PUBLIC ${RT_LIB})
+    endif()
+endif()
 
 # Linker script for test registry sections (used by cobalt_test)
 set(COBALT_LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/tests/test_registry.ld)
