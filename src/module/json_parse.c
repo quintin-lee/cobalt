@@ -49,7 +49,7 @@ static void *jrealloc(json_parse_ctx_t *ctx, void *ptr, size_t new_size)
         void *new_ptr = cobalt_arena_alloc(ctx->arena, new_size);
         if (new_ptr && ptr) {
             /* Copy available content from old block */
-            memcpy(new_ptr, ptr, new_size / 2);
+            memmove(new_ptr, ptr, new_size / 2);
         }
         return new_ptr;
     }

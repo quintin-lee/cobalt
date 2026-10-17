@@ -1293,12 +1293,17 @@ int cobalt_eventloop_del_fd(cobalt_eventloop_t *loop, cobalt_fd_t fd)
 
     fd_entry_t **prev = &loop->fd_head;
     fd_entry_t  *curr = *prev;
+    fd_entry_t  *last = NULL;
     while (curr) {
         if (curr->fd == (int)fd) {
             *prev = curr->next;
+            if (loop->fd_tail == curr) {
+                loop->fd_tail = last;
+            }
             loop->alloc->free(loop->alloc, curr);
             return 0;
         }
+        last = curr;
         prev = &curr->next;
         curr = curr->next;
     }
