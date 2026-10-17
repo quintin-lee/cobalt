@@ -42,6 +42,7 @@ void test_platform_utils(void);
 void test_threadpool(void);
 void test_buffer(void);
 void test_parallel_sort(void);
+void test_taskgraph(void);
 
 typedef struct {
     const char *name;
@@ -89,6 +90,7 @@ static const TestEntry test_registry[] = {
     {"threadpool", test_threadpool},
     {"buffer", test_buffer},
     {"parallel_sort", test_parallel_sort},
+    {"taskgraph", test_taskgraph},
 };
 
 static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);
