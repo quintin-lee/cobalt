@@ -68,6 +68,7 @@ add_test(NAME test_thread_safety COMMAND cobalt_test --filter thread_safety)
 add_test(NAME test_threadsafewrapper COMMAND cobalt_test --filter threadsafewrapper)
 add_test(NAME test_threadpool COMMAND cobalt_test --filter threadpool)
 add_test(NAME test_buffer COMMAND cobalt_test --filter buffer)
+add_test(NAME test_parallel_sort COMMAND cobalt_test --filter parallel_sort)
 
 # Benchmarks
 add_executable(benchmark_hashmap benchmark/benchmark_hashmap.c)
