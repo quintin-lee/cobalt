@@ -45,7 +45,7 @@
 - Modify: `tests/CMakeLists.txt`
 - Modify: `tests/test_runner.c`
 
-- [ ] **Step 1: Create `include/cobalt/container/buffer.h`**
+- [x] **Step 1: Create `include/cobalt/container/buffer.h`**
 
 Define `cobalt_buffer_t` interface with Doxygen documentation:
 ```c
@@ -87,19 +87,19 @@ ssize_t          cobalt_buffer_write_fd(cobalt_buffer_t *buf, int fd, int *err_o
 #endif /* COBALT_CONTAINER_BUFFER_H */
 ```
 
-- [ ] **Step 2: Implement `src/container/buffer.c`**
+- [x] **Step 2: Implement `src/container/buffer.c`**
 
 Implement `cobalt_buffer_t` struct, layout management, in-place defragmentation (`memmove`), geometric expansion, and two-segment `readv` using stack buffer.
 
-- [ ] **Step 3: Create `tests/unit/test_buffer.c`**
+- [x] **Step 3: Create `tests/unit/test_buffer.c`**
 
 Test creation, destruction, append, prepend, retrieve, retrieve_all, expansion, defragmentation, custom allocator lifecycle, and `read_fd`/`write_fd` over pipes.
 
-- [ ] **Step 4: Wire into build systems**
+- [x] **Step 4: Wire into build systems**
 
 Add `src/container/buffer.c` to `CMakeLists.txt`, include in `include/cobalt/cobalt.h`, register `test_buffer` in `tests/CMakeLists.txt` and `tests/test_runner.c`.
 
-- [ ] **Step 5: Build, verify tests & commit**
+- [x] **Step 5: Build, verify tests & commit**
 
 ```bash
 clang-format -i include/cobalt/container/buffer.h src/container/buffer.c tests/unit/test_buffer.c
@@ -155,7 +155,7 @@ git commit -m "feat(eventloop): ✨ implement 4-level hierarchical timing wheel"
 - Modify: `src/module/eventloop.c`
 - Modify: `tests/unit/test_eventloop.c`
 
-- [ ] **Step 1: Declare `cobalt_eventloop_post` in `include/cobalt/module/eventloop.h`**
+- [x] **Step 1: Declare `cobalt_eventloop_post` in `include/cobalt/module/eventloop.h`**
 
 ```c
 typedef void (*cobalt_loop_task_fn_t)(void *arg);
@@ -163,7 +163,7 @@ typedef void (*cobalt_loop_task_fn_t)(void *arg);
 int cobalt_eventloop_post(cobalt_eventloop_t *loop, cobalt_loop_task_fn_t fn, void *arg);
 ```
 
-- [ ] **Step 2: Implement post queue and kernel wakeup in `src/module/eventloop.c`**
+- [x] **Step 2: Implement post queue and kernel wakeup in `src/module/eventloop.c`**
 
 Implement:
 - Initialize `cobalt_lfqueue_t *post_queue` using `cobalt_lfqueue_create_with_allocator`.
@@ -172,11 +172,11 @@ Implement:
 - Handle wakeup event in `cobalt_eventloop_iteration`: drain `wakeup_fd`, dequeue and execute all posted tasks.
 - Clean up queue and wakeup fd in `cobalt_eventloop_destroy`.
 
-- [ ] **Step 3: Add multi-threaded producer test in `tests/unit/test_eventloop.c`**
+- [x] **Step 3: Add multi-threaded producer test in `tests/unit/test_eventloop.c`**
 
 Spawn 4 worker threads submitting 20,000 tasks total via `cobalt_eventloop_post` while eventloop is running. Verify atomic counter reaches 20,000 with zero loss.
 
-- [ ] **Step 4: Build, verify tests & commit**
+- [x] **Step 4: Build, verify tests & commit**
 
 ```bash
 clang-format -i include/cobalt/module/eventloop.h src/module/eventloop.c tests/unit/test_eventloop.c
