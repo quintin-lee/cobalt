@@ -62,6 +62,7 @@ set(SOURCES
     src/memory/arena.c
     src/memory/pool.c
     src/memory/slab.c
+    src/memory/ebr.c
     src/runtime/error.c
     src/runtime/error_stack.c
     src/runtime/logger.c

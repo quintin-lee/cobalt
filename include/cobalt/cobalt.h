@@ -19,6 +19,7 @@
 /* --- Memory management --- */
 #include <cobalt/memory/allocator.h>
 #include <cobalt/memory/arena.h>
+#include <cobalt/memory/ebr.h>
 
 /* --- Runtime and error handling --- */
 #include <cobalt/runtime/error.h>
