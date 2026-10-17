@@ -116,7 +116,10 @@ static pthread_once_t s_ebr_key_once = PTHREAD_ONCE_INIT;
 static void ebr_tls_destructor(void *val)
 {
     if (val) {
-        cobalt_ebr_unregister((cobalt_ebr_handle_t *)val);
+        cobalt_ebr_handle_t *h = (cobalt_ebr_handle_t *)val;
+        if (atomic_load_explicit(&h->registered, memory_order_acquire)) {
+            cobalt_ebr_unregister(h);
+        }
     }
 }
 
@@ -171,6 +174,11 @@ void cobalt_ebr_destroy(cobalt_ebr_t *ebr)
     cobalt_ebr_handle_t *curr = atomic_load_explicit(&ebr->head_handle, memory_order_relaxed);
     while (curr) {
         cobalt_ebr_handle_t *next = atomic_load_explicit(&curr->next, memory_order_relaxed);
+#ifndef _WIN32
+        if (pthread_getspecific(s_ebr_tls_key) == curr) {
+            pthread_setspecific(s_ebr_tls_key, NULL);
+        }
+#endif
         atomic_store_explicit(&curr->registered, false, memory_order_relaxed);
         atomic_store_explicit(&curr->active_epoch, 0, memory_order_relaxed);
         for (size_t i = 0; i < 3; i++) {
@@ -254,6 +262,12 @@ void cobalt_ebr_unregister(cobalt_ebr_handle_t *handle)
     if (!handle) {
         return;
     }
+
+#ifndef _WIN32
+    if (pthread_getspecific(s_ebr_tls_key) == handle) {
+        pthread_setspecific(s_ebr_tls_key, NULL);
+    }
+#endif
 
     cobalt_ebr_t *ebr = handle->owner;
 
