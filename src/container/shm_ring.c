@@ -296,3 +296,222 @@ cobalt_shm_header_t *cobalt_shm_spsc_get_header(cobalt_shm_spsc_t *spsc)
     }
     return spsc->hdr;
 }
+
+/**
+ * @brief Internal MPMC control structure wrapping mapped memory.
+ */
+struct cobalt_shm_mpmc {
+    cobalt_shm_header_t *hdr;
+    uint8_t             *buffer;
+    size_t               capacity;
+    size_t               mask;
+    size_t               slot_size;
+    size_t               slot_stride; /* ALIGN_UP(sizeof(cobalt_shm_mpmc_slot_t) + slot_size, 64) */
+};
+
+int cobalt_shm_mpmc_init(void               *shm_addr,
+                         size_t              total_size,
+                         size_t              capacity,
+                         size_t              slot_size,
+                         cobalt_shm_mpmc_t **out_mpmc)
+{
+    if (!shm_addr || !out_mpmc || capacity < 2 || (capacity & (capacity - 1)) != 0 ||
+        slot_size == 0 || ((uintptr_t)shm_addr % 64) != 0) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    size_t slot_stride = ALIGN_UP(sizeof(cobalt_shm_mpmc_slot_t) + slot_size, 64);
+    if (slot_stride == 0 || capacity > (SIZE_MAX - sizeof(cobalt_shm_header_t)) / slot_stride) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    size_t required_size = sizeof(cobalt_shm_header_t) + capacity * slot_stride;
+    if (total_size < required_size) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    cobalt_shm_mpmc_t *mpmc = (cobalt_shm_mpmc_t *)calloc(1, sizeof(cobalt_shm_mpmc_t));
+    if (!mpmc) {
+        return COBALT_ERROR_OUT_OF_MEMORY;
+    }
+
+    memset(shm_addr, 0, sizeof(cobalt_shm_header_t));
+    cobalt_shm_header_t *hdr = (cobalt_shm_header_t *)shm_addr;
+    hdr->magic               = COBALT_SHM_MAGIC;
+    hdr->version             = COBALT_SHM_VERSION;
+    hdr->mode                = COBALT_SHM_MODE_MPMC;
+    hdr->total_shm_size      = (uint64_t)total_size;
+    hdr->capacity            = (uint64_t)capacity;
+    hdr->slot_size           = (uint32_t)slot_size;
+    hdr->creator_pid         = cobalt_getpid();
+
+    atomic_init(&hdr->heartbeat, 0);
+    atomic_init(&hdr->write_cursor, 0);
+    atomic_init(&hdr->read_cursor, 0);
+    atomic_init(&hdr->channel_state, 0);
+    atomic_init(&hdr->waiting_readers, 0);
+    atomic_init(&hdr->waiting_writers, 0);
+
+    uint8_t *buffer = (uint8_t *)shm_addr + sizeof(cobalt_shm_header_t);
+    for (size_t i = 0; i < capacity; i++) {
+        cobalt_shm_mpmc_slot_t *slot = (cobalt_shm_mpmc_slot_t *)(buffer + i * slot_stride);
+        atomic_init(&slot->sequence, (uint64_t)i);
+        slot->actual_len = 0;
+        slot->reserved   = 0;
+    }
+
+    mpmc->hdr         = hdr;
+    mpmc->buffer      = buffer;
+    mpmc->capacity    = capacity;
+    mpmc->mask        = capacity - 1;
+    mpmc->slot_size   = slot_size;
+    mpmc->slot_stride = slot_stride;
+
+    *out_mpmc = mpmc;
+    return COBALT_SUCCESS;
+}
+
+int cobalt_shm_mpmc_attach(void *shm_addr, size_t total_size, cobalt_shm_mpmc_t **out_mpmc)
+{
+    if (!shm_addr || !out_mpmc || total_size < sizeof(cobalt_shm_header_t) ||
+        ((uintptr_t)shm_addr % 64) != 0) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    cobalt_shm_header_t *hdr = (cobalt_shm_header_t *)shm_addr;
+    if (hdr->magic != COBALT_SHM_MAGIC || hdr->version != COBALT_SHM_VERSION ||
+        hdr->mode != COBALT_SHM_MODE_MPMC) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    if (hdr->capacity < 2 || (hdr->capacity & (hdr->capacity - 1)) != 0 || hdr->slot_size == 0) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    size_t slot_stride = ALIGN_UP(sizeof(cobalt_shm_mpmc_slot_t) + (size_t)hdr->slot_size, 64);
+    if (slot_stride == 0 ||
+        (size_t)hdr->capacity > (SIZE_MAX - sizeof(cobalt_shm_header_t)) / slot_stride) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    size_t required_size = sizeof(cobalt_shm_header_t) + (size_t)hdr->capacity * slot_stride;
+    if (total_size < required_size) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    cobalt_shm_mpmc_t *mpmc = (cobalt_shm_mpmc_t *)calloc(1, sizeof(cobalt_shm_mpmc_t));
+    if (!mpmc) {
+        return COBALT_ERROR_OUT_OF_MEMORY;
+    }
+
+    mpmc->hdr         = hdr;
+    mpmc->buffer      = (uint8_t *)shm_addr + sizeof(cobalt_shm_header_t);
+    mpmc->capacity    = (size_t)hdr->capacity;
+    mpmc->mask        = (size_t)(hdr->capacity - 1);
+    mpmc->slot_size   = (size_t)hdr->slot_size;
+    mpmc->slot_stride = slot_stride;
+
+    *out_mpmc = mpmc;
+    return COBALT_SUCCESS;
+}
+
+void cobalt_shm_mpmc_detach(cobalt_shm_mpmc_t *mpmc)
+{
+    if (mpmc) {
+        free(mpmc);
+    }
+}
+
+int cobalt_shm_mpmc_push(cobalt_shm_mpmc_t *mpmc, const void *data, size_t len)
+{
+    if (!mpmc || !data || len > mpmc->slot_size) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    uint64_t pos = atomic_load_explicit(&mpmc->hdr->write_cursor, memory_order_relaxed);
+    while (1) {
+        cobalt_shm_mpmc_slot_t *slot =
+            (cobalt_shm_mpmc_slot_t *)(mpmc->buffer + (pos & mpmc->mask) * mpmc->slot_stride);
+        uint64_t seq  = atomic_load_explicit(&slot->sequence, memory_order_acquire);
+        int64_t  diff = (int64_t)seq - (int64_t)pos;
+
+        if (diff == 0) {
+            if (atomic_compare_exchange_weak_explicit(&mpmc->hdr->write_cursor,
+                                                      &pos,
+                                                      pos + 1,
+                                                      memory_order_relaxed,
+                                                      memory_order_relaxed)) {
+                slot->actual_len = (uint32_t)len;
+                memcpy(slot->payload, data, len);
+                atomic_store_explicit(&slot->sequence, pos + 1, memory_order_release);
+                return COBALT_SUCCESS;
+            }
+        } else if (diff < 0) {
+            return COBALT_ERROR_QUEUE_FULL;
+        } else {
+            pos = atomic_load_explicit(&mpmc->hdr->write_cursor, memory_order_relaxed);
+        }
+    }
+}
+
+int cobalt_shm_mpmc_pop(cobalt_shm_mpmc_t *mpmc, void *buf, size_t buf_size, size_t *out_len)
+{
+    if (!mpmc || (!buf && buf_size > 0)) {
+        return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+
+    uint64_t pos = atomic_load_explicit(&mpmc->hdr->read_cursor, memory_order_relaxed);
+    while (1) {
+        cobalt_shm_mpmc_slot_t *slot =
+            (cobalt_shm_mpmc_slot_t *)(mpmc->buffer + (pos & mpmc->mask) * mpmc->slot_stride);
+        uint64_t seq  = atomic_load_explicit(&slot->sequence, memory_order_acquire);
+        int64_t  diff = (int64_t)seq - (int64_t)(pos + 1);
+
+        if (diff == 0) {
+            if (atomic_compare_exchange_weak_explicit(&mpmc->hdr->read_cursor,
+                                                      &pos,
+                                                      pos + 1,
+                                                      memory_order_relaxed,
+                                                      memory_order_relaxed)) {
+                uint32_t actual = slot->actual_len;
+                if (out_len) {
+                    *out_len = (size_t)actual;
+                }
+                if (buf && buf_size > 0) {
+                    size_t to_copy = (size_t)actual < buf_size ? (size_t)actual : buf_size;
+                    memcpy(buf, slot->payload, to_copy);
+                }
+                atomic_store_explicit(&slot->sequence, pos + mpmc->capacity, memory_order_release);
+                return COBALT_SUCCESS;
+            }
+        } else if (diff < 0) {
+            return COBALT_ERROR_EMPTY_CONTAINER;
+        } else {
+            pos = atomic_load_explicit(&mpmc->hdr->read_cursor, memory_order_relaxed);
+        }
+    }
+}
+
+size_t cobalt_shm_mpmc_capacity(const cobalt_shm_mpmc_t *mpmc)
+{
+    if (!mpmc) {
+        return 0;
+    }
+    return mpmc->capacity;
+}
+
+size_t cobalt_shm_mpmc_slot_size(const cobalt_shm_mpmc_t *mpmc)
+{
+    if (!mpmc) {
+        return 0;
+    }
+    return mpmc->slot_size;
+}
+
+cobalt_shm_header_t *cobalt_shm_mpmc_get_header(cobalt_shm_mpmc_t *mpmc)
+{
+    if (!mpmc) {
+        return NULL;
+    }
+    return mpmc->hdr;
+}

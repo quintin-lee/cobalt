@@ -6,11 +6,14 @@
 #include "cobalt/container/shm_ring.h"
 #include "cobalt/platform/notifier.h"
 #include "cobalt/platform/shm.h"
+#include "cobalt/platform/thread.h"
 #include "cobalt/runtime/error.h"
 #include "test_framework.h"
 
+#include <stdalign.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void test_shm_create_and_close(void)
@@ -686,6 +689,382 @@ static void test_spsc_invalid_args(void)
     printf("  SPSC invalid arguments test passed\n");
 }
 
+static void test_mpmc_basic_push_pop(void)
+{
+    printf("Testing cobalt_shm_mpmc basic push and pop...\n");
+
+    const char *name = "/cobalt_test_mpmc_basic";
+    cobalt_shm_unlink(name);
+
+    size_t capacity    = 128;
+    size_t slot_size   = 64;
+    size_t slot_stride = 128; /* ALIGN_UP(16 + 64, 64) */
+    size_t total_size  = sizeof(cobalt_shm_header_t) + capacity * slot_stride;
+
+    cobalt_shm_t *shm_prod = NULL;
+    int           rc       = cobalt_shm_create(name, total_size, &shm_prod);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(shm_prod != NULL);
+
+    cobalt_shm_mpmc_t *mpmc_prod = NULL;
+    rc                           = cobalt_shm_mpmc_init(
+        cobalt_shm_get_addr(shm_prod), total_size, capacity, slot_size, &mpmc_prod);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(mpmc_prod != NULL);
+    TEST_ASSERT(cobalt_shm_mpmc_capacity(mpmc_prod) == capacity);
+    TEST_ASSERT(cobalt_shm_mpmc_slot_size(mpmc_prod) == slot_size);
+
+    cobalt_shm_header_t *hdr = cobalt_shm_mpmc_get_header(mpmc_prod);
+    TEST_ASSERT(hdr != NULL);
+    TEST_ASSERT(hdr->magic == COBALT_SHM_MAGIC);
+    TEST_ASSERT(hdr->version == COBALT_SHM_VERSION);
+    TEST_ASSERT(hdr->mode == COBALT_SHM_MODE_MPMC);
+    TEST_ASSERT(hdr->capacity == capacity);
+    TEST_ASSERT(hdr->slot_size == (uint32_t)slot_size);
+
+    cobalt_shm_t *shm_cons = NULL;
+    rc                     = cobalt_shm_open(name, &shm_cons);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(shm_cons != NULL);
+
+    cobalt_shm_mpmc_t *mpmc_cons = NULL;
+    rc = cobalt_shm_mpmc_attach(cobalt_shm_get_addr(shm_cons), total_size, &mpmc_cons);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(mpmc_cons != NULL);
+    TEST_ASSERT(cobalt_shm_mpmc_capacity(mpmc_cons) == capacity);
+    TEST_ASSERT(cobalt_shm_mpmc_slot_size(mpmc_cons) == slot_size);
+
+    /* Write 100 messages of varying sizes */
+    for (int i = 0; i < 100; i++) {
+        uint8_t payload[64];
+        size_t  len = (size_t)((i * 17) % 64 + 1);
+        for (size_t j = 0; j < len; j++) {
+            payload[j] = (uint8_t)((i * 3 + j) & 0xFF);
+        }
+        rc = cobalt_shm_mpmc_push(mpmc_prod, payload, len);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    /* Read and verify all 100 messages */
+    for (int i = 0; i < 100; i++) {
+        uint8_t buf[64];
+        size_t  out_len      = 0;
+        size_t  expected_len = (size_t)((i * 17) % 64 + 1);
+
+        rc = cobalt_shm_mpmc_pop(mpmc_cons, buf, sizeof(buf), &out_len);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        TEST_ASSERT(out_len == expected_len);
+
+        for (size_t j = 0; j < out_len; j++) {
+            TEST_ASSERT(buf[j] == (uint8_t)((i * 3 + j) & 0xFF));
+        }
+    }
+
+    /* Verify ring buffer is empty */
+    uint8_t buf[64];
+    size_t  out_len = 0;
+    rc              = cobalt_shm_mpmc_pop(mpmc_cons, buf, sizeof(buf), &out_len);
+    TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+
+    cobalt_shm_mpmc_detach(mpmc_cons);
+    cobalt_shm_mpmc_detach(mpmc_prod);
+    cobalt_shm_close(shm_cons);
+    cobalt_shm_close(shm_prod);
+    cobalt_shm_unlink(name);
+
+    printf("  MPMC basic push and pop test passed\n");
+}
+
+static void test_mpmc_queue_full_and_empty(void)
+{
+    printf("Testing cobalt_shm_mpmc queue full and empty conditions across revolutions...\n");
+
+    const char *name = "/cobalt_test_mpmc_full_empty";
+    cobalt_shm_unlink(name);
+
+    size_t capacity    = 16;
+    size_t slot_size   = 32;
+    size_t slot_stride = 64; /* ALIGN_UP(16 + 32, 64) */
+    size_t total_size  = sizeof(cobalt_shm_header_t) + capacity * slot_stride;
+
+    cobalt_shm_t *shm = NULL;
+    int           rc  = cobalt_shm_create(name, total_size, &shm);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_shm_mpmc_t *mpmc = NULL;
+    rc = cobalt_shm_mpmc_init(cobalt_shm_get_addr(shm), total_size, capacity, slot_size, &mpmc);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    /* Test multiple revolutions */
+    for (int rev = 0; rev < 5; rev++) {
+        /* Empty check before push */
+        uint32_t val     = 0;
+        size_t   out_len = 0;
+        rc               = cobalt_shm_mpmc_pop(mpmc, &val, sizeof(val), &out_len);
+        TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+
+        /* Fill exactly 16 slots */
+        for (int i = 0; i < 16; i++) {
+            uint32_t item = (uint32_t)(rev * 1000 + i);
+            rc            = cobalt_shm_mpmc_push(mpmc, &item, sizeof(item));
+            TEST_ASSERT(rc == COBALT_SUCCESS);
+        }
+
+        /* 17th push should return QUEUE_FULL */
+        uint32_t extra = 99999;
+        rc             = cobalt_shm_mpmc_push(mpmc, &extra, sizeof(extra));
+        TEST_ASSERT(rc == COBALT_ERROR_QUEUE_FULL);
+
+        /* Drain all 16 slots */
+        for (int i = 0; i < 16; i++) {
+            val     = 0;
+            out_len = 0;
+            rc      = cobalt_shm_mpmc_pop(mpmc, &val, sizeof(val), &out_len);
+            TEST_ASSERT(rc == COBALT_SUCCESS);
+            TEST_ASSERT(out_len == sizeof(uint32_t));
+            TEST_ASSERT(val == (uint32_t)(rev * 1000 + i));
+        }
+
+        /* 17th pop should return EMPTY_CONTAINER */
+        rc = cobalt_shm_mpmc_pop(mpmc, &val, sizeof(val), &out_len);
+        TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+    }
+
+    cobalt_shm_mpmc_detach(mpmc);
+    cobalt_shm_close(shm);
+    cobalt_shm_unlink(name);
+
+    printf("  MPMC queue full and empty test passed\n");
+}
+
+#define MPMC_NUM_PRODUCERS 4
+#define MPMC_NUM_CONSUMERS 4
+#define MPMC_ITEMS_PER_PRODUCER 12500
+#define MPMC_TOTAL_ITEMS (MPMC_NUM_PRODUCERS * MPMC_ITEMS_PER_PRODUCER)
+#define MPMC_ITEMS_PER_CONSUMER (MPMC_TOTAL_ITEMS / MPMC_NUM_CONSUMERS)
+
+typedef struct {
+    cobalt_shm_mpmc_t *mpmc;
+    int                thread_id;
+} mpmc_worker_arg_t;
+
+static uint64_t g_mpmc_consumer_sums[MPMC_NUM_CONSUMERS];
+static size_t   g_mpmc_consumer_counts[MPMC_NUM_CONSUMERS];
+
+static void *mpmc_producer_worker(void *arg)
+{
+    mpmc_worker_arg_t *w = (mpmc_worker_arg_t *)arg;
+    for (int i = 0; i < MPMC_ITEMS_PER_PRODUCER; i++) {
+        uint64_t val = (uint64_t)(w->thread_id * MPMC_ITEMS_PER_PRODUCER + i + 1);
+        while (cobalt_shm_mpmc_push(w->mpmc, &val, sizeof(val)) == COBALT_ERROR_QUEUE_FULL) {
+            cobalt_thread_yield();
+        }
+    }
+    return NULL;
+}
+
+static void *mpmc_consumer_worker(void *arg)
+{
+    mpmc_worker_arg_t *w            = (mpmc_worker_arg_t *)arg;
+    uint64_t           sum          = 0;
+    size_t             items_popped = 0;
+
+    while (items_popped < MPMC_ITEMS_PER_CONSUMER) {
+        uint64_t val     = 0;
+        size_t   out_len = 0;
+        int      rc      = cobalt_shm_mpmc_pop(w->mpmc, &val, sizeof(val), &out_len);
+        if (rc == COBALT_SUCCESS) {
+            TEST_ASSERT(out_len == sizeof(val));
+            sum += val;
+            items_popped++;
+        } else if (rc == COBALT_ERROR_EMPTY_CONTAINER) {
+            cobalt_thread_yield();
+        }
+    }
+    g_mpmc_consumer_sums[w->thread_id]   = sum;
+    g_mpmc_consumer_counts[w->thread_id] = items_popped;
+    return NULL;
+}
+
+static void test_mpmc_multithreaded_contention(void)
+{
+    printf("Testing cobalt_shm_mpmc multithreaded contention (4P + 4C, 50,000 items)...\n");
+
+    const char *name = "/cobalt_test_mpmc_mt";
+    cobalt_shm_unlink(name);
+
+    size_t capacity    = 1024;
+    size_t slot_size   = sizeof(uint64_t);
+    size_t slot_stride = 64; /* ALIGN_UP(16 + 8, 64) */
+    size_t total_size  = sizeof(cobalt_shm_header_t) + capacity * slot_stride;
+
+    cobalt_shm_t *shm = NULL;
+    int           rc  = cobalt_shm_create(name, total_size, &shm);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_shm_mpmc_t *mpmc = NULL;
+    rc = cobalt_shm_mpmc_init(cobalt_shm_get_addr(shm), total_size, capacity, slot_size, &mpmc);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_thread_t   producers[MPMC_NUM_PRODUCERS];
+    cobalt_thread_t   consumers[MPMC_NUM_CONSUMERS];
+    mpmc_worker_arg_t prod_args[MPMC_NUM_PRODUCERS];
+    mpmc_worker_arg_t cons_args[MPMC_NUM_CONSUMERS];
+
+    for (int i = 0; i < MPMC_NUM_CONSUMERS; i++) {
+        cons_args[i].mpmc         = mpmc;
+        cons_args[i].thread_id    = i;
+        g_mpmc_consumer_sums[i]   = 0;
+        g_mpmc_consumer_counts[i] = 0;
+        TEST_ASSERT(cobalt_thread_create(mpmc_consumer_worker, &cons_args[i], &consumers[i]) == 0);
+    }
+
+    for (int i = 0; i < MPMC_NUM_PRODUCERS; i++) {
+        prod_args[i].mpmc      = mpmc;
+        prod_args[i].thread_id = i;
+        TEST_ASSERT(cobalt_thread_create(mpmc_producer_worker, &prod_args[i], &producers[i]) == 0);
+    }
+
+    for (int i = 0; i < MPMC_NUM_PRODUCERS; i++) {
+        cobalt_thread_join(producers[i]);
+    }
+    for (int i = 0; i < MPMC_NUM_CONSUMERS; i++) {
+        cobalt_thread_join(consumers[i]);
+    }
+
+    size_t   total_items_consumed = 0;
+    uint64_t total_sum            = 0;
+    for (int i = 0; i < MPMC_NUM_CONSUMERS; i++) {
+        total_items_consumed += g_mpmc_consumer_counts[i];
+        total_sum += g_mpmc_consumer_sums[i];
+    }
+
+    TEST_ASSERT(total_items_consumed == (size_t)MPMC_TOTAL_ITEMS);
+
+    uint64_t expected_sum = 0;
+    for (int p = 0; p < MPMC_NUM_PRODUCERS; p++) {
+        for (int i = 0; i < MPMC_ITEMS_PER_PRODUCER; i++) {
+            expected_sum += (uint64_t)(p * MPMC_ITEMS_PER_PRODUCER + i + 1);
+        }
+    }
+    TEST_ASSERT(total_sum == expected_sum);
+
+    /* Verify ring is now empty */
+    uint64_t dummy   = 0;
+    size_t   out_len = 0;
+    rc               = cobalt_shm_mpmc_pop(mpmc, &dummy, sizeof(dummy), &out_len);
+    TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+
+    cobalt_shm_mpmc_detach(mpmc);
+    cobalt_shm_close(shm);
+    cobalt_shm_unlink(name);
+
+    printf("  MPMC multithreaded contention test passed\n");
+}
+
+static void test_mpmc_invalid_args(void)
+{
+    printf("Testing cobalt_shm_mpmc invalid arguments and edge cases...\n");
+
+    cobalt_shm_mpmc_t   *mpmc = NULL;
+    _Alignas(64) uint8_t buffer[4096];
+
+    /* init: NULL address */
+    TEST_ASSERT(cobalt_shm_mpmc_init(NULL, sizeof(buffer), 16, 32, &mpmc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: unaligned address */
+    TEST_ASSERT(cobalt_shm_mpmc_init(buffer + 1, sizeof(buffer) - 1, 16, 32, &mpmc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: NULL out_mpmc */
+    TEST_ASSERT(cobalt_shm_mpmc_init(buffer, sizeof(buffer), 16, 32, NULL) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: capacity 0 */
+    TEST_ASSERT(cobalt_shm_mpmc_init(buffer, sizeof(buffer), 0, 32, &mpmc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: capacity 1 */
+    TEST_ASSERT(cobalt_shm_mpmc_init(buffer, sizeof(buffer), 1, 32, &mpmc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: non-power-of-two capacity */
+    TEST_ASSERT(cobalt_shm_mpmc_init(buffer, sizeof(buffer), 10, 32, &mpmc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: slot_size 0 */
+    TEST_ASSERT(cobalt_shm_mpmc_init(buffer, sizeof(buffer), 16, 0, &mpmc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: total_size too small */
+    TEST_ASSERT(cobalt_shm_mpmc_init(buffer, 100, 16, 32, &mpmc) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* Valid init */
+    int rc = cobalt_shm_mpmc_init(buffer, sizeof(buffer), 16, 32, &mpmc);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(mpmc != NULL);
+
+    /* attach: unaligned address */
+    cobalt_shm_mpmc_t *mpmc_att = NULL;
+    TEST_ASSERT(cobalt_shm_mpmc_attach(buffer + 1, sizeof(buffer) - 1, &mpmc_att) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* attach: NULL address or NULL out_mpmc */
+    TEST_ASSERT(cobalt_shm_mpmc_attach(NULL, sizeof(buffer), &mpmc_att) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_mpmc_attach(buffer, sizeof(buffer), NULL) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* attach: undersized total_size */
+    TEST_ASSERT(cobalt_shm_mpmc_attach(buffer, 100, &mpmc_att) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* attach: corrupted header mode */
+    cobalt_shm_header_t *hdr = (cobalt_shm_header_t *)buffer;
+    hdr->mode                = COBALT_SHM_MODE_SPSC;
+    TEST_ASSERT(cobalt_shm_mpmc_attach(buffer, sizeof(buffer), &mpmc_att) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+    hdr->mode = COBALT_SHM_MODE_MPMC;
+
+    /* push: NULL handle or NULL data */
+    uint32_t data = 42;
+    TEST_ASSERT(cobalt_shm_mpmc_push(NULL, &data, sizeof(data)) == COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_mpmc_push(mpmc, NULL, sizeof(data)) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* push: payload len > slot_size (32) */
+    uint8_t large_data[64];
+    TEST_ASSERT(cobalt_shm_mpmc_push(mpmc, large_data, 64) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* pop: NULL handle */
+    uint32_t out_buf = 0;
+    size_t   out_len = 0;
+    TEST_ASSERT(cobalt_shm_mpmc_pop(NULL, &out_buf, sizeof(out_buf), &out_len) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* pop: buf NULL but buf_size > 0 */
+    TEST_ASSERT(cobalt_shm_mpmc_pop(mpmc, NULL, sizeof(out_buf), &out_len) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* pop: NULL out_len with valid buf is allowed */
+    rc = cobalt_shm_mpmc_push(mpmc, &data, sizeof(data));
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    rc = cobalt_shm_mpmc_pop(mpmc, &out_buf, sizeof(out_buf), NULL);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(out_buf == 42);
+
+    /* getters on NULL handle */
+    TEST_ASSERT(cobalt_shm_mpmc_capacity(NULL) == 0);
+    TEST_ASSERT(cobalt_shm_mpmc_slot_size(NULL) == 0);
+    TEST_ASSERT(cobalt_shm_mpmc_get_header(NULL) == NULL);
+
+    /* detach: NULL is safe no-op */
+    cobalt_shm_mpmc_detach(NULL);
+
+    cobalt_shm_mpmc_detach(mpmc);
+
+    printf("  MPMC invalid arguments test passed\n");
+}
+
 void test_shm(void)
 {
     printf("Testing shared memory primitive (cobalt_shm_t)...\n");
@@ -706,5 +1085,12 @@ void test_shm(void)
     test_spsc_wraparound();
     test_spsc_queue_full();
     test_spsc_invalid_args();
-    printf("  SPSC shared memory ring tests completed successfully!\n");
+    printf("  SPSC shared memory ring tests completed successfully!\n\n");
+
+    printf("Testing lock-free MPMC shared memory ring (cobalt_shm_mpmc_t)...\n");
+    test_mpmc_basic_push_pop();
+    test_mpmc_queue_full_and_empty();
+    test_mpmc_multithreaded_contention();
+    test_mpmc_invalid_args();
+    printf("  MPMC shared memory ring tests completed successfully!\n");
 }

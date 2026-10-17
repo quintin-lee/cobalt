@@ -151,4 +151,89 @@ cobalt_shm_header_t *cobalt_shm_spsc_get_header(cobalt_shm_spsc_t *spsc);
  */
 int cobalt_shm_spsc_cancel(cobalt_shm_spsc_t *spsc);
 
+/**
+ * @brief MPMC slot header preceding payload within each aligned slot.
+ */
+typedef struct {
+    atomic_uint_fast64_t sequence;   /* 8 bytes sequence number */
+    uint32_t             actual_len; /* Actual payload bytes written */
+    uint32_t             reserved;   /* Padding to 16 bytes */
+    uint8_t              payload[];  /* Variable user payload up to slot_size */
+} cobalt_shm_mpmc_slot_t;
+
+/**
+ * @brief Opaque handle for local MPMC ring buffer operations.
+ */
+typedef struct cobalt_shm_mpmc cobalt_shm_mpmc_t;
+
+/**
+ * @brief Initialize a new MPMC Dmitry Vyukov shared memory ring buffer.
+ * @param shm_addr Base address of mapped shared memory (must be 64-byte aligned)
+ * @param total_size Total mapped size in bytes
+ * @param capacity Number of slots (must be a power of two)
+ * @param slot_size Maximum payload capacity per slot in bytes (must be > 0)
+ * @param out_mpmc Pointer to receive created MPMC handle
+ * @return COBALT_SUCCESS on success, error code otherwise
+ */
+int cobalt_shm_mpmc_init(void               *shm_addr,
+                         size_t              total_size,
+                         size_t              capacity,
+                         size_t              slot_size,
+                         cobalt_shm_mpmc_t **out_mpmc);
+
+/**
+ * @brief Attach to an existing MPMC shared memory ring buffer.
+ * @param shm_addr Base address of mapped shared memory (must be 64-byte aligned)
+ * @param total_size Total mapped size in bytes
+ * @param out_mpmc Pointer to receive MPMC handle
+ * @return COBALT_SUCCESS on success, error code otherwise
+ */
+int cobalt_shm_mpmc_attach(void *shm_addr, size_t total_size, cobalt_shm_mpmc_t **out_mpmc);
+
+/**
+ * @brief Detach and free local MPMC handle (does not unmap shm).
+ * @param mpmc MPMC handle
+ */
+void cobalt_shm_mpmc_detach(cobalt_shm_mpmc_t *mpmc);
+
+/**
+ * @brief Enqueue a message into the MPMC ring buffer (lock-free, multi-producer safe).
+ * @param mpmc MPMC handle
+ * @param data Pointer to message payload
+ * @param len Length in bytes (must be <= slot_size)
+ * @return COBALT_SUCCESS on success, COBALT_ERROR_QUEUE_FULL if ring is full
+ */
+int cobalt_shm_mpmc_push(cobalt_shm_mpmc_t *mpmc, const void *data, size_t len);
+
+/**
+ * @brief Dequeue a message from the MPMC ring buffer (lock-free, multi-consumer safe).
+ * @param mpmc MPMC handle
+ * @param buf Output buffer to copy payload into
+ * @param buf_size Size of output buffer
+ * @param out_len Pointer to receive actual payload length (optional, can be NULL)
+ * @return COBALT_SUCCESS on success, COBALT_ERROR_EMPTY_CONTAINER if ring is empty
+ */
+int cobalt_shm_mpmc_pop(cobalt_shm_mpmc_t *mpmc, void *buf, size_t buf_size, size_t *out_len);
+
+/**
+ * @brief Get capacity (number of slots).
+ * @param mpmc MPMC handle
+ * @return Capacity in number of slots, or 0 if mpmc is NULL
+ */
+size_t cobalt_shm_mpmc_capacity(const cobalt_shm_mpmc_t *mpmc);
+
+/**
+ * @brief Get slot size (max bytes per slot).
+ * @param mpmc MPMC handle
+ * @return Maximum payload bytes per slot, or 0 if mpmc is NULL
+ */
+size_t cobalt_shm_mpmc_slot_size(const cobalt_shm_mpmc_t *mpmc);
+
+/**
+ * @brief Get underlying shared memory header.
+ * @param mpmc MPMC handle
+ * @return Pointer to underlying shared memory header, or NULL if mpmc is NULL
+ */
+cobalt_shm_header_t *cobalt_shm_mpmc_get_header(cobalt_shm_mpmc_t *mpmc);
+
 #endif /* COBALT_CONTAINER_SHM_RING_H */
