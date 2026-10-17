@@ -430,6 +430,121 @@ static void test_regex_convenience(void)
     printf("  convenience test API: OK\n");
 }
 
+static void test_regex_capture_groups(void)
+{
+    printf("Testing regex capture group extraction...\n");
+
+    cobalt_regex_t *re = cobalt_regex_compile("(\\d{4})-(\\d{2})-(\\d{2})", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_capture_count(re), 3U);
+
+    cobalt_regex_capture_t caps[4];
+    int                    res = cobalt_regex_search(re, "Date: 2026-10-17 today", caps, 4);
+    TEST_EQUAL(res, 1);
+
+    /* Group 0: full match "2026-10-17" */
+    TEST_EQUAL(caps[0].start, 6U);
+    TEST_EQUAL(caps[0].end, 16U);
+    TEST_EQUAL(caps[0].length, 10U);
+
+    /* Group 1: "2026" */
+    TEST_EQUAL(caps[1].start, 6U);
+    TEST_EQUAL(caps[1].end, 10U);
+    TEST_EQUAL(caps[1].length, 4U);
+
+    /* Group 2: "10" */
+    TEST_EQUAL(caps[2].start, 11U);
+    TEST_EQUAL(caps[2].end, 13U);
+    TEST_EQUAL(caps[2].length, 2U);
+
+    /* Group 3: "17" */
+    TEST_EQUAL(caps[3].start, 14U);
+    TEST_EQUAL(caps[3].end, 16U);
+    TEST_EQUAL(caps[3].length, 2U);
+
+    cobalt_regex_destroy(re);
+
+    /* Nested groups: ((a)(b(c))) */
+    re = cobalt_regex_compile("((a)(b(c)))", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_capture_count(re), 4U);
+
+    cobalt_regex_capture_t nested_caps[5];
+    res = cobalt_regex_search(re, "abc", nested_caps, 5);
+    TEST_EQUAL(res, 1);
+    TEST_EQUAL(nested_caps[0].start, 0U);
+    TEST_EQUAL(nested_caps[0].end, 3U);
+    TEST_EQUAL(nested_caps[0].length, 3U);
+
+    /* Group 1: "abc" */
+    TEST_EQUAL(nested_caps[1].start, 0U);
+    TEST_EQUAL(nested_caps[1].end, 3U);
+    TEST_EQUAL(nested_caps[1].length, 3U);
+
+    /* Group 2: "a" */
+    TEST_EQUAL(nested_caps[2].start, 0U);
+    TEST_EQUAL(nested_caps[2].end, 1U);
+    TEST_EQUAL(nested_caps[2].length, 1U);
+
+    /* Group 3: "bc" */
+    TEST_EQUAL(nested_caps[3].start, 1U);
+    TEST_EQUAL(nested_caps[3].end, 3U);
+    TEST_EQUAL(nested_caps[3].length, 2U);
+
+    /* Group 4: "c" */
+    TEST_EQUAL(nested_caps[4].start, 2U);
+    TEST_EQUAL(nested_caps[4].end, 3U);
+    TEST_EQUAL(nested_caps[4].length, 1U);
+
+    cobalt_regex_destroy(re);
+
+    /* Unmatched capture groups in alternation: (a)|(b) */
+    re = cobalt_regex_compile("(a)|(b)", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    cobalt_regex_capture_t alt_caps[3];
+    res = cobalt_regex_search(re, "a", alt_caps, 3);
+    TEST_EQUAL(res, 1);
+    TEST_EQUAL(alt_caps[1].start, 0U);
+    TEST_EQUAL(alt_caps[1].end, 1U);
+    TEST_EQUAL(alt_caps[1].length, 1U);
+    /* Group 2 did not participate in match */
+    TEST_EQUAL(alt_caps[2].start, (size_t)-1);
+    TEST_EQUAL(alt_caps[2].end, (size_t)-1);
+    TEST_EQUAL(alt_caps[2].length, 0U);
+
+    cobalt_regex_destroy(re);
+
+    printf("  capture group extraction: OK\n");
+}
+
+static void test_regex_backreferences(void)
+{
+    printf("Testing regex backreferences (\\1)...\n");
+
+    /* Repeated word: ([a-z]+)\s+\1 */
+    cobalt_regex_t *re = cobalt_regex_compile("([a-z]+)\\s+\\1", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+
+    cobalt_regex_capture_t caps[2];
+    TEST_EQUAL(cobalt_regex_search(re, "hello hello", caps, 2), 1);
+    TEST_EQUAL(caps[0].start, 0U);
+    TEST_EQUAL(caps[0].end, 11U);
+    TEST_EQUAL(caps[1].start, 0U);
+    TEST_EQUAL(caps[1].end, 5U);
+
+    TEST_EQUAL(cobalt_regex_search(re, "hello world", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    /* HTML tag pattern: <([a-z]+)>.*?</\1> */
+    re = cobalt_regex_compile("<([a-z]+)>.*?</\\1>", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "<div>hello world</div>", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "<div>hello world</span>", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    printf("  backreferences: OK\n");
+}
+
 void test_regex(void)
 {
     printf("=== Regex Engine Tests ===\n");
@@ -444,5 +559,7 @@ void test_regex(void)
     test_regex_quantifiers();
     test_regex_alternation();
     test_regex_convenience();
+    test_regex_capture_groups();
+    test_regex_backreferences();
     printf("All regex unit tests passed!\n");
 }
