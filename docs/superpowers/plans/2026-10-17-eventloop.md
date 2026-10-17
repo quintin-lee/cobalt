@@ -276,27 +276,27 @@ git commit -m "test(bench): ⚡ add benchmark suite for event loop and buffer en
 **Files:**
 - Repository-wide verification across all modified and created files.
 
-- [ ] **Step 1: Clang-format verification**
+- [x] **Step 1: Clang-format verification**
 
 ```bash
 clang-format -i include/cobalt/container/buffer.h src/container/buffer.c tests/unit/test_buffer.c include/cobalt/module/eventloop.h src/module/eventloop.c tests/unit/test_eventloop.c tests/benchmark/benchmark_eventloop.c
 clang-format --dry-run -Werror include/cobalt/container/buffer.h src/container/buffer.c tests/unit/test_buffer.c include/cobalt/module/eventloop.h src/module/eventloop.c tests/unit/test_eventloop.c tests/benchmark/benchmark_eventloop.c
 ```
 
-- [ ] **Step 2: Clang-tidy static analysis**
+- [x] **Step 2: Clang-tidy static analysis**
 
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Debug -DCOBALT_RUN_TIDY=ON
 cmake --build build -j4
 ```
 
-- [ ] **Step 3: Full CTest execution**
+- [x] **Step 3: Full CTest execution**
 
 ```bash
 ctest --test-dir build --output-on-failure
 ```
 
-- [ ] **Step 4: AddressSanitizer & LeakSanitizer execution**
+- [x] **Step 4: AddressSanitizer & LeakSanitizer execution**
 
 ```bash
 cmake -B build-asan -DCMAKE_BUILD_TYPE=Debug -DCOBALT_ENABLE_ASAN=ON
@@ -304,7 +304,7 @@ cmake --build build-asan -j4
 ctest --test-dir build-asan --output-on-failure
 ```
 
-- [ ] **Step 5: Commit finalization**
+- [x] **Step 5: Commit finalization**
 
 ```bash
 git add -f docs/superpowers/plans/2026-10-17-eventloop.md
