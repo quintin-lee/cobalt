@@ -3,6 +3,7 @@
  * @brief Unified benchmark runner — executes all benchmarks with statistics
  */
 
+#include "cobalt/algorithm/regex.h"
 #include "cobalt/algorithm/sort.h"
 #include "cobalt/container/buffer.h"
 #include "cobalt/container/deque.h"
@@ -459,6 +460,49 @@ static void bench_buffer_throughput(void)
     cobalt_buffer_destroy(buf);
 }
 
+/* ===== Regex ===== */
+static void bench_regex_redos(void)
+{
+    cobalt_regex_t *re = cobalt_regex_compile("^(a+)+$", COBALT_REGEX_DEFAULT);
+    if (!re) {
+        return;
+    }
+    const char *pathological = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX";
+    for (int i = 0; i < 1000; i++) {
+        cobalt_regex_search(re, pathological, NULL, 0);
+    }
+    cobalt_regex_destroy(re);
+}
+
+static void bench_regex_email(void)
+{
+    cobalt_regex_t *re = cobalt_regex_compile("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,6}$",
+                                              COBALT_REGEX_DEFAULT);
+    if (!re) {
+        return;
+    }
+    const char *email = "user.name+tag@example-domain.co.uk";
+    for (int i = 0; i < 10000; i++) {
+        cobalt_regex_match_exact(re, email, NULL, 0);
+    }
+    cobalt_regex_destroy(re);
+}
+
+static void bench_regex_ipv4(void)
+{
+    cobalt_regex_t *re =
+        cobalt_regex_compile("\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}", COBALT_REGEX_DEFAULT);
+    if (!re) {
+        return;
+    }
+    const char *line = "2026-10-17 12:00:00 IP 192.168.1.100 GET /api/v1/resource HTTP/1.1 200 OK";
+    cobalt_regex_capture_t cap;
+    for (int i = 0; i < 10000; i++) {
+        cobalt_regex_search(re, line, &cap, 1);
+    }
+    cobalt_regex_destroy(re);
+}
+
 int main(int argc, char *argv[])
 {
     int json_mode = 0;
@@ -523,7 +567,13 @@ int main(int argc, char *argv[])
             "parallel_stable_sort_random", 3, bench_parallel_stable_sort_random, &results[23]);
         results[24].name = "taskgraph_dag";
         cobalt_bench_run("taskgraph_dag", 3, bench_taskgraph_dag, &results[24]);
-        results[25].name = NULL;
+        results[25].name = "regex_redos";
+        cobalt_bench_run("regex_redos", 3, bench_regex_redos, &results[25]);
+        results[26].name = "regex_email";
+        cobalt_bench_run("regex_email", 3, bench_regex_email, &results[26]);
+        results[27].name = "regex_ipv4";
+        cobalt_bench_run("regex_ipv4", 3, bench_regex_ipv4, &results[27]);
+        results[28].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         free(g_bench_random_ints);
@@ -584,6 +634,11 @@ int main(int argc, char *argv[])
     BENCH_RUN("eventloop timing wheel (20k)", 3, bench_eventloop_tw);
     BENCH_RUN("eventloop post tasks (20k)", 3, bench_eventloop_post);
     BENCH_RUN("buffer append/retrieve (50MB)", 3, bench_buffer_throughput);
+
+    printf("--- Regex Engine ---\n");
+    BENCH_RUN("regex redos immunity (1k)", 3, bench_regex_redos);
+    BENCH_RUN("regex email validation (10k)", 3, bench_regex_email);
+    BENCH_RUN("regex ipv4 extraction (10k)", 3, bench_regex_ipv4);
 
     printf("\nBenchmark suite complete.\n");
     free(g_bench_random_ints);

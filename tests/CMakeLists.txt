@@ -144,6 +144,11 @@ target_link_libraries(benchmark_taskgraph cobalt pthread m)
 add_test(NAME bench_taskgraph COMMAND benchmark_taskgraph
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 
+add_executable(benchmark_regex benchmark/benchmark_regex.c)
+target_link_libraries(benchmark_regex cobalt pthread m)
+add_test(NAME bench_regex COMMAND benchmark_regex
+         PASS_REGULAR_EXPRESSION "Benchmark completed")
+
 # Unified benchmark runner
 add_executable(bench_runner benchmark/bench_runner.c)
 target_link_libraries(bench_runner cobalt pthread m)
