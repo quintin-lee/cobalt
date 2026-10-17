@@ -57,6 +57,11 @@ static void test_shm_open_existing(void)
     TEST_ASSERT(rc == COBALT_SUCCESS);
     TEST_ASSERT(shm_a != NULL);
 
+    cobalt_shm_t *shm_dup = NULL;
+    int           dup_rc  = cobalt_shm_create(name, 4096, &shm_dup);
+    TEST_ASSERT(dup_rc == COBALT_ERROR_ALREADY_EXISTS);
+    TEST_ASSERT(shm_dup == NULL);
+
     uint32_t *magic_a = (uint32_t *)cobalt_shm_get_addr(shm_a);
     TEST_ASSERT(magic_a != NULL);
     *magic_a = 0xDEADBEEF;

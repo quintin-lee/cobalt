@@ -12,8 +12,6 @@
  * @{
  */
 
-#include "cobalt/runtime/error.h"
-#include <stdbool.h>
 #include <stddef.h>
 
 typedef struct cobalt_shm cobalt_shm_t;

@@ -24,6 +24,10 @@
 #include <unistd.h>
 #endif
 
+#ifndef O_CLOEXEC
+#define O_CLOEXEC 0
+#endif
+
 #define COBALT_SHM_NAME_MAX 256
 
 /**
@@ -37,7 +41,7 @@ struct cobalt_shm {
 #endif
     void  *addr;
     size_t size;
-    char  *name;
+    char   name[COBALT_SHM_NAME_MAX];
 };
 
 /**
@@ -108,7 +112,7 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
         return rc;
     }
 
-    DWORD size_high = (DWORD)((size >> 32) & 0xFFFFFFFF);
+    DWORD size_high = (DWORD)(((uint64_t)size >> 32) & 0xFFFFFFFF);
     DWORD size_low  = (DWORD)(size & 0xFFFFFFFF);
 
     HANDLE handle = CreateFileMappingA(
@@ -116,6 +120,11 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
     if (!handle) {
         cobalt_error_set(NULL, COBALT_ERROR_IO);
         return COBALT_ERROR_IO;
+    }
+    if (GetLastError() == ERROR_ALREADY_EXISTS) {
+        CloseHandle(handle);
+        cobalt_error_set(NULL, COBALT_ERROR_ALREADY_EXISTS);
+        return COBALT_ERROR_ALREADY_EXISTS;
     }
 
     void *addr = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS, 0, 0, size);
@@ -133,19 +142,11 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
         return COBALT_ERROR_OUT_OF_MEMORY;
     }
 
-    size_t name_len = strlen(win_name);
-    shm->name       = (char *)malloc(name_len + 1);
-    if (!shm->name) {
-        UnmapViewOfFile(addr);
-        CloseHandle(handle);
-        free(shm);
-        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
-        return COBALT_ERROR_OUT_OF_MEMORY;
-    }
-    memcpy(shm->name, win_name, name_len + 1);
-    shm->handle = handle;
-    shm->addr   = addr;
-    shm->size   = size;
+    strncpy(shm->name, win_name, sizeof(shm->name) - 1);
+    shm->name[sizeof(shm->name) - 1] = '\0';
+    shm->handle                      = handle;
+    shm->addr                        = addr;
+    shm->size                        = size;
 
     *out_shm = shm;
     cobalt_error_set(NULL, COBALT_SUCCESS);
@@ -196,19 +197,11 @@ int cobalt_shm_open(const char *name, cobalt_shm_t **out_shm)
         return COBALT_ERROR_OUT_OF_MEMORY;
     }
 
-    size_t name_len = strlen(win_name);
-    shm->name       = (char *)malloc(name_len + 1);
-    if (!shm->name) {
-        UnmapViewOfFile(addr);
-        CloseHandle(handle);
-        free(shm);
-        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
-        return COBALT_ERROR_OUT_OF_MEMORY;
-    }
-    memcpy(shm->name, win_name, name_len + 1);
-    shm->handle = handle;
-    shm->addr   = addr;
-    shm->size   = size;
+    strncpy(shm->name, win_name, sizeof(shm->name) - 1);
+    shm->name[sizeof(shm->name) - 1] = '\0';
+    shm->handle                      = handle;
+    shm->addr                        = addr;
+    shm->size                        = size;
 
     *out_shm = shm;
     cobalt_error_set(NULL, COBALT_SUCCESS);
@@ -220,6 +213,12 @@ int cobalt_shm_unlink(const char *name)
     if (!name) {
         cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
         return COBALT_ERROR_INVALID_ARGUMENT;
+    }
+    char win_name[COBALT_SHM_NAME_MAX];
+    int  rc = format_shm_name(name, win_name, sizeof(win_name));
+    if (rc != COBALT_SUCCESS) {
+        cobalt_error_set(NULL, rc);
+        return rc;
     }
     cobalt_error_set(NULL, COBALT_SUCCESS);
     return COBALT_SUCCESS;
@@ -242,7 +241,7 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
         return rc;
     }
 
-    int fd = shm_open(path, O_CREAT | O_RDWR, 0666);
+    int fd = shm_open(path, O_CREAT | O_EXCL | O_RDWR | O_CLOEXEC, 0666);
     if (fd < 0) {
         int err = COBALT_ERROR_IO;
         if (errno == EACCES) {
@@ -258,6 +257,7 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
 
     if (ftruncate(fd, (off_t)size) != 0) {
         close(fd);
+        shm_unlink(path);
         cobalt_error_set(NULL, COBALT_ERROR_IO);
         return COBALT_ERROR_IO;
     }
@@ -265,6 +265,7 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
     void *addr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
     if (addr == MAP_FAILED) {
         close(fd);
+        shm_unlink(path);
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return COBALT_ERROR_OUT_OF_MEMORY;
     }
@@ -273,23 +274,16 @@ int cobalt_shm_create(const char *name, size_t size, cobalt_shm_t **out_shm)
     if (!shm) {
         munmap(addr, size);
         close(fd);
+        shm_unlink(path);
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return COBALT_ERROR_OUT_OF_MEMORY;
     }
 
-    size_t path_len = strlen(path);
-    shm->name       = (char *)malloc(path_len + 1);
-    if (!shm->name) {
-        munmap(addr, size);
-        close(fd);
-        free(shm);
-        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
-        return COBALT_ERROR_OUT_OF_MEMORY;
-    }
-    memcpy(shm->name, path, path_len + 1);
-    shm->fd   = fd;
-    shm->addr = addr;
-    shm->size = size;
+    strncpy(shm->name, path, sizeof(shm->name) - 1);
+    shm->name[sizeof(shm->name) - 1] = '\0';
+    shm->fd                          = fd;
+    shm->addr                        = addr;
+    shm->size                        = size;
 
     *out_shm = shm;
     cobalt_error_set(NULL, COBALT_SUCCESS);
@@ -311,7 +305,7 @@ int cobalt_shm_open(const char *name, cobalt_shm_t **out_shm)
         return rc;
     }
 
-    int fd = shm_open(path, O_RDWR, 0666);
+    int fd = shm_open(path, O_RDWR | O_CLOEXEC, 0666);
     if (fd < 0) {
         int err = COBALT_ERROR_IO;
         if (errno == ENOENT) {
@@ -348,19 +342,11 @@ int cobalt_shm_open(const char *name, cobalt_shm_t **out_shm)
         return COBALT_ERROR_OUT_OF_MEMORY;
     }
 
-    size_t path_len = strlen(path);
-    shm->name       = (char *)malloc(path_len + 1);
-    if (!shm->name) {
-        munmap(addr, size);
-        close(fd);
-        free(shm);
-        cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
-        return COBALT_ERROR_OUT_OF_MEMORY;
-    }
-    memcpy(shm->name, path, path_len + 1);
-    shm->fd   = fd;
-    shm->addr = addr;
-    shm->size = size;
+    strncpy(shm->name, path, sizeof(shm->name) - 1);
+    shm->name[sizeof(shm->name) - 1] = '\0';
+    shm->fd                          = fd;
+    shm->addr                        = addr;
+    shm->size                        = size;
 
     *out_shm = shm;
     cobalt_error_set(NULL, COBALT_SUCCESS);
@@ -428,8 +414,5 @@ void cobalt_shm_close(cobalt_shm_t *shm)
         close(shm->fd);
     }
 #endif
-    if (shm->name) {
-        free(shm->name);
-    }
     free(shm);
 }
