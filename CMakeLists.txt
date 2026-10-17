@@ -82,6 +82,7 @@ set(SOURCES
     src/algorithm/sort.c
     src/algorithm/functional.c
     src/algorithm/stream.c
+    src/algorithm/regex.c
     src/module/json.c
     src/module/json_parse.c
     src/module/json_serialize.c

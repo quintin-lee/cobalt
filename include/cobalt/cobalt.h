@@ -52,6 +52,7 @@
 
 /* --- Algorithm support --- */
 #include <cobalt/algorithm/functional.h>
+#include <cobalt/algorithm/regex.h>
 #include <cobalt/algorithm/sort.h>
 
 /* --- Additional function modules --- */
