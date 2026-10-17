@@ -1108,16 +1108,504 @@ size_t cobalt_regex_capture_count(const cobalt_regex_t *re)
     return re ? re->capture_count : 0;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Pike Virtual Machine Execution Core                                        */
+/* -------------------------------------------------------------------------- */
+
+#define COBALT_REGEX_STACK_THRESHOLD 64
+
+typedef struct {
+    uint32_t pc;
+    uint8_t  backref_gid;
+    uint8_t  backref_offset;
+    uint8_t  backref_remaining;
+    size_t   slots[2 * COBALT_REGEX_MAX_CAPTURES];
+} pike_thread_t;
+
+typedef struct {
+    pike_thread_t *threads;
+    size_t         count;
+    size_t         capacity;
+} pike_thread_list_t;
+
+static void add_thread(pike_thread_list_t   *list,
+                       pike_thread_t         t,
+                       const cobalt_regex_t *re,
+                       const char           *text,
+                       size_t                text_len,
+                       size_t                pos,
+                       uint32_t             *visited_gen,
+                       uint32_t              current_step,
+                       bool                 *matched,
+                       pike_thread_t        *best_match,
+                       bool                  require_full_match)
+{
+    uint32_t pc = t.pc;
+    if (pc >= re->inst_count) {
+        return;
+    }
+
+    if (visited_gen[pc] == current_step) {
+        return;
+    }
+    visited_gen[pc] = current_step;
+
+    const cobalt_regex_inst_t *inst = &re->insts[pc];
+
+    switch (inst->opcode) {
+    case OP_JUMP:
+        t.pc = (uint32_t)inst->u.jump.target;
+        add_thread(list,
+                   t,
+                   re,
+                   text,
+                   text_len,
+                   pos,
+                   visited_gen,
+                   current_step,
+                   matched,
+                   best_match,
+                   require_full_match);
+        break;
+
+    case OP_SPLIT: {
+        t.pc = (uint32_t)inst->u.split.target1;
+        add_thread(list,
+                   t,
+                   re,
+                   text,
+                   text_len,
+                   pos,
+                   visited_gen,
+                   current_step,
+                   matched,
+                   best_match,
+                   require_full_match);
+
+        t.pc = (uint32_t)inst->u.split.target2;
+        add_thread(list,
+                   t,
+                   re,
+                   text,
+                   text_len,
+                   pos,
+                   visited_gen,
+                   current_step,
+                   matched,
+                   best_match,
+                   require_full_match);
+        break;
+    }
+
+    case OP_SAVE: {
+        uint8_t slot = inst->sub_op;
+        if (slot < 2 * COBALT_REGEX_MAX_CAPTURES) {
+            t.slots[slot] = pos;
+        }
+        t.pc = pc + 1;
+        add_thread(list,
+                   t,
+                   re,
+                   text,
+                   text_len,
+                   pos,
+                   visited_gen,
+                   current_step,
+                   matched,
+                   best_match,
+                   require_full_match);
+        break;
+    }
+
+    case OP_BOL: {
+        bool at_bol = false;
+        if (pos == 0) {
+            at_bol = true;
+        } else if ((re->flags & COBALT_REGEX_MULTILINE) && pos > 0 && text[pos - 1] == '\n') {
+            at_bol = true;
+        }
+        if (at_bol) {
+            t.pc = pc + 1;
+            add_thread(list,
+                       t,
+                       re,
+                       text,
+                       text_len,
+                       pos,
+                       visited_gen,
+                       current_step,
+                       matched,
+                       best_match,
+                       require_full_match);
+        }
+        break;
+    }
+
+    case OP_EOL: {
+        bool at_eol = false;
+        if (pos == text_len) {
+            at_eol = true;
+        } else if ((re->flags & COBALT_REGEX_MULTILINE) && pos < text_len && text[pos] == '\n') {
+            at_eol = true;
+        }
+        if (at_eol) {
+            t.pc = pc + 1;
+            add_thread(list,
+                       t,
+                       re,
+                       text,
+                       text_len,
+                       pos,
+                       visited_gen,
+                       current_step,
+                       matched,
+                       best_match,
+                       require_full_match);
+        }
+        break;
+    }
+
+    case OP_WORD_BOUNDARY: {
+        bool before_is_word = false;
+        bool after_is_word  = false;
+        if (pos > 0) {
+            unsigned char prev = (unsigned char)text[pos - 1];
+            before_is_word     = isalnum(prev) || prev == '_';
+        }
+        if (pos < text_len) {
+            unsigned char curr = (unsigned char)text[pos];
+            after_is_word      = isalnum(curr) || curr == '_';
+        }
+        bool is_boundary = (before_is_word != after_is_word);
+        bool negate      = (inst->sub_op != 0);
+        if (is_boundary != negate) {
+            t.pc = pc + 1;
+            add_thread(list,
+                       t,
+                       re,
+                       text,
+                       text_len,
+                       pos,
+                       visited_gen,
+                       current_step,
+                       matched,
+                       best_match,
+                       require_full_match);
+        }
+        break;
+    }
+
+    case OP_MATCH: {
+        if (require_full_match) {
+            if (pos == text_len && t.slots[0] == 0 && t.slots[1] == text_len) {
+                *matched    = true;
+                *best_match = t;
+            }
+        } else {
+            if (!(*matched) || (t.slots[0] == best_match->slots[0])) {
+                *matched    = true;
+                *best_match = t;
+            }
+        }
+        break;
+    }
+
+    default:
+        /* Consuming instructions: OP_CHAR, OP_ANY, OP_CLASS, OP_BACKREF */
+        if (list->count < list->capacity) {
+            list->threads[list->count++] = t;
+        }
+        break;
+    }
+}
+
+static int run_vm(const cobalt_regex_t   *re,
+                  const char             *text,
+                  cobalt_regex_capture_t *captures,
+                  size_t                  max_captures,
+                  uint32_t                start_pc,
+                  bool                    require_full_match)
+{
+    if (!re || !text) {
+        cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+        return -1;
+    }
+
+    size_t text_len = strlen(text);
+    size_t M        = re->inst_count;
+    if (M == 0) {
+        return 0;
+    }
+
+    pike_thread_t stack_clist[COBALT_REGEX_STACK_THRESHOLD];
+    pike_thread_t stack_nlist[COBALT_REGEX_STACK_THRESHOLD];
+    uint32_t      stack_gen[COBALT_REGEX_STACK_THRESHOLD];
+
+    pike_thread_t *clist_mem   = stack_clist;
+    pike_thread_t *nlist_mem   = stack_nlist;
+    uint32_t      *visited_gen = stack_gen;
+    void          *heap_buf    = NULL;
+
+    if (M > COBALT_REGEX_STACK_THRESHOLD) {
+        size_t bytes = 2 * M * sizeof(pike_thread_t) + M * sizeof(uint32_t);
+        heap_buf     = re_alloc(re->alloc, bytes);
+        if (!heap_buf) {
+            cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
+            return -1;
+        }
+        clist_mem   = (pike_thread_t *)heap_buf;
+        nlist_mem   = clist_mem + M;
+        visited_gen = (uint32_t *)(nlist_mem + M);
+    }
+
+    memset(visited_gen, 0, M * sizeof(uint32_t));
+
+    pike_thread_list_t clist = {.threads = clist_mem, .count = 0, .capacity = M};
+    pike_thread_list_t nlist = {.threads = nlist_mem, .count = 0, .capacity = M};
+
+    pike_thread_t initial_thread;
+    memset(&initial_thread, 0, sizeof(initial_thread));
+    initial_thread.pc = start_pc;
+    for (size_t s = 0; s < 2 * COBALT_REGEX_MAX_CAPTURES; s++) {
+        initial_thread.slots[s] = (size_t)-1;
+    }
+
+    bool          matched = false;
+    pike_thread_t best_match;
+    memset(&best_match, 0, sizeof(best_match));
+
+    uint32_t current_step = 1;
+
+    add_thread(&clist,
+               initial_thread,
+               re,
+               text,
+               text_len,
+               0,
+               visited_gen,
+               current_step,
+               &matched,
+               &best_match,
+               require_full_match);
+
+    for (size_t pos = 0; pos <= text_len; pos++) {
+        if (clist.count == 0) {
+            break;
+        }
+
+        /* If we found a match and no thread in clist can extend it, we can stop early */
+        if (matched && !require_full_match) {
+            bool has_same_start = false;
+            for (size_t i = 0; i < clist.count; i++) {
+                if (clist.threads[i].slots[0] == best_match.slots[0]) {
+                    has_same_start = true;
+                    break;
+                }
+            }
+            if (!has_same_start) {
+                break;
+            }
+        }
+
+        if (pos == text_len) {
+            break;
+        }
+
+        char c = text[pos];
+        current_step++;
+        if (current_step == 0) {
+            memset(visited_gen, 0, M * sizeof(uint32_t));
+            current_step = 1;
+        }
+
+        nlist.count = 0;
+
+        for (size_t i = 0; i < clist.count; i++) {
+            pike_thread_t              t            = clist.threads[i];
+            const cobalt_regex_inst_t *inst         = &re->insts[t.pc];
+            bool                       char_matched = false;
+
+            /* Check backreference in progress */
+            if (t.backref_remaining > 0) {
+                uint8_t gid   = t.backref_gid;
+                size_t  start = t.slots[2 * gid];
+                if (start != (size_t)-1 && start + t.backref_offset < text_len) {
+                    char expected = text[start + t.backref_offset];
+                    if (inst->flags & 1U) {
+                        char_matched =
+                            (tolower((unsigned char)c) == tolower((unsigned char)expected));
+                    } else {
+                        char_matched = (c == expected);
+                    }
+                }
+                if (char_matched) {
+                    t.backref_offset++;
+                    t.backref_remaining--;
+                    if (t.backref_remaining == 0) {
+                        t.pc = t.pc + 1;
+                        add_thread(&nlist,
+                                   t,
+                                   re,
+                                   text,
+                                   text_len,
+                                   pos + 1,
+                                   visited_gen,
+                                   current_step,
+                                   &matched,
+                                   &best_match,
+                                   require_full_match);
+                    } else {
+                        if (nlist.count < nlist.capacity) {
+                            nlist.threads[nlist.count++] = t;
+                        }
+                    }
+                }
+                continue;
+            }
+
+            switch (inst->opcode) {
+            case OP_CHAR: {
+                char expected = inst->u.ch;
+                if (inst->flags & 1U) {
+                    char_matched = (tolower((unsigned char)c) == tolower((unsigned char)expected));
+                } else {
+                    char_matched = (c == expected);
+                }
+                break;
+            }
+
+            case OP_ANY: {
+                if (inst->flags & 1U) {
+                    char_matched = true;
+                } else {
+                    char_matched = (c != '\n');
+                }
+                break;
+            }
+
+            case OP_CLASS: {
+                unsigned char uc     = (unsigned char)c;
+                bool          in_set = (inst->u.cls.bitmap[uc >> 5] & (1U << (uc & 31))) != 0;
+                bool          negate = (inst->sub_op != 0);
+                char_matched         = (in_set != negate);
+                break;
+            }
+
+            case OP_BACKREF: {
+                uint8_t gid   = inst->sub_op;
+                size_t  start = t.slots[2 * gid];
+                size_t  end   = t.slots[2 * gid + 1];
+                if (start != (size_t)-1 && end != (size_t)-1 && end >= start) {
+                    size_t ref_len = end - start;
+                    if (ref_len == 0) {
+                        t.pc = t.pc + 1;
+                        add_thread(&clist,
+                                   t,
+                                   re,
+                                   text,
+                                   text_len,
+                                   pos,
+                                   visited_gen,
+                                   current_step,
+                                   &matched,
+                                   &best_match,
+                                   require_full_match);
+                    } else {
+                        char expected = text[start];
+                        if (inst->flags & 1U) {
+                            char_matched =
+                                (tolower((unsigned char)c) == tolower((unsigned char)expected));
+                        } else {
+                            char_matched = (c == expected);
+                        }
+                        if (char_matched) {
+                            if (ref_len == 1) {
+                                t.pc = t.pc + 1;
+                                add_thread(&nlist,
+                                           t,
+                                           re,
+                                           text,
+                                           text_len,
+                                           pos + 1,
+                                           visited_gen,
+                                           current_step,
+                                           &matched,
+                                           &best_match,
+                                           require_full_match);
+                            } else {
+                                t.backref_gid       = gid;
+                                t.backref_offset    = 1;
+                                t.backref_remaining = (uint8_t)(ref_len - 1);
+                                if (nlist.count < nlist.capacity) {
+                                    nlist.threads[nlist.count++] = t;
+                                }
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
+
+            default:
+                break;
+            }
+
+            if (char_matched) {
+                t.pc = t.pc + 1;
+                add_thread(&nlist,
+                           t,
+                           re,
+                           text,
+                           text_len,
+                           pos + 1,
+                           visited_gen,
+                           current_step,
+                           &matched,
+                           &best_match,
+                           require_full_match);
+            }
+        }
+
+        /* Swap lists */
+        pike_thread_t *tmp_threads = clist.threads;
+        clist.threads              = nlist.threads;
+        clist.count                = nlist.count;
+        nlist.threads              = tmp_threads;
+        nlist.count                = 0;
+    }
+
+    if (heap_buf) {
+        re_free(re->alloc, heap_buf);
+    }
+
+    if (matched) {
+        if (captures && max_captures > 0) {
+            for (size_t k = 0; k < max_captures; k++) {
+                if (k < COBALT_REGEX_MAX_CAPTURES && best_match.slots[2 * k] != (size_t)-1 &&
+                    best_match.slots[2 * k + 1] != (size_t)-1 &&
+                    best_match.slots[2 * k + 1] >= best_match.slots[2 * k]) {
+                    captures[k].start  = best_match.slots[2 * k];
+                    captures[k].end    = best_match.slots[2 * k + 1];
+                    captures[k].length = captures[k].end - captures[k].start;
+                } else {
+                    captures[k].start  = (size_t)-1;
+                    captures[k].end    = (size_t)-1;
+                    captures[k].length = 0;
+                }
+            }
+        }
+        return 1;
+    }
+
+    return 0;
+}
+
 int cobalt_regex_search(const cobalt_regex_t   *re,
                         const char             *text,
                         cobalt_regex_capture_t *captures,
                         size_t                  max_captures)
 {
-    (void)re;
-    (void)text;
-    (void)captures;
-    (void)max_captures;
-    return -1;
+    return run_vm(re, text, captures, max_captures, re ? re->search_pc : 0, false);
 }
 
 int cobalt_regex_match_exact(const cobalt_regex_t   *re,
@@ -1125,16 +1613,20 @@ int cobalt_regex_match_exact(const cobalt_regex_t   *re,
                              cobalt_regex_capture_t *captures,
                              size_t                  max_captures)
 {
-    (void)re;
-    (void)text;
-    (void)captures;
-    (void)max_captures;
-    return -1;
+    return run_vm(re, text, captures, max_captures, re ? re->exact_pc : 0, true);
 }
 
 int cobalt_regex_test(const char *pattern, const char *text)
 {
-    (void)pattern;
-    (void)text;
-    return -1;
+    if (!pattern || !text) {
+        cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
+        return -1;
+    }
+    cobalt_regex_t *re = cobalt_regex_compile(pattern, COBALT_REGEX_DEFAULT);
+    if (!re) {
+        return -1;
+    }
+    int res = cobalt_regex_search(re, text, NULL, 0);
+    cobalt_regex_destroy(re);
+    return res;
 }

@@ -217,6 +217,219 @@ static void test_regex_custom_allocator(void)
     printf("  custom allocator injection: OK\n");
 }
 
+static void test_regex_literals(void)
+{
+    printf("Testing regex literal matching and exact matching...\n");
+
+    cobalt_regex_t *re = cobalt_regex_compile("cat", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+
+    TEST_EQUAL(cobalt_regex_search(re, "the cat sat", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "the dog sat", NULL, 0), 0);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "cat", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "the cat", NULL, 0), 0);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "cats", NULL, 0), 0);
+
+    cobalt_regex_destroy(re);
+
+    /* Empty pattern */
+    re = cobalt_regex_compile("", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "abc", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "a", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    /* Case insensitive matching */
+    re = cobalt_regex_compile("HeLLo", COBALT_REGEX_CASE_INSENSITIVE);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "say hello there", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "HELLO", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    printf("  literal matching: OK\n");
+}
+
+static void test_regex_wildcard(void)
+{
+    printf("Testing regex wildcard and DOTALL...\n");
+
+    cobalt_regex_t *re = cobalt_regex_compile("c.t", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "cat", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "cot", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "c\nt", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    /* With DOTALL */
+    re = cobalt_regex_compile("c.t", COBALT_REGEX_DOTALL);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "c\nt", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    printf("  wildcard and DOTALL: OK\n");
+}
+
+static void test_regex_anchors(void)
+{
+    printf("Testing regex anchors (^, $, \\b, \\B) and MULTILINE...\n");
+
+    cobalt_regex_t *re = cobalt_regex_compile("^cat", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "cat sat", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "the cat", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("cat$", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "the cat", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "cat sat", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    /* Word boundary */
+    re = cobalt_regex_compile("\\bcat\\b", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "the cat sat", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "the scat sat", NULL, 0), 0);
+    TEST_EQUAL(cobalt_regex_search(re, "the catch sat", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("\\Bcat\\b", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "the scat sat", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "the cat sat", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    /* Multiline */
+    re = cobalt_regex_compile("^world", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "hello\nworld", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("^world", COBALT_REGEX_MULTILINE);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "hello\nworld", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("hello$", COBALT_REGEX_MULTILINE);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "hello\nworld", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    printf("  anchors: OK\n");
+}
+
+static void test_regex_classes(void)
+{
+    printf("Testing regex character classes and shorthands...\n");
+
+    cobalt_regex_t *re = cobalt_regex_compile("[a-z]+", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "123hello456", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "123456", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("[^0-9]+", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "abc", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "123", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("\\d{3}", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "ab12cd", NULL, 0), 0);
+    TEST_EQUAL(cobalt_regex_search(re, "ab123cd", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("\\w+", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "!@#$%", NULL, 0), 0);
+    TEST_EQUAL(cobalt_regex_search(re, "!@#abc$%", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("\\s+", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "nospaces", NULL, 0), 0);
+    TEST_EQUAL(cobalt_regex_search(re, "has spaces", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    printf("  character classes: OK\n");
+}
+
+static void test_regex_quantifiers(void)
+{
+    printf("Testing regex quantifiers (greedy and non-greedy)...\n");
+
+    cobalt_regex_t *re = cobalt_regex_compile("ba*c", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "bc", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "bac", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "baaac", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("ba+c", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "bc", NULL, 0), 0);
+    TEST_EQUAL(cobalt_regex_search(re, "bac", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "baaac", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("ba?c", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "bc", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "bac", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "baac", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("a{2,4}", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "a", NULL, 0), 0);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "aa", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "aaa", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "aaaa", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_match_exact(re, "aaaaa", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    /* Non-greedy */
+    re = cobalt_regex_compile("a*?", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "aaaa", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    re = cobalt_regex_compile("a+?", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "aaaa", NULL, 0), 1);
+    cobalt_regex_destroy(re);
+
+    printf("  quantifiers: OK\n");
+}
+
+static void test_regex_alternation(void)
+{
+    printf("Testing regex alternation (cat|dog|fox)...\n");
+
+    cobalt_regex_t *re = cobalt_regex_compile("cat|dog|fox", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+    TEST_EQUAL(cobalt_regex_search(re, "a dog barked", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "a fox ran", NULL, 0), 1);
+    TEST_EQUAL(cobalt_regex_search(re, "a bird sang", NULL, 0), 0);
+    cobalt_regex_destroy(re);
+
+    printf("  alternation: OK\n");
+}
+
+static void test_regex_convenience(void)
+{
+    printf("Testing regex convenience API cobalt_regex_test...\n");
+
+    TEST_EQUAL(cobalt_regex_test("hello.*world", "hello beautiful world"), 1);
+    TEST_EQUAL(cobalt_regex_test("hello.*world", "goodbye world"), 0);
+    TEST_EQUAL(cobalt_regex_test(NULL, "abc"), -1);
+    TEST_EQUAL(cobalt_regex_test("(", "abc"), -1);
+
+    printf("  convenience test API: OK\n");
+}
+
 void test_regex(void)
 {
     printf("=== Regex Engine Tests ===\n");
@@ -224,5 +437,12 @@ void test_regex(void)
     test_regex_compile_invalid();
     test_regex_capture_counts();
     test_regex_custom_allocator();
-    printf("All regex compiler unit tests passed!\n");
+    test_regex_literals();
+    test_regex_wildcard();
+    test_regex_anchors();
+    test_regex_classes();
+    test_regex_quantifiers();
+    test_regex_alternation();
+    test_regex_convenience();
+    printf("All regex unit tests passed!\n");
 }
