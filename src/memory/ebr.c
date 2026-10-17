@@ -47,6 +47,7 @@ struct cobalt_ebr {
     /* Orphaned retirement pool from terminated or unregistered threads */
     _Alignas(COBALT_CACHE_LINE_SIZE) cobalt_mutex_t *orphan_lock;
     cobalt_ebr_node_t *orphaned_retired[3];
+    uint64_t           id;
 };
 
 static void *ebr_alloc(cobalt_ebr_t *ebr, size_t size)
@@ -123,6 +124,8 @@ static void ebr_init_tls_key(void)
 }
 #endif
 
+static atomic_uint_fast64_t s_ebr_id_gen = 1;
+
 cobalt_ebr_t *cobalt_ebr_create(cobalt_allocator_t *alloc)
 {
     cobalt_allocator_t *effective_alloc = alloc ? alloc : cobalt_allocator_get_system();
@@ -138,6 +141,7 @@ cobalt_ebr_t *cobalt_ebr_create(cobalt_allocator_t *alloc)
         return NULL;
     }
 
+    ebr->id = atomic_fetch_add_explicit(&s_ebr_id_gen, 1, memory_order_relaxed);
     atomic_init(&ebr->global_epoch, 0);
     atomic_init(&ebr->head_handle, NULL);
     atomic_init(&ebr->total_handles, 0);
@@ -407,4 +411,9 @@ void cobalt_ebr_sync(cobalt_ebr_t *ebr)
     for (size_t i = 0; i < 3; i++) {
         ebr_reclaim_orphaned_slot(ebr, i);
     }
+}
+
+uint64_t cobalt_ebr_get_id(const cobalt_ebr_t *ebr)
+{
+    return ebr ? ebr->id : 0;
 }

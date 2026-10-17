@@ -45,6 +45,7 @@ void test_parallel_sort(void);
 void test_taskgraph(void);
 void test_regex(void);
 void test_ebr(void);
+void test_lfskiplist(void);
 
 typedef struct {
     const char *name;
@@ -95,6 +96,7 @@ static const TestEntry test_registry[] = {
     {"taskgraph", test_taskgraph},
     {"regex", test_regex},
     {"ebr", test_ebr},
+    {"lfskiplist", test_lfskiplist},
 };
 
 static const int test_count = sizeof(test_registry) / sizeof(test_registry[0]);

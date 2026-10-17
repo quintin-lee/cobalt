@@ -96,6 +96,13 @@ bool cobalt_ebr_try_advance(cobalt_ebr_t *ebr);
  */
 void cobalt_ebr_sync(cobalt_ebr_t *ebr);
 
+/**
+ * @brief Get unique instance ID of the EBR engine
+ * @param ebr Pointer to the EBR instance
+ * @return Monotonic unique 64-bit ID
+ */
+uint64_t cobalt_ebr_get_id(const cobalt_ebr_t *ebr);
+
 #ifdef __cplusplus
 }
 #endif
