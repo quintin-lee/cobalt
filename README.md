@@ -6,9 +6,9 @@ A lightweight, zero-dependency C11 framework providing object-oriented capabilit
 
 - **8-Layer Architecture**: Strict upward-only dependency model
 - **Object System**: Single inheritance + multi-interface support with reference counting
-- **Memory Management**: System, Arena, Pool, and Slab allocators with custom allocator injection
+- **Memory Management**: System, Arena, Pool, and Slab allocators with custom allocator injection, and 3-Epoch Safe Memory Reclamation (`cobalt_ebr_t`)
 - **Thread Safety**: Atomic operations with `stdatomic.h` and platform primitives
-- **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, LFQueue (lock-free MPMC queue), and Buffer (zero-copy dynamic stream buffer)
+- **Containers**: Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, LFQueue (lock-free MPMC queue), Buffer (zero-copy dynamic stream buffer), and Lock-Free SkipList (`cobalt_lfskiplist_t` concurrent sorted map)
 - **Algorithms**: Pattern-Defeating QuickSort (PDQSort), Introspective Heapsort, Adaptive Run MergeSort (TimSort-lite), binary search, find_if, for_each, predicates
 - **Parallel Algorithms**: Multi-core in-place parallel PDQSort (`cobalt_parallel_qsort`) and 100% stable parallel MergeSort (`cobalt_parallel_stable_sort`) with adaptive cutoff heuristics and Help-First work-stealing barriers
 - **TaskGraph DAG Scheduler**: Event-driven Directed Acyclic Graph task scheduler (`cobalt_taskgraph_t`) with Kahn's algorithm cycle detection, zero-reallocation graph reuse, and atomic in-degree push dispatch
@@ -25,11 +25,11 @@ A lightweight, zero-dependency C11 framework providing object-oriented capabilit
 
 ```
 L8  Platform       → Platform detection, atomic operations, thread primitives
-L7a Memory         → System allocator, Arena allocator, Pool, Slab
+L7a Memory         → System allocator, Arena allocator, Pool, Slab, EBR engine
 L7b Runtime        → Error handling, Structured logging, Thread-local state
 L6  Core           → Object system, Class system, Interface tables
 L5  Interface      → Sequence, Map, Set, Iterator protocols
-L4  Container      → Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, Buffer, LFQueue
+L4  Container      → Vector, List, HashMap, TreeMap, Stack, Queue, Set, Deque, Buffer, LFQueue, SkipList
 L3  Algorithm      → PDQSort, Heapsort, TimSort, Search, Predicates, Functional stream operators
 L2  Module         → JSON (DOM/SAX), Thread Pool, Event Loop, Parallel Sort, TaskGraph DAG
 L1  Application    → Example applications, Benchmarks
@@ -106,7 +106,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 56/56 tests passing (100%)
+ctest --output-on-failure  # 59/59 tests passing (100%)
 # or with verbose output
 ctest --verbose
 ```
@@ -155,18 +155,18 @@ cd build
 
 | Category | Count |
 |----------|-------|
-| Source files (`src/**/*.c`) | 40 |
-| Header files (`include/**/*.h`) | 42 |
-| Test files (`tests/**/*.c`) | 58 |
-| Benchmark files (`tests/benchmark/*.c`) | 16 |
+| Source files (`src/**/*.c`) | 42 |
+| Header files (`include/**/*.h`) | 44 |
+| Test files (`tests/**/*.c`) | 60 |
+| Benchmark files (`tests/benchmark/*.c`) | 17 |
 | Example files (`examples/*.c`) | 17 |
-| Documentation files (`docs/**/*.md`, `*.md`) | 43 |
+| Documentation files (`docs/**/*.md`, `*.md`) | 45 |
 
 | Metric | Value |
 |--------|-------|
-| Total lines of code (src + include) | ~21,500 |
-| Git commits | 460+ |
-| CTest status | 56/56 passing (100%) |
+| Total lines of code (src + include) | ~23,000 |
+| Git commits | 470+ |
+| CTest status | 59/59 passing (100%) |
 | Sanitizer status | Clean (ASan/LSan 0 leaks, 0 errors) |
 
 

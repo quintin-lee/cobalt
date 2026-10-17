@@ -53,6 +53,30 @@ Future extension: fixed-size block pool to prevent fragmentation for frequent sm
 
 Future extension: object-caching slab allocator for predictable allocation latency.
 
+### 3.5 3-Epoch Safe Memory Reclamation Engine (`cobalt_ebr_t`)
+
+Pure C11 wait-free memory reclamation based on Keir Fraser / Herlihy-Lev-Shavit 3-Epoch state machine ($e \in \{0, 1, 2\}$). Solves the concurrent read-side ABA and use-after-free problems without garbage collection or global stop-the-world pauses.
+
+**Header:** `include/cobalt/memory/ebr.h`  
+**Source:** `src/memory/ebr.c`
+
+**Key Features:**
+- **Cache-Line Aligned Handles**: Per-thread handles (`cobalt_ebr_handle_t`) with `_Alignas(64)` preventing false sharing.
+- **Wait-Free Enter/Exit**: $O(1)$ critical section entry and exit using relaxed writes and release/acquire fences.
+- **Two-Epoch Retirement Invariant**: Items retired in epoch $e$ are guaranteed safe to reclaim when the global epoch reaches $(e + 2) \bmod 3$.
+- **Automatic Thread Cleanup**: Thread-local handles registered with POSIX `pthread_key_create` destructors, guaranteeing automatic retirement flush upon thread termination.
+- **Quiescence Barrier**: `cobalt_ebr_sync` synchronously drives 3 epoch transitions for deterministic cleanup and teardown.
+
+```c
+cobalt_ebr_t *ebr = cobalt_ebr_create();
+cobalt_ebr_enter(ebr);
+// ... read lock-free data structures safely ...
+cobalt_ebr_exit(ebr);
+// Retire unlinked node:
+cobalt_ebr_retire(ebr, node, free);
+cobalt_ebr_destroy(ebr);
+```
+
 ## 4. Allocator Injection Pattern
 
 Objects accept an allocator parameter at construction, stored externally to keep object headers compact:

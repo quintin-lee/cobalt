@@ -7,12 +7,13 @@
 
 The Concrete Collection layer implements robust, high-performance data structures built on top of Layer 5 interface contracts (`Sequence`, `Map`, `Iterator`) and Layer 7 memory allocators.
 
-As of Cobalt v2.5.0, the container family encompasses 10 specialized data structures:
+As of Cobalt v2.8.0, the container family encompasses 11 specialized data structures:
 - **Sequential**: Vector (dynamic array), List (doubly-linked), Deque (double-ended list), Stack (LIFO), Queue (FIFO)
 - **Associative**: HashMap (chaining hash table), TreeMap (red-black tree), Set (hash set)
 - **High-Performance Stream & Concurrency**:
   - `cobalt_buffer_t`: Layer 4 dynamic zero-copy stream buffer with 3-zone sliding layout and vectorized socket I/O
   - `cobalt_lfqueue_t`: Dmitry Vyukov bounded lock-free MPMC queue with cache-line alignment
+  - `cobalt_lfskiplist_t`: Fraser / Herlihy-Lev-Shavit lock-free concurrent skip list with 3-Epoch safe memory reclamation (EBR)
 
 All collections accept allocator injection at construction time, facilitating whole-heap arena or pool allocation.
 
@@ -174,6 +175,21 @@ struct cobalt_lfqueue {
 - **Interfaces:** `Map` + `Iterable`
 - **Properties**: Unique element collection backed by hash table, $O(1)$ average insert, remove, and contains checks.
 
+### 5.4 Lock-Free Concurrent SkipList (`cobalt_lfskiplist_t`)
+- **Header:** `container/lfskiplist.h` | **Source:** `src/container/lfskiplist.c`
+- **Properties**: 32-level lock-free concurrent ordered map, $O(\log N)$ expected search/insert/remove, wait-free point reads.
+- **Concurrency & Memory Safety**:
+  - Bit-0 marked pointer tagging for atomic two-phase logical deletion.
+  - Cooperative physical unlinking on search traversal.
+  - Layer 7 3-Epoch Safe Memory Reclamation (`cobalt_ebr_t`) guaranteeing safe deferred destruction without GC or stop-the-world pauses.
+  - Concurrent range iterator pinning EBR epochs for thread-safe in-order scans.
+- **Key Operations**:
+  - `cobalt_lfskiplist_insert`: lock-free CAS insertion at level 0, elevating towers up to geometric height.
+  - `cobalt_lfskiplist_get`: wait-free point lookups without holding locks.
+  - `cobalt_lfskiplist_put`: lock-free upsert updating existing value or inserting new key.
+  - `cobalt_lfskiplist_remove`: two-phase deletion (mark top-down, unlink bottom-up, retire to EBR).
+  - `cobalt_lfskiplist_iter_create`: ordered scan within `[min_key, max_key]` range.
+
 ---
 
 ## 6. Container Performance & Feature Matrix
@@ -190,5 +206,6 @@ struct cobalt_lfqueue {
 | **Set** | Hash Set | N/A | N/A | N/A | $O(1)$ avg | $O(N)$ buckets | External sync |
 | **Buffer** | Dynamic Stream Buffer | $O(1)$ peek | $O(1)$ prepend | $O(1)$ append | N/A | $O(N)$ contiguous | External sync |
 | **LFQueue** | Bounded Lock-Free MPMC | N/A | N/A | $O(1)$ lock-free | N/A | $O(\text{cap})$ cache-aligned | **Lock-Free MPMC** |
+| **LFSkiplist** | Lock-Free Skip List | N/A | N/A | N/A | $O(\log N)$ wait-free | $O(N)$ towers | **Lock-Free Concurrent** |
 
 $^*$ Amortized $O(1)$

@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+## v2.8.0 (2026-10-17) — Lock-Free Concurrent SkipList & 3-Epoch Safe Memory Reclamation (EBR) Engine
+
+### Added
+- **3-Epoch Safe Memory Reclamation Engine (`cobalt/memory/ebr.h`)**:
+  - Pure C11 wait-free memory reclamation based on Keir Fraser / Herlihy-Lev-Shavit 3-Epoch state machine ($e \in \{0, 1, 2\}$).
+  - 64-byte cache-line aligned per-thread handles (`cobalt_ebr_handle_t`) with `_Alignas(64)` preventing false sharing.
+  - $O(1)$ wait-free `enter` and `exit` operations using atomic acquire-release semantics.
+  - Bounded 64-item retirement batches with deferred two-epoch retirement invariant guaranteeing zero use-after-free.
+  - Monotonic 64-bit EBR instance ID generation with thread-local handle caching and automatic POSIX thread-key destructor cleanup for terminating threads.
+  - Custom memory allocator injection (`cobalt_allocator_t`).
+  - Synchronous quiescence barrier (`cobalt_ebr_sync`) for testing and resource drainage.
+- **Lock-Free Concurrent SkipList (`cobalt/container/lfskiplist.h`)**:
+  - Fraser / Herlihy-Lev-Shavit (HLS) lock-free skip list supporting up to 32 levels with $P=0.5$ geometric height distribution.
+  - Bit-0 marked pointer tagging (`(uintptr_t)ptr | 1`) for atomic two-phase logical deletion.
+  - Cooperative physical unlinking integrated into search paths (`find_preds_succs`), guaranteeing bounded step bounds even under high contention.
+  - $O(\log N)$ wait-free point lookups (`cobalt_lfskiplist_get`, `cobalt_lfskiplist_contains`) requiring no locks or write operations.
+  - $O(\log N)$ concurrent insertions (`cobalt_lfskiplist_insert`, `cobalt_lfskiplist_put`) with Level-0 CAS linearization and bottom-up tower elevation.
+  - Ordered range iterators (`cobalt_lfskiplist_iter_create`, `cobalt_lfskiplist_iter_next`, `cobalt_lfskiplist_iter_destroy`) pinning EBR epochs to enable safe concurrent traversal without holding container-wide locks.
+  - Transparent support for arbitrary key types (integers, strings, arbitrary structs) with user-defined `compare_func_t` comparator.
+- **Dedicated Benchmark & Stress Suite (`tests/benchmark/benchmark_lfskiplist.c`)**:
+  - Multi-threaded Read-Heavy (90% read / 10% write) benchmark reaching > 3.0M ops/sec.
+  - Balanced (50% read / 50% write) benchmark reaching > 2.7M ops/sec.
+  - Head-to-head comparison demonstrating 4.7x speedup over mutex-protected `cobalt_treemap`.
+  - 8-thread concurrency stress test (200,000 mixed operations) integrated into unit test suite.
+  - Integrated into the unified `bench_runner` tool.
+
+### Changed
+- Total CTest count expanded from 56 to 59 tests, maintaining 100% pass rate under standard compilation and AddressSanitizer/LeakSanitizer (ASan/LSan).
+
 ## v2.7.0 (2026-10-17) — Linear Pike VM Regular Expression Engine with Mathematical ReDoS Immunity
 
 ### Added
