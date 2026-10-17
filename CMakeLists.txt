@@ -83,6 +83,7 @@ set(SOURCES
     src/container/deque.c
     src/container/threadsafewrapper.c
     src/container/buffer.c
+    src/container/shm_ring.c
     src/algorithm/sort.c
     src/algorithm/functional.c
     src/algorithm/stream.c

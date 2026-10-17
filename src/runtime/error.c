@@ -41,6 +41,8 @@ const char *cobalt_error_get_message(cobalt_error_t code)
         return "Index out of bounds";
     case COBALT_ERROR_EMPTY_CONTAINER:
         return "Container is empty";
+    case COBALT_ERROR_QUEUE_FULL:
+        return "Queue is full";
     default:
         return "Unknown error";
     }

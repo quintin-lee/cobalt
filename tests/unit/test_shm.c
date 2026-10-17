@@ -3,6 +3,7 @@
  * @brief Unit tests for platform shared memory primitive (cobalt_shm_t).
  */
 
+#include "cobalt/container/shm_ring.h"
 #include "cobalt/platform/notifier.h"
 #include "cobalt/platform/shm.h"
 #include "cobalt/runtime/error.h"
@@ -332,6 +333,331 @@ static void test_notifier_invalid_args(void)
     printf("  Invalid arguments test passed\n");
 }
 
+static void test_spsc_reserve_commit_peek_consume(void)
+{
+    printf("Testing cobalt_shm_spsc reserve, commit, peek, and consume...\n");
+
+    const char *name = "/cobalt_test_spsc_basic";
+    cobalt_shm_unlink(name);
+
+    size_t capacity   = 65536;
+    size_t total_size = sizeof(cobalt_shm_header_t) + capacity;
+
+    cobalt_shm_t *shm_prod = NULL;
+    int           rc       = cobalt_shm_create(name, total_size, &shm_prod);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(shm_prod != NULL);
+
+    cobalt_shm_spsc_t *spsc_prod = NULL;
+    rc = cobalt_shm_spsc_init(cobalt_shm_get_addr(shm_prod), total_size, capacity, &spsc_prod);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(spsc_prod != NULL);
+
+    cobalt_shm_header_t *hdr = cobalt_shm_spsc_get_header(spsc_prod);
+    TEST_ASSERT(hdr != NULL);
+    TEST_ASSERT(hdr->magic == COBALT_SHM_MAGIC);
+    TEST_ASSERT(hdr->version == COBALT_SHM_VERSION);
+    TEST_ASSERT(hdr->mode == COBALT_SHM_MODE_SPSC);
+    TEST_ASSERT(hdr->capacity == capacity);
+
+    cobalt_shm_t *shm_cons = NULL;
+    rc                     = cobalt_shm_open(name, &shm_cons);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(shm_cons != NULL);
+
+    cobalt_shm_spsc_t *spsc_cons = NULL;
+    rc = cobalt_shm_spsc_attach(cobalt_shm_get_addr(shm_cons), total_size, &spsc_cons);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(spsc_cons != NULL);
+
+    /* Write 100 messages of varying sizes */
+    for (int i = 0; i < 100; i++) {
+        size_t len  = (size_t)((i * 37) % 256 + 1);
+        void  *wptr = NULL;
+        rc          = cobalt_shm_spsc_reserve(spsc_prod, len, &wptr);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        TEST_ASSERT(wptr != NULL);
+
+        uint8_t *bytes = (uint8_t *)wptr;
+        for (size_t j = 0; j < len; j++) {
+            bytes[j] = (uint8_t)((i + j) & 0xFF);
+        }
+
+        uint16_t msg_type = (uint16_t)(1000 + i);
+        rc                = cobalt_shm_spsc_commit(spsc_prod, msg_type, len);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    /* Read and verify all 100 messages */
+    for (int i = 0; i < 100; i++) {
+        size_t      expected_len = (size_t)((i * 37) % 256 + 1);
+        uint16_t    type         = 0;
+        const void *rptr         = NULL;
+        size_t      rlen         = 0;
+
+        rc = cobalt_shm_spsc_peek(spsc_cons, &type, &rptr, &rlen);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        TEST_ASSERT(type == (uint16_t)(1000 + i));
+        TEST_ASSERT(rlen == expected_len);
+        TEST_ASSERT(rptr != NULL);
+
+        const uint8_t *bytes = (const uint8_t *)rptr;
+        for (size_t j = 0; j < rlen; j++) {
+            TEST_ASSERT(bytes[j] == (uint8_t)((i + j) & 0xFF));
+        }
+
+        rc = cobalt_shm_spsc_consume(spsc_cons);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    /* Ring buffer should now be empty */
+    uint16_t    type = 0;
+    const void *rptr = NULL;
+    size_t      rlen = 0;
+    rc               = cobalt_shm_spsc_peek(spsc_cons, &type, &rptr, &rlen);
+    TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+
+    cobalt_shm_spsc_detach(spsc_cons);
+    cobalt_shm_spsc_detach(spsc_prod);
+    cobalt_shm_close(shm_cons);
+    cobalt_shm_close(shm_prod);
+    cobalt_shm_unlink(name);
+
+    printf("  SPSC reserve, commit, peek, consume test passed\n");
+}
+
+static void test_spsc_wraparound(void)
+{
+    printf("Testing cobalt_shm_spsc wraparound...\n");
+
+    const char *name = "/cobalt_test_spsc_wrap";
+    cobalt_shm_unlink(name);
+
+    size_t capacity   = 1024;
+    size_t total_size = sizeof(cobalt_shm_header_t) + capacity;
+
+    cobalt_shm_t *shm = NULL;
+    int           rc  = cobalt_shm_create(name, total_size, &shm);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_shm_spsc_t *spsc_prod = NULL;
+    rc = cobalt_shm_spsc_init(cobalt_shm_get_addr(shm), total_size, capacity, &spsc_prod);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_shm_spsc_t *spsc_cons = NULL;
+    rc = cobalt_shm_spsc_attach(cobalt_shm_get_addr(shm), total_size, &spsc_cons);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    /* Write and consume 50 messages of 120 bytes each.
+     * Each frame is ALIGN_UP(8 + 120, 8) = 128 bytes.
+     * In a 1024-byte buffer, 128 * 50 = 6400 bytes will wrap around 6+ times.
+     */
+    for (int i = 0; i < 50; i++) {
+        size_t len  = 120;
+        void  *wptr = NULL;
+        rc          = cobalt_shm_spsc_reserve(spsc_prod, len, &wptr);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        TEST_ASSERT(wptr != NULL);
+
+        uint8_t *bytes = (uint8_t *)wptr;
+        for (size_t j = 0; j < len; j++) {
+            bytes[j] = (uint8_t)((i * 7 + j) & 0xFF);
+        }
+
+        rc = cobalt_shm_spsc_commit(spsc_prod, (uint16_t)(i + 1), len);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+
+        /* Consume immediately to keep space in ring */
+        uint16_t    type = 0;
+        const void *rptr = NULL;
+        size_t      rlen = 0;
+        rc               = cobalt_shm_spsc_peek(spsc_cons, &type, &rptr, &rlen);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        TEST_ASSERT(type == (uint16_t)(i + 1));
+        TEST_ASSERT(rlen == len);
+
+        const uint8_t *rbytes = (const uint8_t *)rptr;
+        for (size_t j = 0; j < rlen; j++) {
+            TEST_ASSERT(rbytes[j] == (uint8_t)((i * 7 + j) & 0xFF));
+        }
+
+        rc = cobalt_shm_spsc_consume(spsc_cons);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    /* Verify empty at end */
+    uint16_t    type = 0;
+    const void *rptr = NULL;
+    size_t      rlen = 0;
+    rc               = cobalt_shm_spsc_peek(spsc_cons, &type, &rptr, &rlen);
+    TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+
+    cobalt_shm_spsc_detach(spsc_cons);
+    cobalt_shm_spsc_detach(spsc_prod);
+    cobalt_shm_close(shm);
+    cobalt_shm_unlink(name);
+
+    printf("  SPSC wraparound test passed\n");
+}
+
+static void test_spsc_queue_full(void)
+{
+    printf("Testing cobalt_shm_spsc queue full condition...\n");
+
+    const char *name = "/cobalt_test_spsc_full";
+    cobalt_shm_unlink(name);
+
+    size_t capacity   = 1024;
+    size_t total_size = sizeof(cobalt_shm_header_t) + capacity;
+
+    cobalt_shm_t *shm = NULL;
+    int           rc  = cobalt_shm_create(name, total_size, &shm);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_shm_spsc_t *spsc = NULL;
+    rc = cobalt_shm_spsc_init(cobalt_shm_get_addr(shm), total_size, capacity, &spsc);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    /* Each message: payload 200 bytes -> frame size ALIGN_UP(8 + 200, 8) = 208 bytes.
+     * In 1024 bytes, 4 messages take 832 bytes.
+     * The 5th message requires 208 bytes, but remaining space is 1024 - 832 = 192 < 208.
+     * So the 5th message will trigger QUEUE_FULL!
+     */
+    int count = 0;
+    while (1) {
+        void *wptr = NULL;
+        rc         = cobalt_shm_spsc_reserve(spsc, 200, &wptr);
+        if (rc == COBALT_ERROR_QUEUE_FULL) {
+            break;
+        }
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        rc = cobalt_shm_spsc_commit(spsc, 1, 200);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        count++;
+    }
+    TEST_ASSERT(count == 4);
+
+    /* Queue is full, another reserve must fail */
+    void *wptr = NULL;
+    rc         = cobalt_shm_spsc_reserve(spsc, 200, &wptr);
+    TEST_ASSERT(rc == COBALT_ERROR_QUEUE_FULL);
+
+    /* Consume one message */
+    uint16_t    type = 0;
+    const void *rptr = NULL;
+    size_t      rlen = 0;
+    rc               = cobalt_shm_spsc_peek(spsc, &type, &rptr, &rlen);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(rlen == 200);
+    rc = cobalt_shm_spsc_consume(spsc);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    /* Now reserve should succeed! */
+    rc = cobalt_shm_spsc_reserve(spsc, 200, &wptr);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    rc = cobalt_shm_spsc_commit(spsc, 2, 200);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    /* Drain all 4 remaining messages */
+    for (int i = 0; i < 4; i++) {
+        rc = cobalt_shm_spsc_peek(spsc, &type, &rptr, &rlen);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        rc = cobalt_shm_spsc_consume(spsc);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+    }
+
+    /* Now empty */
+    rc = cobalt_shm_spsc_peek(spsc, &type, &rptr, &rlen);
+    TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+
+    cobalt_shm_spsc_detach(spsc);
+    cobalt_shm_close(shm);
+    cobalt_shm_unlink(name);
+
+    printf("  SPSC queue full test passed\n");
+}
+
+static void test_spsc_invalid_args(void)
+{
+    printf("Testing cobalt_shm_spsc invalid arguments...\n");
+
+    cobalt_shm_spsc_t *spsc = NULL;
+    uint8_t            buffer[2048];
+
+    /* init: NULL address */
+    TEST_ASSERT(cobalt_shm_spsc_init(NULL, sizeof(buffer), 1024, &spsc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: NULL out_spsc */
+    TEST_ASSERT(cobalt_shm_spsc_init(buffer, sizeof(buffer), 1024, NULL) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: non-power-of-2 capacity */
+    TEST_ASSERT(cobalt_shm_spsc_init(buffer, sizeof(buffer), 1000, &spsc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: 0 capacity */
+    TEST_ASSERT(cobalt_shm_spsc_init(buffer, sizeof(buffer), 0, &spsc) ==
+                COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* init: total_size too small */
+    TEST_ASSERT(cobalt_shm_spsc_init(buffer, 100, 1024, &spsc) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* Valid init for further tests */
+    int rc = cobalt_shm_spsc_init(buffer, sizeof(buffer), 1024, &spsc);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(spsc != NULL);
+
+    /* reserve: NULL spsc or NULL out_ptr */
+    void *ptr = NULL;
+    TEST_ASSERT(cobalt_shm_spsc_reserve(NULL, 10, &ptr) == COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_spsc_reserve(spsc, 10, NULL) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* reserve: message larger than capacity allows */
+    TEST_ASSERT(cobalt_shm_spsc_reserve(spsc, 2000, &ptr) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* commit without reserve */
+    TEST_ASSERT(cobalt_shm_spsc_commit(spsc, 1, 10) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* consume without peek */
+    TEST_ASSERT(cobalt_shm_spsc_consume(spsc) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* double reserve */
+    rc = cobalt_shm_spsc_reserve(spsc, 64, &ptr);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(cobalt_shm_spsc_reserve(spsc, 64, &ptr) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* commit with len > reserved_len */
+    TEST_ASSERT(cobalt_shm_spsc_commit(spsc, 1, 128) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* commit valid */
+    TEST_ASSERT(cobalt_shm_spsc_commit(spsc, 1, 64) == COBALT_SUCCESS);
+
+    /* peek: NULL spsc or NULL out_ptr */
+    uint16_t    type = 0;
+    size_t      len  = 0;
+    const void *rptr = NULL;
+    TEST_ASSERT(cobalt_shm_spsc_peek(NULL, &type, &rptr, &len) == COBALT_ERROR_INVALID_ARGUMENT);
+    TEST_ASSERT(cobalt_shm_spsc_peek(spsc, &type, NULL, &len) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* consume after peek */
+    TEST_ASSERT(cobalt_shm_spsc_peek(spsc, &type, &rptr, &len) == COBALT_SUCCESS);
+    TEST_ASSERT(cobalt_shm_spsc_consume(spsc) == COBALT_SUCCESS);
+
+    /* double consume */
+    TEST_ASSERT(cobalt_shm_spsc_consume(spsc) == COBALT_ERROR_INVALID_ARGUMENT);
+
+    /* get_header: NULL returns NULL */
+    TEST_ASSERT(cobalt_shm_spsc_get_header(NULL) == NULL);
+
+    /* detach: NULL is safe no-op */
+    cobalt_shm_spsc_detach(NULL);
+
+    cobalt_shm_spsc_detach(spsc);
+
+    printf("  SPSC invalid arguments test passed\n");
+}
+
 void test_shm(void)
 {
     printf("Testing shared memory primitive (cobalt_shm_t)...\n");
@@ -345,5 +671,12 @@ void test_shm(void)
     test_notifier_anonymous();
     test_notifier_named();
     test_notifier_invalid_args();
-    printf("  Notification tests completed successfully!\n");
+    printf("  Notification tests completed successfully!\n\n");
+
+    printf("Testing lock-free SPSC shared memory ring (cobalt_shm_spsc_t)...\n");
+    test_spsc_reserve_commit_peek_consume();
+    test_spsc_wraparound();
+    test_spsc_queue_full();
+    test_spsc_invalid_args();
+    printf("  SPSC shared memory ring tests completed successfully!\n");
 }

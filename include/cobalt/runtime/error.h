@@ -30,6 +30,7 @@ typedef enum {
     COBALT_ERROR_TIMEOUT           = -8,  /**< Timeout */
     COBALT_ERROR_OUT_OF_BOUNDS     = -9,  /**< Index out of bounds */
     COBALT_ERROR_EMPTY_CONTAINER   = -10, /**< Container is empty */
+    COBALT_ERROR_QUEUE_FULL        = -11, /**< Queue is full */
 } cobalt_error_t;
 
 /**
