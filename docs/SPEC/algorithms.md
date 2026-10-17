@@ -180,6 +180,21 @@ Common predicate functions defined in `functional.h`:
 
 ---
 
+## 3. Regular Expression Engine (Pike VM)
+
+As of Cobalt v2.7.0, the algorithm layer includes a deterministic Pike VM regular expression engine (`cobalt/algorithm/regex.h`).
+
+### 3.1 Design Principles & ReDoS Immunity
+Traditional backtracking engines (Perl, PCRE, Python `re`) exhibit worst-case exponential time $O(2^N)$ on pathological patterns such as `^(a+)+$`, leaving applications vulnerable to denial-of-service outages. Cobalt implements a Thompson NFA simulation / Pike Virtual Machine that executes in strictly linear $O(N \times M)$ time (where $N$ is input text length and $M$ is bytecode instruction count).
+
+### 3.2 Pike VM Architecture
+- **Instruction Set**: `OP_CHAR`, `OP_ANY`, `OP_CLASS`, `OP_BOL`, `OP_EOL`, `OP_WORD_BOUNDARY`, `OP_JUMP`, `OP_SPLIT`, `OP_SAVE`, `OP_BACKREF`, `OP_MATCH`.
+- **Deduplication**: Generation-based step deduplication (`visited_gen[pc] == current_step`) guarantees at most one thread per instruction PC per step.
+- **Stack Fast-Path**: For patterns with $M \le 64$ instructions, threads and deduplication structures reside 100% on the calling stack, incurring zero heap allocations during matching.
+- **Lockstep Backreferences**: `OP_BACKREF` matches submatch captures in lockstep with the input stream, preventing combinatorial backtracking.
+
+---
+
 ## 6. Algorithm Complexity Matrix
 
 | Algorithm | Function | Best Time | Average Time | Worst Time | Auxiliary Memory | Stability |
@@ -195,3 +210,4 @@ Common predicate functions defined in `functional.h`:
 | **Stream Map** | `cobalt_map` | $O(N)$ | $O(N)$ | $O(N)$ | $O(1)$ | Stable |
 | **Stream Filter** | `cobalt_filter` | $O(N)$ | $O(N)$ | $O(N)$ | $O(1)$ | Stable |
 | **Stream Fold** | `cobalt_fold` | $O(N)$ | $O(N)$ | $O(N)$ | $O(1)$ | N/A |
+| **Pike VM Regex** | `cobalt_regex_search` | $O(N)$ | $O(N \times M)$ | $O(N \times M)$ | $O(M)$ (stack $\le 64$) | Deterministic |

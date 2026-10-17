@@ -106,7 +106,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 54/54 tests passing (100%)
+ctest --output-on-failure  # 56/56 tests passing (100%)
 # or with verbose output
 ctest --verbose
 ```
@@ -164,9 +164,9 @@ cd build
 
 | Metric | Value |
 |--------|-------|
-| Total lines of code (src + include) | ~20,100 |
-| Git commits | 450+ |
-| CTest status | 54/54 passing (100%) |
+| Total lines of code (src + include) | ~21,500 |
+| Git commits | 460+ |
+| CTest status | 56/56 passing (100%) |
 | Sanitizer status | Clean (ASan/LSan 0 leaks, 0 errors) |
 
 

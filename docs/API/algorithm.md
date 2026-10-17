@@ -173,11 +173,67 @@ Aggregates all elements into a single accumulator starting from `initial`.
 
 ---
 
+## Regular Expression Engine (`regex.h`)
+
+Cobalt provides a pure C11 deterministic Pike VM regular expression engine with linear $O(N \times M)$ runtime, ensuring mathematical immunity against Regular Expression Denial of Service (ReDoS) catastrophic backtracking attacks.
+
+### Types & Constants
+
+```c
+#define COBALT_REGEX_MAX_CAPTURES 16
+
+typedef enum {
+    COBALT_REGEX_DEFAULT          = 0,
+    COBALT_REGEX_CASE_INSENSITIVE = 1 << 0,
+    COBALT_REGEX_DOTALL           = 1 << 1,
+    COBALT_REGEX_MULTILINE        = 1 << 2
+} cobalt_regex_flags_t;
+
+typedef struct {
+    size_t start;
+    size_t end;
+    size_t length;
+} cobalt_regex_capture_t;
+
+typedef struct cobalt_regex cobalt_regex_t;
+```
+
+### Functions
+
+```c
+/* Compilation & Lifecycle */
+cobalt_regex_t *cobalt_regex_compile(const char *pattern, int flags);
+cobalt_regex_t *cobalt_regex_compile_with_alloc(const char *pattern, int flags, cobalt_allocator_t *alloc);
+void cobalt_regex_destroy(cobalt_regex_t *re);
+
+/* Matching & Search */
+int cobalt_regex_search(const cobalt_regex_t *re, const char *text, cobalt_regex_capture_t *captures, size_t max_captures);
+int cobalt_regex_match_exact(const cobalt_regex_t *re, const char *text, cobalt_regex_capture_t *captures, size_t max_captures);
+int cobalt_regex_test(const char *pattern, const char *text);
+
+/* Inspection */
+size_t cobalt_regex_capture_count(const cobalt_regex_t *re);
+```
+
+### Supported Syntax
+
+- **Literals & Escapes**: `\n`, `\r`, `\t`, `\v`, `\f`, `\0`, escaped metacharacters `\\`, `\.`, `\*`, etc.
+- **Character Classes**: `[...]`, negated `[^...]`, ranges `a-z`, shorthands `\d`, `\D`, `\w`, `\W`, `\s`, `\S` (single-cycle 256-bit bitmap lookup).
+- **Wildcard**: `.` (matches all except `\n`, or all including `\n` under `COBALT_REGEX_DOTALL`).
+- **Anchors**: `^` (line start), `$` (line end), `\b` (word boundary), `\B` (non-word boundary).
+- **Quantifiers**: `*`, `+`, `?`, `{m,n}`, `{m}`, `{m,}` in both greedy and non-greedy (`*?`, `+?`, `??`, `{m,n}?`) modes.
+- **Alternation**: `A | B | C` with deterministic left-to-right priority.
+- **Captures & Groups**: `(...)` up to 15 sub-groups, non-capturing `(?:...)`.
+- **Backreferences**: `\1` through `\15` evaluated in lockstep without backtracking.
+
+---
+
 ## Usage Example
 
 ```c
 #include <cobalt/algorithm/sort.h>
 #include <cobalt/algorithm/functional.h>
+#include <cobalt/algorithm/regex.h>
 #include <stdio.h>
 
 static int cmp_ints(const void *a, const void *b) {
@@ -187,13 +243,20 @@ static int cmp_ints(const void *a, const void *b) {
 }
 
 int main(void) {
+    // 1. Regular expression parsing & capture extraction
+    cobalt_regex_t *re = cobalt_regex_compile("(\\d{4})-(\\d{2})-(\\d{2})", COBALT_REGEX_DEFAULT);
+    cobalt_regex_capture_t caps[4];
+    if (cobalt_regex_search(re, "Build date: 2026-10-17", caps, 4)) {
+        printf("Matched date: %.*s\n", (int)caps[0].length, "Build date: 2026-10-17" + caps[0].start);
+    }
+    cobalt_regex_destroy(re);
+
+    // 2. High-performance PDQSort
     int data[] = {42, 17, 88, 17, 95, 3, 1024, 7};
     size_t count = sizeof(data) / sizeof(data[0]);
-
-    // High-performance PDQSort
     cobalt_qsort(data, count, sizeof(int), cmp_ints);
 
-    // In-place deduplication
+    // 3. In-place deduplication
     size_t unique_count = cobalt_unique(data, &count, sizeof(int), cmp_ints);
     printf("Unique count: %zu\n", unique_count);
 

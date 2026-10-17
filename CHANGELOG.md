@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+## v2.7.0 (2026-10-17) — Linear Pike VM Regular Expression Engine with Mathematical ReDoS Immunity
+
+### Added
+- **Linear Pike VM Regular Expression Engine (`cobalt/algorithm/regex.h`)**:
+  - Pure C11 deterministic $O(N \times M)$ linear time execution engine, providing mathematical immunity against ReDoS (Regular Expression Denial of Service) catastrophic backtracking.
+  - Comprehensive regular expression grammar: literals, alternations (`|`), wildcards (`.`), anchors (`^`, `$`, `\b`, `\B`), 256-bit character class bitmaps (`[...]`, `[^...]`, ranges `a-z`, shorthand `\d`, `\D`, `\w`, `\W`, `\s`, `\S`), quantifiers (`*`, `+`, `?`, `{m,n}`) with greedy and non-greedy (`?`) semantics.
+  - Submatch extraction via zero-copy slice structures (`cobalt_regex_capture_t captures[16]`) with `start`, `end`, and `length`.
+  - Non-capturing groups `(?:...)` and capturing groups `(...)` up to 15 sub-groups.
+  - Backreference matching `\1` .. `\15` executed in lockstep without backtracking.
+  - Compilation flags: `COBALT_REGEX_CASE_INSENSITIVE`, `COBALT_REGEX_DOTALL`, and `COBALT_REGEX_MULTILINE`.
+  - Stack Fast-Path: Zero dynamic heap allocations during matching for patterns with $\le 64$ instructions.
+  - Full custom memory allocator support (`cobalt_allocator_t`).
+  - Convenient one-shot test API (`cobalt_regex_test`) and exact-match API (`cobalt_regex_match_exact`).
+- **Dedicated Benchmark & Stress Suite (`tests/benchmark/benchmark_regex.c`)**:
+  - ReDoS vulnerability immunity test on pathological pattern `^(a+)+$` vs `"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaX"`, executing in $< 0.05$ ms (~100k ops/sec).
+  - High-throughput industrial workloads: IPv4 extraction over server logs, email validation (126,000+ ops/sec), and URL routing extraction (40,000+ ops/sec).
+  - Integrated into the unified `bench_runner` benchmark tool.
+
+### Fixed
+- **EventLoop (`src/module/eventloop.c`)**:
+  - Fixed use-after-free by maintaining `loop->fd_tail` when the tail descriptor entry is deleted in `cobalt_eventloop_del_fd`.
+- **JSON Parser (`src/module/json_parse.c`)**:
+  - Replaced `memcpy` with `memmove` in `jrealloc` to prevent memory overlap warnings during arena-backed buffer expansions.
+
+### Changed
+- Total CTest count expanded from 54 to 56 tests, maintaining 100% pass rate under standard compilation and AddressSanitizer/LeakSanitizer (ASan/LSan).
+
 ## v2.6.0 (2026-10-17) — Multi-Core Parallel Sorting & Event-Driven DAG TaskGraph Scheduler
 
 ### Added
