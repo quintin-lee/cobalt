@@ -59,6 +59,7 @@ set(SOURCES
     src/platform/atomic.c
     src/platform/thread.c
     src/platform/shm.c
+    src/platform/notifier.c
     src/memory/allocator.c
     src/memory/arena.c
     src/memory/pool.c
