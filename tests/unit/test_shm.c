@@ -13,12 +13,16 @@
 #include "test_framework.h"
 
 #include <stdalign.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #ifndef _WIN32
+#include <signal.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #endif
 
@@ -1615,6 +1619,571 @@ static void test_channel_invalid_args(void)
     printf("  Channel invalid arguments test passed\n");
 }
 
+#ifndef _WIN32
+static void cleanup_shm_and_notif(const char *name)
+{
+    if (!name) {
+        return;
+    }
+    cobalt_shm_unlink(name);
+    char        path[256];
+    const char *p = name;
+    while (*p == '/') {
+        p++;
+    }
+    snprintf(path, sizeof(path), "/dev/shm/%s_notif", p);
+    unlink(path);
+    snprintf(path, sizeof(path), "/tmp/%s_notif", p);
+    unlink(path);
+}
+
+static uint32_t g_crc32_table[256];
+static bool     g_crc32_table_init = false;
+
+static void init_crc32_table(void)
+{
+    if (g_crc32_table_init) {
+        return;
+    }
+    for (uint32_t i = 0; i < 256; i++) {
+        uint32_t c = i;
+        for (int j = 0; j < 8; j++) {
+            c = (c & 1) ? (0xEDB88320u ^ (c >> 1)) : (c >> 1);
+        }
+        g_crc32_table[i] = c;
+    }
+    g_crc32_table_init = true;
+}
+
+static uint32_t calc_crc32(const uint8_t *data, size_t len)
+{
+    init_crc32_table();
+    uint32_t crc = 0xFFFFFFFFu;
+    for (size_t i = 0; i < len; i++) {
+        crc = g_crc32_table[(crc ^ data[i]) & 0xFF] ^ (crc >> 8);
+    }
+    return crc ^ 0xFFFFFFFFu;
+}
+
+typedef struct {
+    uint32_t index;
+    uint32_t crc;
+} fork_spsc_msg_hdr_t;
+
+static void test_shm_fork_spsc_pingpong(void)
+{
+    printf("Testing cobalt_shm fork SPSC pingpong (50,000 variable length messages + CRC32)...\n");
+
+    const char *name = "/cobalt_fork_spsc";
+    cleanup_shm_and_notif(name);
+
+    cobalt_shm_config_t cfg = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_ADAPTIVE,
+        .capacity          = 65536,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 2000,
+    };
+
+    cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(server != NULL);
+
+    fflush(stdout);
+    fflush(stderr);
+
+    pid_t child_pid = fork();
+    TEST_ASSERT(child_pid >= 0);
+
+    if (child_pid == 0) {
+        /* Child process: sender */
+        cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_ADAPTIVE);
+        if (!client) {
+            _exit(1);
+        }
+
+        uint8_t msg_buf[512];
+        for (int i = 0; i < 50000; i++) {
+            size_t               len = 16 + (size_t)((i * 31) % (256 - 16 + 1));
+            fork_spsc_msg_hdr_t *hdr = (fork_spsc_msg_hdr_t *)msg_buf;
+            hdr->index               = (uint32_t)i;
+
+            size_t   payload_len = len - sizeof(fork_spsc_msg_hdr_t);
+            uint8_t *payload     = msg_buf + sizeof(fork_spsc_msg_hdr_t);
+            for (size_t j = 0; j < payload_len; j++) {
+                payload[j] = (uint8_t)((i + j * 7) & 0xFF);
+            }
+            hdr->crc = calc_crc32(payload, payload_len);
+
+            int send_retries = 0;
+            int rc           = COBALT_ERROR_TIMEOUT;
+            while (rc == COBALT_ERROR_TIMEOUT && send_retries++ < 50) {
+                rc = cobalt_shm_channel_send(client, (uint16_t)(i % 5000 + 1), msg_buf, len, 100);
+            }
+            if (rc != COBALT_SUCCESS) {
+                _exit(2);
+            }
+        }
+
+        cobalt_shm_channel_destroy(client);
+        _exit(0);
+    }
+
+    /* Parent process: receiver */
+    for (int i = 0; i < 50000; i++) {
+        uint8_t  recv_buf[512];
+        uint16_t type         = 0;
+        size_t   out_len      = 0;
+        int      recv_retries = 0;
+        int      rc           = COBALT_ERROR_TIMEOUT;
+        while (rc == COBALT_ERROR_TIMEOUT && recv_retries++ < 50) {
+            rc = cobalt_shm_channel_recv(server, &type, recv_buf, sizeof(recv_buf), &out_len, 100);
+        }
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        TEST_ASSERT(out_len >= sizeof(fork_spsc_msg_hdr_t));
+        TEST_ASSERT(type == (uint16_t)(i % 5000 + 1));
+
+        fork_spsc_msg_hdr_t *hdr = (fork_spsc_msg_hdr_t *)recv_buf;
+        TEST_ASSERT(hdr->index == (uint32_t)i);
+
+        size_t   payload_len  = out_len - sizeof(fork_spsc_msg_hdr_t);
+        uint8_t *payload      = recv_buf + sizeof(fork_spsc_msg_hdr_t);
+        uint32_t expected_crc = calc_crc32(payload, payload_len);
+        TEST_ASSERT(hdr->crc == expected_crc);
+    }
+
+    int   status = 0;
+    pid_t waited = waitpid(child_pid, &status, 0);
+    TEST_ASSERT(waited == child_pid);
+    TEST_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+
+    cobalt_shm_channel_destroy(server);
+    cleanup_shm_and_notif(name);
+
+    printf("  Fork SPSC pingpong test passed\n");
+}
+
+typedef struct {
+    uint32_t producer_id;
+    uint32_t seq;
+    uint32_t payload[14]; /* Total 64 bytes */
+} fork_mpmc_item_t;
+
+typedef struct {
+    _Atomic uint32_t total_consumed;
+    _Atomic uint8_t  received[2][25000];
+} fork_mpmc_tracker_t;
+
+static void test_shm_fork_mpmc_contention(void)
+{
+    printf("Testing cobalt_shm fork MPMC contention (2P + 2C, 50,000 items)...\n");
+
+    const char *chan_name    = "/cobalt_fork_mpmc";
+    const char *counter_name = "/cobalt_fork_mpmc_counter";
+
+    cleanup_shm_and_notif(chan_name);
+    cleanup_shm_and_notif(counter_name);
+
+    cobalt_shm_config_t cfg = {
+        .name              = chan_name,
+        .mode              = COBALT_SHM_MODE_MPMC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 1024,
+        .slot_size         = 64,
+        .create_if_missing = true,
+        .spin_threshold    = 1000,
+    };
+
+    cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(server != NULL);
+
+    cobalt_shm_t *tracker_shm = NULL;
+    int           rc = cobalt_shm_create(counter_name, sizeof(fork_mpmc_tracker_t), &tracker_shm);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(tracker_shm != NULL);
+
+    fork_mpmc_tracker_t *tracker = (fork_mpmc_tracker_t *)cobalt_shm_get_addr(tracker_shm);
+    TEST_ASSERT(tracker != NULL);
+    memset(tracker, 0, sizeof(*tracker));
+
+    fflush(stdout);
+    fflush(stderr);
+
+    pid_t pids[4];
+
+    /* Fork 2 producers */
+    for (int p = 0; p < 2; p++) {
+        pids[p] = fork();
+        TEST_ASSERT(pids[p] >= 0);
+        if (pids[p] == 0) {
+            cobalt_shm_channel_t *client =
+                cobalt_shm_channel_open(chan_name, COBALT_SHM_WAIT_BLOCKING);
+            if (!client) {
+                _exit(1);
+            }
+
+            for (uint32_t s = 0; s < 25000; s++) {
+                fork_mpmc_item_t item;
+                item.producer_id = (uint32_t)p;
+                item.seq         = s;
+                item.payload[0]  = (uint32_t)(p * 100000 + s);
+                memset(item.payload + 1, 0, sizeof(item.payload) - sizeof(uint32_t));
+
+                int send_retries = 0;
+                int send_rc      = COBALT_ERROR_TIMEOUT;
+                while (send_rc == COBALT_ERROR_TIMEOUT && send_retries++ < 50) {
+                    send_rc = cobalt_shm_channel_send(client, 0, &item, sizeof(item), 100);
+                }
+                if (send_rc != COBALT_SUCCESS) {
+                    _exit(2);
+                }
+            }
+
+            cobalt_shm_channel_destroy(client);
+            _exit(0);
+        }
+    }
+
+    /* Fork 2 consumers */
+    for (int c = 0; c < 2; c++) {
+        pids[2 + c] = fork();
+        TEST_ASSERT(pids[2 + c] >= 0);
+        if (pids[2 + c] == 0) {
+            cobalt_shm_channel_t *client =
+                cobalt_shm_channel_open(chan_name, COBALT_SHM_WAIT_BLOCKING);
+            if (!client) {
+                _exit(10);
+            }
+
+            cobalt_shm_t *c_shm = NULL;
+            if (cobalt_shm_open(counter_name, &c_shm) != COBALT_SUCCESS) {
+                _exit(11);
+            }
+            fork_mpmc_tracker_t *c_tracker = (fork_mpmc_tracker_t *)cobalt_shm_get_addr(c_shm);
+            if (!c_tracker) {
+                _exit(12);
+            }
+
+            while (atomic_load_explicit(&c_tracker->total_consumed, memory_order_acquire) < 50000) {
+                fork_mpmc_item_t item;
+                size_t           out_len = 0;
+                int              recv_rc =
+                    cobalt_shm_channel_recv(client, NULL, &item, sizeof(item), &out_len, 100);
+                if (recv_rc == COBALT_SUCCESS) {
+                    if (out_len != sizeof(item)) {
+                        _exit(13);
+                    }
+                    if (item.producer_id >= 2 || item.seq >= 25000) {
+                        _exit(14);
+                    }
+                    if (item.payload[0] != (uint32_t)(item.producer_id * 100000 + item.seq)) {
+                        _exit(15);
+                    }
+                    uint8_t prev = atomic_exchange_explicit(
+                        &c_tracker->received[item.producer_id][item.seq], 1, memory_order_acq_rel);
+                    if (prev != 0) {
+                        _exit(16);
+                    }
+                    uint32_t cur = atomic_fetch_add_explicit(
+                        &c_tracker->total_consumed, 1, memory_order_release);
+                    if (cur + 1 >= 50000) {
+                        break;
+                    }
+                } else if (recv_rc == COBALT_ERROR_TIMEOUT ||
+                           recv_rc == COBALT_ERROR_EMPTY_CONTAINER) {
+                    if (atomic_load_explicit(&c_tracker->total_consumed, memory_order_acquire) >=
+                        50000) {
+                        break;
+                    }
+                } else {
+                    _exit(17);
+                }
+            }
+
+            cobalt_shm_close(c_shm);
+            cobalt_shm_channel_destroy(client);
+            _exit(0);
+        }
+    }
+
+    /* Wait for all 4 children */
+    for (int i = 0; i < 4; i++) {
+        int   status = 0;
+        pid_t waited = waitpid(pids[i], &status, 0);
+        TEST_ASSERT(waited == pids[i]);
+        if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+            fprintf(stderr,
+                    "Child pids[%d]=%d exited with status=%d (WIFEXITED=%d, WEXITSTATUS=%d, "
+                    "WIFSIGNALED=%d, WTERMSIG=%d)\n",
+                    i,
+                    (int)pids[i],
+                    status,
+                    WIFEXITED(status),
+                    WEXITSTATUS(status),
+                    WIFSIGNALED(status),
+                    WTERMSIG(status));
+        }
+        TEST_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+    }
+
+    TEST_ASSERT(atomic_load_explicit(&tracker->total_consumed, memory_order_acquire) == 50000);
+    for (int p = 0; p < 2; p++) {
+        for (int s = 0; s < 25000; s++) {
+            TEST_ASSERT(atomic_load_explicit(&tracker->received[p][s], memory_order_acquire) == 1);
+        }
+    }
+
+    cobalt_shm_close(tracker_shm);
+    cleanup_shm_and_notif(counter_name);
+    cobalt_shm_channel_destroy(server);
+    cleanup_shm_and_notif(chan_name);
+
+    printf("  Fork MPMC contention test passed\n");
+}
+
+typedef struct {
+    int                 count;
+    int                 expected_count;
+    cobalt_eventloop_t *loop;
+    bool                corrupted;
+} fork_ev_ctx_t;
+
+static void on_fork_ev_msg(
+    cobalt_shm_channel_t *chan, uint16_t msg_type, const void *payload, size_t len, void *user_data)
+{
+    (void)chan;
+    fork_ev_ctx_t *ctx = (fork_ev_ctx_t *)user_data;
+    if (len != sizeof(uint32_t)) {
+        ctx->corrupted = true;
+        cobalt_eventloop_stop(ctx->loop);
+        return;
+    }
+    uint32_t val = *(const uint32_t *)payload;
+    if (val != (uint32_t)ctx->count || msg_type != (uint16_t)(ctx->count % 1000 + 1)) {
+        ctx->corrupted = true;
+        cobalt_eventloop_stop(ctx->loop);
+        return;
+    }
+    ctx->count++;
+    if (ctx->count >= ctx->expected_count) {
+        cobalt_eventloop_stop(ctx->loop);
+    }
+}
+
+static void test_shm_fork_eventloop_drain(void)
+{
+    printf("Testing cobalt_shm fork EventLoop drain (10,000 messages)...\n");
+
+    const char *name = "/cobalt_fork_ev";
+    cleanup_shm_and_notif(name);
+
+    cobalt_shm_config_t cfg = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 65536,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 1000,
+    };
+
+    cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(server != NULL);
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+
+    fork_ev_ctx_t ctx = {
+        .count          = 0,
+        .expected_count = 10000,
+        .loop           = loop,
+        .corrupted      = false,
+    };
+
+    int rc = cobalt_shm_channel_attach_eventloop(server, loop, on_fork_ev_msg, &ctx);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    fflush(stdout);
+    fflush(stderr);
+
+    pid_t child_pid = fork();
+    TEST_ASSERT(child_pid >= 0);
+
+    if (child_pid == 0) {
+        /* Child sends 10,000 messages */
+        cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
+        if (!client) {
+            _exit(1);
+        }
+
+        for (uint32_t i = 0; i < 10000; i++) {
+            int send_retries = 0;
+            int send_rc      = COBALT_ERROR_TIMEOUT;
+            while (send_rc == COBALT_ERROR_TIMEOUT && send_retries++ < 50) {
+                send_rc =
+                    cobalt_shm_channel_send(client, (uint16_t)(i % 1000 + 1), &i, sizeof(i), 100);
+            }
+            if (send_rc != COBALT_SUCCESS) {
+                _exit(2);
+            }
+        }
+
+        cobalt_shm_channel_destroy(client);
+        _exit(0);
+    }
+
+    uint64_t timer_id = cobalt_eventloop_add_timer(loop, 10000, 0, on_ev_safety_timer, loop);
+    TEST_ASSERT(timer_id > 0);
+
+    cobalt_eventloop_run(loop);
+
+    TEST_ASSERT(!ctx.corrupted);
+    TEST_ASSERT(ctx.count == 10000);
+
+    int   status = 0;
+    pid_t waited = waitpid(child_pid, &status, 0);
+    TEST_ASSERT(waited == child_pid);
+    TEST_ASSERT(WIFEXITED(status) && WEXITSTATUS(status) == 0);
+
+    rc = cobalt_shm_channel_detach_eventloop(server);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    cobalt_eventloop_del_timer(loop, timer_id);
+    cobalt_eventloop_destroy(loop);
+    cobalt_shm_channel_destroy(server);
+    cleanup_shm_and_notif(name);
+
+    printf("  Fork EventLoop drain test passed\n");
+}
+
+static void test_shm_fork_crash_recovery(void)
+{
+    printf("Testing cobalt_shm fork crash recovery (SIGKILL during uncommitted reserve)...\n");
+
+    const char *name = "/cobalt_fork_crash";
+    cleanup_shm_and_notif(name);
+
+    cobalt_shm_config_t cfg = {
+        .name              = name,
+        .mode              = COBALT_SHM_MODE_SPSC,
+        .wait_policy       = COBALT_SHM_WAIT_BLOCKING,
+        .capacity          = 4096,
+        .slot_size         = 0,
+        .create_if_missing = true,
+        .spin_threshold    = 1000,
+    };
+
+    cobalt_shm_channel_t *server = cobalt_shm_channel_create(&cfg);
+    TEST_ASSERT(server != NULL);
+
+    int sync_pipe[2];
+    int prc = pipe(sync_pipe);
+    TEST_ASSERT(prc == 0);
+
+    fflush(stdout);
+    fflush(stderr);
+
+    pid_t child_pid = fork();
+    TEST_ASSERT(child_pid >= 0);
+
+    if (child_pid == 0) {
+        close(sync_pipe[0]);
+
+        cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
+        if (!client) {
+            _exit(1);
+        }
+
+        void *wptr = NULL;
+        int   rc   = cobalt_shm_channel_reserve(client, 128, &wptr);
+        if (rc != COBALT_SUCCESS || !wptr) {
+            _exit(2);
+        }
+
+        /* Write payload into reserved slot but do NOT commit */
+        memset(wptr, 0xEE, 128);
+
+        /* Signal parent that reserve was completed */
+        if (write(sync_pipe[1], "R", 1) != 1) {
+            _exit(3);
+        }
+        close(sync_pipe[1]);
+
+        /* Block awaiting kill */
+        while (1) {
+            pause();
+        }
+    }
+
+    close(sync_pipe[1]);
+    char    sig = 0;
+    ssize_t n   = read(sync_pipe[0], &sig, 1);
+    close(sync_pipe[0]);
+    TEST_ASSERT(n == 1 && sig == 'R');
+
+    /* Kill child abruptly with SIGKILL */
+    int krc = kill(child_pid, SIGKILL);
+    TEST_ASSERT(krc == 0);
+
+    int   status = 0;
+    pid_t waited = waitpid(child_pid, &status, 0);
+    TEST_ASSERT(waited == child_pid);
+    TEST_ASSERT(WIFSIGNALED(status));
+    TEST_ASSERT(WTERMSIG(status) == SIGKILL);
+
+    /* Verify channel remains completely usable */
+    /* 1. Uncommitted reserved slot was never committed, so container is empty */
+    char     buf[256];
+    uint16_t type    = 0;
+    size_t   out_len = 0;
+    int      rc      = cobalt_shm_channel_recv(server, &type, buf, sizeof(buf), &out_len, 0);
+    TEST_ASSERT(rc == COBALT_ERROR_EMPTY_CONTAINER);
+
+    /* 2. Server can send and receive new messages */
+    for (int i = 0; i < 100; i++) {
+        char msg[64];
+        snprintf(msg, sizeof(msg), "crash-recovery-%03d", i);
+        rc = cobalt_shm_channel_send(server, (uint16_t)(500 + i), msg, strlen(msg) + 1, 1000);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+
+        char     recv_buf[64];
+        uint16_t recv_type = 0;
+        size_t   recv_len  = 0;
+        rc                 = cobalt_shm_channel_recv(
+            server, &recv_type, recv_buf, sizeof(recv_buf), &recv_len, 1000);
+        TEST_ASSERT(rc == COBALT_SUCCESS);
+        TEST_ASSERT(recv_type == (uint16_t)(500 + i));
+        TEST_ASSERT(recv_len == strlen(msg) + 1);
+        TEST_ASSERT(strcmp(recv_buf, msg) == 0);
+    }
+
+    /* 3. A fresh client handle can connect and exchange messages with server */
+    cobalt_shm_channel_t *client = cobalt_shm_channel_open(name, COBALT_SHM_WAIT_BLOCKING);
+    TEST_ASSERT(client != NULL);
+
+    const char *test_msg = "post_crash_client_msg";
+    rc = cobalt_shm_channel_send(client, 999, test_msg, strlen(test_msg) + 1, 1000);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
+    char     client_recv[64];
+    uint16_t client_type = 0;
+    size_t   client_len  = 0;
+    rc                   = cobalt_shm_channel_recv(
+        server, &client_type, client_recv, sizeof(client_recv), &client_len, 1000);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(client_type == 999);
+    TEST_ASSERT(client_len == strlen(test_msg) + 1);
+    TEST_ASSERT(strcmp(client_recv, test_msg) == 0);
+
+    cobalt_shm_channel_destroy(client);
+    cobalt_shm_channel_destroy(server);
+    cleanup_shm_and_notif(name);
+
+    printf("  Fork crash recovery test passed\n");
+}
+#endif
+
 void test_shm(void)
 {
     printf("Testing shared memory primitive (cobalt_shm_t)...\n");
@@ -1652,5 +2221,14 @@ void test_shm(void)
     test_channel_send_timeout_full();
     test_channel_mpmc_eventloop_integration();
     test_channel_invalid_args();
-    printf("  Shared memory channel facade tests completed successfully!\n");
+    printf("  Shared memory channel facade tests completed successfully!\n\n");
+
+#ifndef _WIN32
+    printf("Testing multi-process fork stress and crash recovery...\n");
+    test_shm_fork_spsc_pingpong();
+    test_shm_fork_mpmc_contention();
+    test_shm_fork_eventloop_drain();
+    test_shm_fork_crash_recovery();
+    printf("  Multi-process stress and crash recovery tests completed successfully!\n");
+#endif
 }
