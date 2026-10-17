@@ -265,6 +265,15 @@ int cobalt_notifier_create(const char *name, cobalt_notifier_t **out_notif)
     }
     *out_notif = NULL;
 
+    char path[COBALT_NOTIFIER_PATH_MAX];
+    if (name != NULL) {
+        int rc = format_notifier_path(name, path, sizeof(path));
+        if (rc != COBALT_SUCCESS) {
+            cobalt_error_set(NULL, rc);
+            return rc;
+        }
+    }
+
     cobalt_notifier_t *notif = (cobalt_notifier_t *)malloc(sizeof(cobalt_notifier_t));
     if (!notif) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
@@ -305,14 +314,6 @@ int cobalt_notifier_create(const char *name, cobalt_notifier_t **out_notif)
         *out_notif = notif;
         cobalt_error_set(NULL, COBALT_SUCCESS);
         return COBALT_SUCCESS;
-    }
-
-    char path[COBALT_NOTIFIER_PATH_MAX];
-    int  rc = format_notifier_path(name, path, sizeof(path));
-    if (rc != COBALT_SUCCESS) {
-        free(notif);
-        cobalt_error_set(NULL, rc);
-        return rc;
     }
 
     if (mkfifo(path, 0666) != 0) {
@@ -460,12 +461,15 @@ int cobalt_notifier_wait(cobalt_notifier_t *notif, int timeout_ms)
             ret = poll(&pfd, 1, -1);
         } while (ret < 0 && errno == EINTR);
     } else if (timeout_ms == 0) {
-        ret = poll(&pfd, 1, 0);
+        do {
+            ret = poll(&pfd, 1, 0);
+        } while (ret < 0 && errno == EINTR);
     } else {
-        struct timespec start, now;
+        struct timespec start;
+        struct timespec now;
         clock_gettime(CLOCK_MONOTONIC, &start);
         int remaining = timeout_ms;
-        do {
+        for (;;) {
             ret = poll(&pfd, 1, remaining);
             if (ret < 0 && errno == EINTR) {
                 clock_gettime(CLOCK_MONOTONIC, &now);
@@ -476,8 +480,10 @@ int cobalt_notifier_wait(cobalt_notifier_t *notif, int timeout_ms)
                     break;
                 }
                 remaining = timeout_ms - (int)elapsed;
+                continue;
             }
-        } while (ret < 0 && errno == EINTR);
+            break;
+        }
     }
 
     if (ret < 0) {

@@ -203,6 +203,12 @@ static void test_notifier_anonymous(void)
     rc = cobalt_notifier_wait(notif, 0);
     TEST_ASSERT(rc == COBALT_ERROR_TIMEOUT);
 
+    /* Test infinite timeout wait after notification */
+    rc = cobalt_notifier_notify(notif);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    rc = cobalt_notifier_wait(notif, -1);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+
     cobalt_notifier_destroy(notif);
     printf("  Anonymous notifier test passed\n");
 }
@@ -266,6 +272,13 @@ static void test_notifier_named(void)
     rc                         = cobalt_notifier_open(name, &notif_c);
     TEST_ASSERT(rc == COBALT_ERROR_NOT_FOUND);
     TEST_ASSERT(notif_c == NULL);
+
+    /* Test unslashed name normalization */
+    cobalt_notifier_t *notif_noslash = NULL;
+    rc = cobalt_notifier_create("cobalt_test_notif_noslash", &notif_noslash);
+    TEST_ASSERT(rc == COBALT_SUCCESS);
+    TEST_ASSERT(notif_noslash != NULL);
+    cobalt_notifier_destroy(notif_noslash);
 
     printf("  Named notifier test passed\n");
 }
