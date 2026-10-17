@@ -294,15 +294,23 @@ int cobalt_cond_timedwait(cobalt_cond_t *c, cobalt_mutex_t *m, int64_t timeout_m
 /* ========================================================================= */
 
 #ifdef _WIN32
+typedef struct {
+    cobalt_thread_fn_t fn;
+    void              *arg;
+} win32_thread_trampoline_t;
+
 /**
  * @brief Win32 thread entry trampoline (adapts cobalt_thread_fn_t to _beginthreadex)
- * @param arg Thread function pointer passed through _beginthreadex
+ * @param trampoline_arg Trampoline context containing fn and arg
  * @return Return value of the wrapped thread function
  */
-static unsigned __stdcall thread_proxy(void *arg)
+static unsigned __stdcall thread_proxy(void *trampoline_arg)
 {
-    cobalt_thread_fn_t fn = (cobalt_thread_fn_t)(uintptr_t)arg;
-    return (unsigned)(uintptr_t)fn(NULL);
+    win32_thread_trampoline_t *t   = (win32_thread_trampoline_t *)trampoline_arg;
+    cobalt_thread_fn_t         fn  = t->fn;
+    void                      *arg = t->arg;
+    free(t);
+    return (unsigned)(uintptr_t)fn(arg);
 }
 #endif
 
@@ -317,18 +325,25 @@ static unsigned __stdcall thread_proxy(void *arg)
  */
 int cobalt_thread_create(cobalt_thread_fn_t fn, void *arg, cobalt_thread_t *out_handle)
 {
-    (void)arg;
     if (!fn) {
         return -1;
     }
 #ifdef _WIN32
-    HANDLE h =
-        (HANDLE)(uintptr_t)_beginthreadex(NULL, 0, thread_proxy, (void *)(uintptr_t)fn, 0, NULL);
+    win32_thread_trampoline_t *t = (win32_thread_trampoline_t *)malloc(sizeof(*t));
+    if (!t) {
+        return -1;
+    }
+    t->fn    = fn;
+    t->arg   = arg;
+    HANDLE h = (HANDLE)(uintptr_t)_beginthreadex(NULL, 0, thread_proxy, t, 0, NULL);
     if (!h) {
+        free(t);
         return -1;
     }
     if (out_handle) {
         *out_handle = (cobalt_thread_t)h;
+    } else {
+        CloseHandle(h);
     }
     return 0;
 #else
