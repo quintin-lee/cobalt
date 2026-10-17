@@ -25,7 +25,7 @@
 #endif
 
 #define COBALT_THREADPOOL_DEFAULT_LOCAL_CAPACITY 1024
-#define COBALT_THREADPOOL_DEFAULT_GLOBAL_CAPACITY 4096
+#define COBALT_THREADPOOL_DEFAULT_GLOBAL_CAPACITY 65536
 
 /* -------------------------------------------------------------------------- */
 /* CPU Core Auto-Detection                                                    */

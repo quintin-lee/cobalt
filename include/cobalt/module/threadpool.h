@@ -41,7 +41,7 @@ typedef void (*cobalt_parallel_for_fn_t)(size_t index, void *arg);
 typedef struct {
     size_t num_threads;        /**< Worker count (0 = auto-detect CPU cores) */
     size_t local_queue_size;   /**< Per-worker deque capacity (default 1024, power of 2) */
-    size_t global_queue_size;  /**< Global MPMC queue capacity (default 4096, power of 2) */
+    size_t global_queue_size;  /**< Global MPMC queue capacity (default 65536, power of 2) */
     cobalt_allocator_t *alloc; /**< Memory allocator (NULL = system allocator) */
 } cobalt_threadpool_config_t;
 
