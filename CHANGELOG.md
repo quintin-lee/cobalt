@@ -35,6 +35,10 @@
   - Ping-pong round-trip latency (Min, Median/P50, P90, P99, Max, Average) across SPSC Spin, SPSC Blocking, and MPMC Blocking policies.
   - Streaming throughput benchmarks for 64B, 1KB, and 64KB payloads, confirming >20M msgs/sec throughput and zero-copy bandwidth >600 GB/s.
   - Integrated into unified `tests/benchmark/bench_runner.c` with `--json` reporting support.
+- **Regression Test for Overflow & OOB Defects (`tests/unit`)**:
+  - `test_buffer_defrag_prepend_no_underflow` locks in the defragmentation underflow fix (ASan-confirmed heap OOB write).
+  - `test_vector_overflow_guards` locks in the `SIZE_MAX / sizeof(void *)` element limit on `create`/`reserve`/push-doubling.
+  - `test_regex_backref_no_truncation` locks in the `size_t` backreference counter (previously `uint8_t`, truncating captures past 255 chars).
 
 ### Changed
 - Total CTest suites expanded from 59 to 61 (44 unit test suites + 17 benchmarks; new `test_shm` and `bench_shm`), maintaining 100% pass rate under Release, Debug, and AddressSanitizer/LeakSanitizer (`build-asan`).
@@ -47,6 +51,12 @@
 - Added `COBALT_STRICT_WARNINGS` CMake option (default ON) controlling
   `-Wall -Wextra -Werror`; removed unused `test_registry.ld` / `TEST_REGISTER` /
   `TEST_AUTO_REGISTER` dead code.
+- Added `COBALT_RUN_TSAN` CMake option (default OFF) building with
+  `-fsanitize=thread`; CI already runs a dedicated `tsan` job.
+- `list_merge` (used by `cobalt_list_merge_sort` / `cobalt_list_sort`) converted
+  from per-node recursion to a single-pass iterative merge, bounding merge-sort
+  stack depth to O(log n) instead of O(n) for very large lists.
+
 
 ### Fixed
 - EBR: `cobalt_ebr_sync` no longer reclaims the orphan pool prematurely — orphaned
@@ -57,6 +67,21 @@
   retired lists — they are now spliced into the orphan pool under the orphan lock,
   closing the lost-update window where handle churn (`unregister` → `register`)
   leaked retired nodes.
+- `cobalt_buffer_ensure_writable` defragmentation: `discardable = read_pos -
+  prepend_size` underflowed to `SIZE_MAX` after `cobalt_buffer_prepend` lowered
+  `read_pos` below `prepend_size`, causing a heap out-of-bounds write on the next
+  expansion (ASan-confirmed). Now clamped to 0 so the demand routes to the
+  geometric-expansion branch.
+- `cobalt_buffer_ensure_writable` geometric expansion: `capacity * 2` and
+  `write_pos + len + capacity` guarded against `size_t` overflow (`SIZE_MAX`).
+- `cobalt_vector_create` / `cobalt_vector_reserve` / push-doubling: requested
+  element counts now capped at `SIZE_MAX / sizeof(void *)`, so the allocated
+  pointer array can never wrap and alias a short block (later indexing would
+  run out of bounds).
+- Pike VM regex engine: `pike_thread_t` backreference `backref_offset` /
+  `backref_remaining` counters widened from `uint8_t` to `size_t`, so a capture
+  longer than 255 chars (e.g. `(a{128}a{128}a{128})\1` → 384 chars) is matched in
+  full instead of being silently truncated to 255 (false-positive match).
 
 ## v2.7.0 (2026-10-17) — Lock-Free Concurrent SkipList, 3-Epoch EBR Engine & Linear Pike VM Regex Engine
 
