@@ -54,10 +54,20 @@ typedef struct {
     void            *arg;
 } cobalt_task_t;
 
+/* Buffer slot for the Chase-Lev deque. Fields are atomic: a stealer whose top
+ * sample went stale may speculatively read a slot the owner is recycling, and
+ * that conflicting access must be well-defined even though the value is
+ * discarded unless the subsequent top CAS succeeds (which proves that no slot
+ * reuse could have raced with the read). */
 typedef struct {
-    cobalt_task_t *buffer;
-    size_t         capacity;
-    size_t         mask;
+    _Atomic(cobalt_task_fn_t) fn;
+    _Atomic(void *)           arg;
+} chase_lev_slot_t;
+
+typedef struct {
+    chase_lev_slot_t *buffer;
+    size_t            capacity;
+    size_t            mask;
     _Alignas(64) atomic_size_t top;
     _Alignas(64) atomic_size_t bottom;
 } chase_lev_deque_t;
@@ -78,9 +88,9 @@ static int chase_lev_init(chase_lev_deque_t *q, size_t capacity, cobalt_allocato
     atomic_init(&q->top, 0);
     atomic_init(&q->bottom, 0);
 
-    size_t buf_bytes = cap * sizeof(cobalt_task_t);
-    q->buffer        = alloc ? (cobalt_task_t *)alloc->alloc(alloc, buf_bytes)
-                             : (cobalt_task_t *)malloc(buf_bytes);
+    size_t buf_bytes = cap * sizeof(chase_lev_slot_t);
+    q->buffer        = alloc ? (chase_lev_slot_t *)alloc->alloc(alloc, buf_bytes)
+                             : (chase_lev_slot_t *)malloc(buf_bytes);
     return q->buffer ? 0 : -1;
 }
 
@@ -103,7 +113,9 @@ static int chase_lev_push(chase_lev_deque_t *q, cobalt_task_t task)
     if (b - t >= q->capacity) {
         return -1; /* Deque is full */
     }
-    q->buffer[b & q->mask] = task;
+    chase_lev_slot_t *slot = &q->buffer[b & q->mask];
+    atomic_store_explicit(&slot->fn, task.fn, memory_order_relaxed);
+    atomic_store_explicit(&slot->arg, task.arg, memory_order_relaxed);
     atomic_store_explicit(&q->bottom, b + 1, memory_order_release);
     return 0;
 }
@@ -120,7 +132,9 @@ static int chase_lev_pop(chase_lev_deque_t *q, cobalt_task_t *out_task)
 
     size_t t = atomic_load_explicit(&q->top, memory_order_relaxed);
     if (t <= b) {
-        *out_task = q->buffer[b & q->mask];
+        chase_lev_slot_t *slot = &q->buffer[b & q->mask];
+        out_task->fn           = atomic_load_explicit(&slot->fn, memory_order_relaxed);
+        out_task->arg          = atomic_load_explicit(&slot->arg, memory_order_relaxed);
         if (t == b) {
             /* Last remaining element: compete with potential concurrent stealers */
             size_t expected_t = t;
@@ -147,7 +161,9 @@ static int chase_lev_steal(chase_lev_deque_t *q, cobalt_task_t *out_task)
     size_t b = atomic_load_explicit(&q->bottom, memory_order_acquire);
 
     if (t < b) {
-        *out_task = q->buffer[t & q->mask];
+        chase_lev_slot_t *slot = &q->buffer[t & q->mask];
+        out_task->fn           = atomic_load_explicit(&slot->fn, memory_order_relaxed);
+        out_task->arg          = atomic_load_explicit(&slot->arg, memory_order_relaxed);
         if (atomic_compare_exchange_weak_explicit(
                 &q->top, &t, t + 1, memory_order_seq_cst, memory_order_relaxed)) {
             return 0;
@@ -424,6 +440,12 @@ void cobalt_threadpool_destroy(cobalt_threadpool_t *pool)
                 cobalt_thread_join(pool->workers[i].thread_handle);
                 pool->workers[i].thread_handle = NULL;
             }
+        }
+        /* Deques are destroyed only after every worker has exited: a worker may
+         * be inside a work-stealing scan over its peers' deques while this
+         * teardown runs, so freeing any deque before all joins complete would
+         * release memory a still-running worker is reading. */
+        for (size_t i = 0; i < pool->num_workers; i++) {
             chase_lev_destroy(&pool->workers[i].local_deque, pool->alloc);
         }
         pool->alloc->free(pool->alloc, pool->workers);
@@ -582,16 +604,64 @@ void cobalt_waitgroup_add(cobalt_waitgroup_t *wg, int64_t delta)
     atomic_fetch_add_explicit(&wg->counter, delta, memory_order_release);
 }
 
+/**
+ * @brief Perform the final decrement (to zero) while holding the mutex
+ *
+ * @details The transition to zero happens inside the critical section, so a
+ *          thread that observes `counter == 0` under the mutex (wait() /
+ *          destroy()) is synchronized with the broadcast and with every
+ *          earlier `done()`. Performing the transition *before* locking would
+ *          open a window where wait() observes zero, returns, and the caller
+ *          destroys the waitgroup while the finalizing worker has yet to
+ *          acquire the mutex (use-after-free).
+ *
+ * @param wg Waitgroup whose counter was observed at one
+ */
+static void waitgroup_done_final(cobalt_waitgroup_t *wg)
+{
+    cobalt_mutex_lock(wg->mutex);
+    int64_t cur = atomic_load_explicit(&wg->counter, memory_order_acquire);
+    if (cur == 1) {
+        atomic_store_explicit(&wg->counter, 0, memory_order_release);
+        cobalt_cond_broadcast(wg->cond);
+    } else if (cur > 1) {
+        /*
+         * A concurrent add() raced the final decrement (contract misuse);
+         * still account for this decrement so the count cannot leak.
+         */
+        if (atomic_fetch_sub_explicit(&wg->counter, 1, memory_order_acq_rel) == 1) {
+            cobalt_cond_broadcast(wg->cond);
+        }
+    }
+    cobalt_mutex_unlock(wg->mutex);
+}
+
 void cobalt_waitgroup_done(cobalt_waitgroup_t *wg)
 {
     if (!wg) {
         return;
     }
-    int64_t prev = atomic_fetch_sub_explicit(&wg->counter, 1, memory_order_acq_rel);
-    if (prev <= 1) {
-        cobalt_mutex_lock(wg->mutex);
-        cobalt_cond_broadcast(wg->cond);
-        cobalt_mutex_unlock(wg->mutex);
+    /*
+     * Lock-free fast path: CAS-decrement while the counter stays above one.
+     * A counter value of one means no other done() can still be pending (any
+     * other pending decrement would keep the count at two or more), so this
+     * thread owns the final decrement and performs it under the mutex.
+     */
+    for (;;) {
+        int64_t cur = atomic_load_explicit(&wg->counter, memory_order_acquire);
+        if (cur > 1) {
+            if (atomic_compare_exchange_weak_explicit(
+                    &wg->counter, &cur, cur - 1, memory_order_acq_rel, memory_order_acquire)) {
+                return;
+            }
+            continue;
+        }
+        if (cur <= 0) {
+            /* Misuse: more done() calls than add(); avoid counter underflow. */
+            return;
+        }
+        waitgroup_done_final(wg);
+        return;
     }
 }
 
@@ -608,10 +678,21 @@ void cobalt_waitgroup_wait(cobalt_waitgroup_t *wg)
                 cobalt_thread_yield();
             }
         }
+        /*
+         * The counter is cleared inside the mutex, so acquiring and releasing
+         * it here serializes with the finalizer's critical section and makes
+         * destroy() safe immediately after wait() returns.
+         */
+        cobalt_mutex_lock(wg->mutex);
+        cobalt_mutex_unlock(wg->mutex);
         return;
     }
 
-    /* External thread: block on condition variable */
+    /*
+     * External thread: block on condition variable. The counter is re-checked
+     * under the mutex so a completion between the probe and the lock cannot be
+     * missed; on return every decrement (including the final one) is complete.
+     */
     cobalt_mutex_lock(wg->mutex);
     while (atomic_load_explicit(&wg->counter, memory_order_acquire) > 0) {
         cobalt_cond_wait(wg->cond, wg->mutex);
@@ -624,7 +705,16 @@ void cobalt_waitgroup_destroy(cobalt_waitgroup_t *wg)
     if (!wg) {
         return;
     }
+
+    /*
+     * Barrier against a concurrent waitgroup_done_final(): once this lock is
+     * granted, any in-flight completion has fully finished touching the
+     * mutex/cond. The caller must still ensure wait() has returned, or that no
+     * add()/done() pair remains in flight, before destroying the waitgroup.
+     */
     if (wg->mutex) {
+        cobalt_mutex_lock(wg->mutex);
+        cobalt_mutex_unlock(wg->mutex);
         cobalt_mutex_destroy(wg->mutex);
     }
     if (wg->cond) {
