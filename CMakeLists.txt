@@ -20,11 +20,18 @@ option(COBALT_RUN_FORMAT "Run clang-format checks" ON)
 option(COBALT_BUILD_COVERAGE "Build with coverage instrumentation" OFF)
 option(COBALT_COVERAGE_THRESHOLD "Minimum coverage percentage to pass (0 = no check)" 80)
 option(COBALT_RUN_ASAN "Build with AddressSanitizer" OFF)
+option(COBALT_RUN_TSAN "Build with ThreadSanitizer" OFF)
 
 # ASAN build flags
 if(COBALT_RUN_ASAN)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=address -fno-omit-frame-pointer -g")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=address")
+endif()
+
+# TSAN build flags
+if(COBALT_RUN_TSAN)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsanitize=thread -fno-omit-frame-pointer -g")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -fsanitize=thread")
 endif()
 
 # Copy lsan.suppress to build dir for ASan tests
