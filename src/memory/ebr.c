@@ -23,6 +23,7 @@ typedef struct cobalt_ebr_node {
     void (*free_fn)(void *ptr, void *user_data);
     void                   *user_data;
     struct cobalt_ebr_node *next;
+    uint64_t                epoch;
 } cobalt_ebr_node_t;
 
 /**
@@ -93,19 +94,60 @@ static void ebr_reclaim_node_list(cobalt_ebr_t *ebr, cobalt_ebr_node_t **head_re
     }
 }
 
-static void ebr_reclaim_orphaned_slot(cobalt_ebr_t *ebr, size_t slot)
+/**
+ * @brief Reclaim orphaned retired nodes up to a safe epoch boundary
+ * @param ebr EBR instance
+ * @param slot Orphan slot index
+ * @param limit_epoch Nodes retired in an epoch <= limit_epoch are freed; newer
+ *        nodes are kept for a later advance (3-epoch rule)
+ */
+static void ebr_reclaim_orphaned_slot(cobalt_ebr_t *ebr, size_t slot, uint64_t limit_epoch)
 {
     if (!ebr || slot >= 3 || !ebr->orphan_lock) {
         return;
     }
-    cobalt_ebr_node_t *to_free = NULL;
+
     cobalt_mutex_lock(ebr->orphan_lock);
-    to_free                     = ebr->orphaned_retired[slot];
+    cobalt_ebr_node_t *to_free  = ebr->orphaned_retired[slot];
     ebr->orphaned_retired[slot] = NULL;
     cobalt_mutex_unlock(ebr->orphan_lock);
 
-    if (to_free) {
-        ebr_reclaim_node_list(ebr, &to_free);
+    if (!to_free) {
+        return;
+    }
+
+    /* Split off nodes still too new to free; they keep their slot, in
+     * original order, tail-linked to whatever concurrently re-landed in the
+     * slot between the detach above and this re-attach. */
+    cobalt_ebr_node_t *keep_head = NULL, *keep_tail = NULL;
+    cobalt_ebr_node_t *curr = to_free;
+    while (curr) {
+        cobalt_ebr_node_t *next = curr->next;
+        if (curr->epoch > limit_epoch) {
+            if (!keep_tail) {
+                keep_head = keep_tail = curr;
+            } else {
+                keep_tail->next = curr;
+                keep_tail       = curr;
+            }
+        } else {
+            if (curr->ptr) {
+                if (curr->free_fn) {
+                    curr->free_fn(curr->ptr, curr->user_data);
+                } else {
+                    ebr_free(ebr, curr->ptr);
+                }
+            }
+            ebr_free(ebr, curr);
+        }
+        curr = next;
+    }
+
+    if (keep_head) {
+        cobalt_mutex_lock(ebr->orphan_lock);
+        keep_tail->next             = ebr->orphaned_retired[slot];
+        ebr->orphaned_retired[slot] = keep_head;
+        cobalt_mutex_unlock(ebr->orphan_lock);
     }
 }
 
@@ -214,10 +256,25 @@ cobalt_ebr_handle_t *cobalt_ebr_register(cobalt_ebr_t *ebr)
         if (atomic_compare_exchange_strong_explicit(
                 &curr->registered, &expected, true, memory_order_acq_rel, memory_order_acquire)) {
             atomic_store_explicit(&curr->active_epoch, 0, memory_order_release);
-            curr->retired_count    = 0;
-            curr->local_retired[0] = NULL;
-            curr->local_retired[1] = NULL;
-            curr->local_retired[2] = NULL;
+            /* Splice any lingering local lists into the orphan pool under
+             * the same lock the previous owner's unregister transfer uses,
+             * so no node is dropped whichever of the two operations runs
+             * second (a plain NULL reset would discard the list before the
+             * owner's transfer reaches it). */
+            cobalt_mutex_lock(ebr->orphan_lock);
+            for (size_t i = 0; i < 3; i++) {
+                if (curr->local_retired[i]) {
+                    cobalt_ebr_node_t *tail = curr->local_retired[i];
+                    while (tail->next) {
+                        tail = tail->next;
+                    }
+                    tail->next               = ebr->orphaned_retired[i];
+                    ebr->orphaned_retired[i] = curr->local_retired[i];
+                    curr->local_retired[i]   = NULL;
+                }
+            }
+            curr->retired_count = 0;
+            cobalt_mutex_unlock(ebr->orphan_lock);
 #ifndef _WIN32
             pthread_setspecific(s_ebr_tls_key, curr);
 #endif
@@ -351,6 +408,7 @@ void cobalt_ebr_retire(cobalt_ebr_handle_t *handle,
 
     uint64_t g                  = atomic_load_explicit(&ebr->global_epoch, memory_order_relaxed);
     size_t   slot               = g % 3;
+    node->epoch                 = g;
     node->next                  = handle->local_retired[slot];
     handle->local_retired[slot] = node;
     handle->retired_count++;
@@ -396,9 +454,10 @@ bool cobalt_ebr_try_advance(cobalt_ebr_t *ebr)
         return false;
     }
 
-    /* With new epoch (g + 1), slot (g + 1 + 1) % 3 = (g + 2) % 3 is safe to reclaim */
+    /* With new epoch (g + 1), slot (g + 1 + 1) % 3 = (g + 2) % 3 holds epoch g - 1:
+     * it may be freed now (clamped at 0 for the initial advance). */
     size_t safe_slot = (g + 2) % 3;
-    ebr_reclaim_orphaned_slot(ebr, safe_slot);
+    ebr_reclaim_orphaned_slot(ebr, safe_slot, g > 0 ? g - 1 : 0);
 
     return true;
 }
@@ -423,9 +482,10 @@ void cobalt_ebr_sync(cobalt_ebr_t *ebr)
         }
     }
 
-    /* Flush orphaned lists */
+    /* Flush orphaned lists up to the 3-epoch boundary; any concurrently
+     * refilled (newer) nodes remain for the next advance. */
     for (size_t i = 0; i < 3; i++) {
-        ebr_reclaim_orphaned_slot(ebr, i);
+        ebr_reclaim_orphaned_slot(ebr, i, target - 2);
     }
 }
 

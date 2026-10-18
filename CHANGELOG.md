@@ -48,6 +48,16 @@
   `-Wall -Wextra -Werror`; removed unused `test_registry.ld` / `TEST_REGISTER` /
   `TEST_AUTO_REGISTER` dead code.
 
+### Fixed
+- EBR: `cobalt_ebr_sync` no longer reclaims the orphan pool prematurely — orphaned
+  reclamation is now epoch-bounded (3-epoch rule), so nodes retired after the sync
+  point are kept until a later advance instead of being freed while active readers
+  may still hold them.
+- EBR: handle reuse no longer silently drops the previous owner's lingering local
+  retired lists — they are now spliced into the orphan pool under the orphan lock,
+  closing the lost-update window where handle churn (`unregister` → `register`)
+  leaked retired nodes.
+
 ## v2.7.0 (2026-10-17) — Lock-Free Concurrent SkipList, 3-Epoch EBR Engine & Linear Pike VM Regex Engine
 
 
