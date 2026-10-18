@@ -32,4 +32,7 @@ struct json_node {
     bool              owns_arena; /**< Whether root node owns and should destroy the arena */
 };
 
+/** Maximum nesting depth for the DOM JSON parser, matching the SAX parser. */
+#define COBALT_JSON_DOM_MAX_DEPTH 128
+
 #endif /* COBALT_JSON_INTERNAL_H */

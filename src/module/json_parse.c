@@ -17,12 +17,14 @@
  * Stores the string currently being parsed, position, and total length.
  */
 typedef struct {
-    const char         *str;        /**< The JSON string to be parsed */
-    size_t              pos;        /**< The current character position being parsed */
-    size_t              len;        /**< Total length of the string */
-    cobalt_allocator_t *alloc;      /**< Resolved allocator (never NULL after entry) */
-    cobalt_arena_t     *arena;      /**< Backing memory arena (if using arena) */
-    bool                owns_arena; /**< True if parser created and owns the arena */
+    const char         *str;            /**< The JSON string to be parsed */
+    size_t              pos;            /**< The current character position being parsed */
+    size_t              len;            /**< Total length of the string */
+    cobalt_allocator_t *alloc;          /**< Resolved allocator (never NULL after entry) */
+    cobalt_arena_t     *arena;          /**< Backing memory arena (if using arena) */
+    bool                owns_arena;     /**< True if parser created and owns the arena */
+    size_t              depth;          /**< Current object/array nesting depth */
+    bool                depth_exceeded; /**< Set when the nesting cap is hit */
 } json_parse_ctx_t;
 
 /** @brief Allocate parser memory via the context's resolved allocator or arena. */
@@ -239,6 +241,11 @@ static json_node_t *json_parse_value(json_parse_ctx_t *ctx);
  */
 static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
 {
+    if (ctx->depth >= COBALT_JSON_DOM_MAX_DEPTH) {
+        ctx->depth_exceeded = true;
+        return NULL;
+    }
+    ctx->depth++;
     json_skip_whitespace(ctx);
     if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '{') {
         return NULL;
@@ -247,6 +254,7 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
 
     json_node_t *root = json_node_create(ctx, JSON_OBJECT);
     if (!root) {
+        ctx->depth--;
         return NULL;
     }
 
@@ -254,6 +262,7 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
     json_skip_whitespace(ctx);
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
         ctx->pos++;
+        ctx->depth--;
         return root;
     }
 
@@ -317,6 +326,7 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == '}') {
         ctx->pos++;
     }
+    ctx->depth--;
     return root;
 }
 
@@ -328,6 +338,11 @@ static json_node_t *json_parse_object(json_parse_ctx_t *ctx)
  */
 static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
 {
+    if (ctx->depth >= COBALT_JSON_DOM_MAX_DEPTH) {
+        ctx->depth_exceeded = true;
+        return NULL;
+    }
+    ctx->depth++;
     json_skip_whitespace(ctx);
     if (ctx->pos >= ctx->len || ctx->str[ctx->pos] != '[') {
         return NULL;
@@ -336,6 +351,7 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
 
     json_node_t *root = json_node_create(ctx, JSON_ARRAY);
     if (!root) {
+        ctx->depth--;
         return NULL;
     }
 
@@ -343,6 +359,7 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
     json_skip_whitespace(ctx);
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
         ctx->pos++;
+        ctx->depth--;
         return root;
     }
 
@@ -373,6 +390,7 @@ static json_node_t *json_parse_array(json_parse_ctx_t *ctx)
     if (ctx->pos < ctx->len && ctx->str[ctx->pos] == ']') {
         ctx->pos++;
     }
+    ctx->depth--;
     return root;
 }
 
@@ -483,12 +501,14 @@ json_node_t *json_parse_with_arena(const char *text, cobalt_arena_t *arena)
     }
 
     json_parse_ctx_t ctx = {
-        .str        = text,
-        .pos        = 0,
-        .len        = len,
-        .alloc      = NULL,
-        .arena      = arena,
-        .owns_arena = false,
+        .str            = text,
+        .pos            = 0,
+        .len            = len,
+        .alloc          = NULL,
+        .arena          = arena,
+        .owns_arena     = false,
+        .depth          = 0,
+        .depth_exceeded = false,
     };
 
     json_skip_whitespace(&ctx);
@@ -497,6 +517,9 @@ json_node_t *json_parse_with_arena(const char *text, cobalt_arena_t *arena)
     }
 
     json_node_t *root = json_parse_value(&ctx);
+    if (ctx.depth_exceeded) {
+        return NULL; /* partial tree, if any, is owned by the caller's arena */
+    }
     if (root) {
         root->arena      = arena;
         root->owns_arena = false;
@@ -526,12 +549,14 @@ json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc)
     }
 
     json_parse_ctx_t ctx = {
-        .str        = text,
-        .pos        = 0,
-        .len        = len,
-        .alloc      = effective_alloc,
-        .arena      = arena,
-        .owns_arena = true,
+        .str            = text,
+        .pos            = 0,
+        .len            = len,
+        .alloc          = effective_alloc,
+        .arena          = arena,
+        .owns_arena     = true,
+        .depth          = 0,
+        .depth_exceeded = false,
     };
 
     json_skip_whitespace(&ctx);
@@ -541,11 +566,10 @@ json_node_t *json_parse_with_alloc(const char *text, cobalt_allocator_t *alloc)
     }
 
     json_node_t *root = json_parse_value(&ctx);
-    if (!root) {
+    if (!root || ctx.depth_exceeded) {
         cobalt_arena_destroy(arena);
         return NULL;
     }
-
     root->arena      = arena;
     root->owns_arena = true;
     return root;

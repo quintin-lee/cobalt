@@ -19,6 +19,7 @@ void test_json_malformed_paths(void);
 void test_json_long_escapes(void);
 void test_json_oom(void);
 void test_json_arena(void);
+void test_json_depth_cap(void);
 
 /* Counting allocator: delegates to libc, counts live blocks.
  * realloc is counted as free(old)+alloc(new) on success, so a full
@@ -512,6 +513,35 @@ void test_json_malformed_paths(void)
     printf("  Malformed error paths: OK\n");
 }
 
+void test_json_depth_cap(void)
+{
+    printf("Testing JSON DOM depth cap...\n");
+
+    /* 200-deep array: rejected, must return NULL (pre-fix: stack overflow). */
+    size_t N    = 200;
+    char  *deep = (char *)malloc(2 * N + 1);
+    TEST_ASSERT(deep != NULL);
+    memset(deep, '[', N);
+    memset(deep + N, ']', N);
+    deep[2 * N] = '\0';
+    TEST_ASSERT(json_parse(deep) == NULL);
+    free(deep);
+
+    /* 127-deep array: parses successfully (just under the cap). */
+    size_t M  = 127;
+    char  *ok = (char *)malloc(2 * M + 1);
+    TEST_ASSERT(ok != NULL);
+    memset(ok, '[', M);
+    memset(ok + M, ']', M);
+    ok[2 * M]         = '\0';
+    json_node_t *root = json_parse(ok);
+    TEST_ASSERT(root != NULL);
+    json_destroy(root);
+    free(ok);
+
+    printf("  JSON DOM depth cap: OK\n");
+}
+
 void test_json_long_escapes(void)
 {
     printf("Testing JSON long escape growth...\n");
@@ -679,6 +709,7 @@ void test_json(void)
 {
     printf("Testing json...\n");
     test_json_parse_null();
+    test_json_depth_cap();
     test_json_parse_number();
     test_json_parse_string();
     test_json_parse_bool();
