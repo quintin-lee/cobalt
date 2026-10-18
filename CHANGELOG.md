@@ -39,6 +39,10 @@
   - `test_buffer_defrag_prepend_no_underflow` locks in the defragmentation underflow fix (ASan-confirmed heap OOB write).
   - `test_vector_overflow_guards` locks in the `SIZE_MAX / sizeof(void *)` element limit on `create`/`reserve`/push-doubling.
   - `test_regex_backref_no_truncation` locks in the `size_t` backreference counter (previously `uint8_t`, truncating captures past 255 chars).
+  - `test_json_surrogate_pairs` locks in UTF-16 surrogate-pair synthesis in the JSON
+    DOM parser: a paired `\uD83D\uDE00` decodes to the 4-byte UTF-8 form of U+1F600,
+    and a lone high/low surrogate fails the string parse (partial object/array tree,
+    NULL at the top level).
 
 ### Changed
 - Total CTest suites expanded from 59 to 61 (44 unit test suites + 17 benchmarks; new `test_shm` and `bench_shm`), maintaining 100% pass rate under Release, Debug, and AddressSanitizer/LeakSanitizer (`build-asan`).
@@ -87,6 +91,19 @@
   `backref_remaining` counters widened from `uint8_t` to `size_t`, so a capture
   longer than 255 chars (e.g. `(a{128}a{128}a{128})\1` → 384 chars) is matched in
   full instead of being silently truncated to 255 (false-positive match).
+- Geometric-growth overflow guards: capacity math in the regex node pool and codegen
+  instruction table, the treemap iterator stack, the eventloop timer table (power-of-two
+  clamp at 2^30 to keep the `new_cap - 1` mask valid) and pollfds array (`INT_MAX`
+  clamp in the int domain), and the JSON DOM/SAX string-growth paths is now clamped to
+  `SIZE_MAX / sizeof(elem)`; the `json_sax` initial-segment `malloc` is NULL-checked.
+  The clamps are defensive (reachable only near `SIZE_MAX/2`), so no dedicated tests
+  were added — the full suite plus the ASan build are the regression net.
+- The JSON DOM parser now synthesizes UTF-16 surrogate pairs into a single 4-byte
+  UTF-8 sequence, matching the SAX parser; lone high/low surrogates fail the string
+  parse instead of emitting invalid UTF-8 bytes.
+- The eventloop signal counter `g_signal_count` is now `volatile sig_atomic_t`,
+  removing data-race-undefined behavior from the async-signal context (handler
+  increment vs. drain-loop decrement).
 
 ## v2.7.0 (2026-10-17) — Lock-Free Concurrent SkipList, 3-Epoch EBR Engine & Linear Pike VM Regex Engine
 
