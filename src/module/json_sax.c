@@ -281,9 +281,10 @@ static bool parse_string(sax_parser_t *p, bool is_key)
     size_t init_seg = p->pos - start_pos;
     if (init_seg > 0) {
         if (init_seg >= cap) {
-            cap       = (init_seg + 1) * 2;
-            buf       = (char *)malloc(cap);
-            allocated = true;
+            size_t need = init_seg > SIZE_MAX - 1 ? SIZE_MAX : init_seg + 1;
+            cap         = need > SIZE_MAX / 2 ? SIZE_MAX : need * 2;
+            buf         = (char *)malloc(cap);
+            allocated   = true;
         }
         memcpy(buf, p->str + start_pos, init_seg);
         out_len = init_seg;
@@ -376,7 +377,8 @@ static bool parse_string(sax_parser_t *p, bool is_key)
                         p, COBALT_JSON_ERR_INVALID_ESCAPE, "Invalid Unicode codepoint");
                 }
                 if (out_len + ulen + 1 > cap) {
-                    cap           = (cap + ulen + 1) * 2;
+                    size_t need   = cap > SIZE_MAX - ulen - 1 ? SIZE_MAX : cap + ulen + 1;
+                    cap           = need > SIZE_MAX / 2 ? SIZE_MAX : need * 2;
                     char *new_buf = (char *)realloc(allocated ? buf : NULL, cap);
                     if (!new_buf) {
                         if (allocated) {
@@ -402,7 +404,8 @@ static bool parse_string(sax_parser_t *p, bool is_key)
             }
 
             if (out_len + 2 > cap) {
-                cap           = (cap + 2) * 2;
+                size_t need   = cap > SIZE_MAX - 2 ? SIZE_MAX : cap + 2;
+                cap           = need > SIZE_MAX / 2 ? SIZE_MAX : need * 2;
                 char *new_buf = (char *)realloc(allocated ? buf : NULL, cap);
                 if (!new_buf) {
                     if (allocated) {
@@ -432,7 +435,8 @@ static bool parse_string(sax_parser_t *p, bool is_key)
             p->pos = seg_end;
 
             if (out_len + seg_len + 1 > cap) {
-                cap           = (cap + seg_len + 1) * 2;
+                size_t need   = cap > SIZE_MAX - seg_len - 1 ? SIZE_MAX : cap + seg_len + 1;
+                cap           = need > SIZE_MAX / 2 ? SIZE_MAX : need * 2;
                 char *new_buf = (char *)realloc(allocated ? buf : NULL, cap);
                 if (!new_buf) {
                     if (allocated) {

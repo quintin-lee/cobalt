@@ -12,6 +12,7 @@
 #include "cobalt/platform/thread.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -129,6 +130,10 @@ typedef struct {
     uint64_t             timer_id;
     cobalt_timer_node_t *node;
 } timer_table_entry_t;
+
+/* Largest power-of-two timer table capacity. 2^30 * 16 bytes = 16 GiB; the
+ * `new_cap - 1` probe mask stays a power of two. */
+#define COBALT_TIMER_TABLE_MAX_CAP (1u << 30)
 
 /**
  * @brief Open-addressing hash table for O(1) timer cancellation
@@ -341,7 +346,15 @@ static int timer_table_insert(cobalt_eventloop_t  *loop,
                               cobalt_timer_node_t *node)
 {
     if (table->capacity == 0 || table->count * 10 >= table->capacity * 7) {
-        size_t               new_cap     = table->capacity == 0 ? 64 : table->capacity * 2;
+        size_t new_cap;
+        if (table->capacity == 0) {
+            new_cap = 64;
+        } else if (table->capacity >= COBALT_TIMER_TABLE_MAX_CAP) {
+            new_cap = table->capacity; /* capped: retry same size; OOM -> -1 */
+        } else {
+            new_cap = table->capacity * 2 > COBALT_TIMER_TABLE_MAX_CAP ? COBALT_TIMER_TABLE_MAX_CAP
+                                                                       : table->capacity * 2;
+        }
         timer_table_entry_t *new_entries = (timer_table_entry_t *)loop->alloc->alloc(
             loop->alloc, sizeof(timer_table_entry_t) * new_cap);
         if (!new_entries) {
@@ -753,8 +766,15 @@ static int platform_add_fd(cobalt_eventloop_t *loop, int fd, short events)
 #else
     int idx = fd;
     if (idx >= loop->pollfds_capacity) {
-        int            new_cap  = loop->pollfds_capacity == 0 ? COBALT_EVENTLOOP_DEFAULT_CAPACITY
-                                                              : loop->pollfds_capacity * 2;
+        int max_cap = (int)(INT_MAX / sizeof(struct pollfd));
+        int new_cap;
+        if (loop->pollfds_capacity == 0) {
+            new_cap = COBALT_EVENTLOOP_DEFAULT_CAPACITY;
+        } else if (loop->pollfds_capacity > max_cap / 2) {
+            new_cap = max_cap; /* capped: retry same size; OOM -> -1 */
+        } else {
+            new_cap = loop->pollfds_capacity * 2;
+        }
         struct pollfd *new_pfds = (struct pollfd *)loop->alloc->realloc(
             loop->alloc, loop->pollfds, sizeof(struct pollfd) * new_cap);
         if (!new_pfds) {

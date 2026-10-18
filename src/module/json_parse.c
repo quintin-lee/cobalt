@@ -9,6 +9,7 @@
 #include "json_internal.h"
 #include <ctype.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -197,8 +198,9 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
             }
 
             if (len + elen + 1 > capacity) {
-                capacity  = (len + elen + 1) * 2;
-                char *tmp = (char *)jrealloc(ctx, result, capacity);
+                size_t need = len > SIZE_MAX - elen - 1 ? SIZE_MAX : len + elen + 1;
+                capacity    = need > SIZE_MAX / 2 ? SIZE_MAX : need * 2;
+                char *tmp   = (char *)jrealloc(ctx, result, capacity);
                 if (!tmp) {
                     jfree(ctx, result);
                     return NULL;
@@ -210,7 +212,7 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
             ctx->pos++;
         } else {
             if (len + 2 > capacity) {
-                capacity *= 2;
+                capacity  = capacity > SIZE_MAX / 2 ? SIZE_MAX : capacity * 2;
                 char *tmp = (char *)jrealloc(ctx, result, capacity);
                 if (!tmp) {
                     jfree(ctx, result);

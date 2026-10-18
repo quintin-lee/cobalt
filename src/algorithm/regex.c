@@ -230,7 +230,8 @@ static uint32_t node_alloc(node_pool_t *pool, ast_type_t type)
         return AST_NULL;
     }
     if (pool->count >= pool->capacity) {
-        size_t      new_cap = pool->capacity * 2;
+        size_t      max_cap = SIZE_MAX / sizeof(ast_node_t);
+        size_t      new_cap = pool->capacity > max_cap / 2 ? max_cap : pool->capacity * 2;
         ast_node_t *new_nodes =
             (ast_node_t *)re_realloc(pool->alloc, pool->nodes, new_cap * sizeof(ast_node_t));
         if (!new_nodes) {
@@ -756,7 +757,9 @@ static uint32_t emit_inst(codegen_t *cg, cobalt_opcode_t op)
         return 0;
     }
     if (cg->count >= cg->capacity) {
-        size_t               new_cap   = cg->capacity ? cg->capacity * 2 : 32;
+        size_t max_cap = SIZE_MAX / sizeof(cobalt_regex_inst_t);
+        size_t new_cap =
+            cg->capacity == 0 ? 32 : (cg->capacity > max_cap / 2 ? max_cap : cg->capacity * 2);
         cobalt_regex_inst_t *new_insts = (cobalt_regex_inst_t *)re_realloc(
             cg->alloc, cg->insts, new_cap * sizeof(cobalt_regex_inst_t));
         if (!new_insts) {
