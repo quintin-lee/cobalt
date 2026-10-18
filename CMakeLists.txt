@@ -122,9 +122,6 @@ if(UNIX AND NOT APPLE)
     endif()
 endif()
 
-# Linker script for test registry sections (used by cobalt_test)
-set(COBALT_LINKER_SCRIPT ${CMAKE_SOURCE_DIR}/tests/test_registry.ld)
-
 # Examples
 if(COBALT_BUILD_EXAMPLES)
     add_executable(examples_basic_usage examples/basic_usage.c)
