@@ -54,13 +54,18 @@ make install DESTDIR=/tmp/stage
 The default CMake configuration enables `-Wall -Wextra -Werror` to keep the codebase clean and portable.
 
 ```bash
+# Disable the warning-as-error gate for a permissive local build
+cmake .. -DCMAKE_BUILD_TYPE=Release -DCOBALT_STRICT_WARNINGS=OFF
+```
+
+```bash
 # Disable the clang-tidy / clang-format build gates for a specific local build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DCOBALT_RUN_TIDY=OFF -DCOBALT_RUN_FORMAT=OFF
 ```
 
-> Note: `-Wall -Wextra -Werror` is always enabled for the library build. The optional
-> `COBALT_RUN_TIDY` / `COBALT_RUN_FORMAT` flags (default `ON`) control whether clang-tidy
-> and the clang-format POST_BUILD check are executed.
+> Note: `-Wall -Wextra -Werror` is enabled by default via the `COBALT_STRICT_WARNINGS`
+> option (default `ON`). The optional `COBALT_RUN_TIDY` / `COBALT_RUN_FORMAT` flags
+> (default `ON`) control whether clang-tidy and the clang-format POST_BUILD check run.
 
 ## Quick Start
 
@@ -204,7 +209,7 @@ Available via popular package managers:
 | Manager | Command |
 |---------|---------|
 | vcpkg | `vcpkg install cobalt` |
-| Conan | `conan install --requires=cobalt/2.6.0` |
+| Conan | `conan install --requires=cobalt/2.7.0` |
 | pkg-config | `pkg-config --cflags --libs cobalt` |
 
 ## Performance

@@ -39,6 +39,14 @@
 ### Changed
 - Total CTest suites expanded from 43 to 45 (44 unit test suites + `bench_shm`), maintaining 100% pass rate under Release, Debug, and AddressSanitizer/LeakSanitizer (`build-asan`).
 - Full clang-tidy pass across all IPC headers and sources with 0 warnings.
+- Capped JSON DOM parser nesting depth at 128 (matches SAX parser
+  `COBALT_JSON_MAX_DEPTH`); over-deep input now returns NULL instead of overflowing
+  the stack.
+- Thread-pool `parallel_for`, its waitgroup, and `cobalt_parallel_stable_sort_with_alloc`
+  now honor the injected allocator (new `cobalt_waitgroup_create_with_alloc`).
+- Added `COBALT_STRICT_WARNINGS` CMake option (default ON) controlling
+  `-Wall -Wextra -Werror`; removed unused `test_registry.ld` / `TEST_REGISTER` /
+  `TEST_AUTO_REGISTER` dead code.
 
 ## v2.7.0 (2026-10-17) — Lock-Free Concurrent SkipList, 3-Epoch EBR Engine & Linear Pike VM Regex Engine
 

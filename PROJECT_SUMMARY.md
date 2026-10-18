@@ -1,4 +1,4 @@
-# Cobalt C Framework v2.5.0 - Implementation Summary
+# Cobalt C Framework v2.7.0 - Implementation Summary
 
 ## Project Overview
 
@@ -143,7 +143,7 @@ Supports:
 
 ## Version
 
-Tagged as **v2.3.0** - Security Fixes & Advanced APIs Release
+Tagged as **v2.7.0** - Lock-Free SkipList, 3-Epoch EBR Engine & Linear Pike VM Regex Engine
 
 ## Phase 3 Updates
 
