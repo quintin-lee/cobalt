@@ -67,6 +67,11 @@
   retired lists — they are now spliced into the orphan pool under the orphan lock,
   closing the lost-update window where handle churn (`unregister` → `register`)
   leaked retired nodes.
+- EBR: `cobalt_ebr_unregister` reset `handle->retired_count` outside the
+  `orphan_lock` while the register-reuse path resets the same field under it,
+  leaving an unsynchronized write pair when a handle is immediately re-registered
+  by another thread (TSan-confirmed data race in `test_ebr`). The reset now runs
+  inside the lock on both paths.
 - `cobalt_buffer_ensure_writable` defragmentation: `discardable = read_pos -
   prepend_size` underflowed to `SIZE_MAX` after `cobalt_buffer_prepend` lowered
   `read_pos` below `prepend_size`, causing a heap out-of-bounds write on the next
