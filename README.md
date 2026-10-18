@@ -190,6 +190,7 @@ Continuous integration runs on every push to `master`:
 | **build** | Build with GCC/Clang × Debug/Release (4 variants) with format + tidy gates |
 | **asan** | AddressSanitizer build with LSan suppressions for allocator-inject tests |
 | **ubsan** | UndefinedBehaviorSanitizer build |
+| **tsan** | ThreadSanitizer build for data race detection |
 | **valgrind** | Memory leak and error checking with Valgrind |
 | **bench** | Performance benchmark regression detection |
 | **coverage** | Code coverage reporting with lcov |
