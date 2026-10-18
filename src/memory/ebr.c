@@ -334,6 +334,10 @@ void cobalt_ebr_unregister(cobalt_ebr_handle_t *handle)
 
     /* Transfer any remaining local retired nodes to orphaned list */
     if (ebr && ebr->orphan_lock) {
+        /* Reset the batch counter under the same lock the register reuse
+         * path resets it with: an unregistered handle may be picked up by
+         * another thread's register concurrently, and the two resets must
+         * be synchronized via the mutex or TSan flags a data race. */
         cobalt_mutex_lock(ebr->orphan_lock);
         for (size_t i = 0; i < 3; i++) {
             if (handle->local_retired[i]) {
@@ -346,10 +350,9 @@ void cobalt_ebr_unregister(cobalt_ebr_handle_t *handle)
                 handle->local_retired[i] = NULL;
             }
         }
+        handle->retired_count = 0;
         cobalt_mutex_unlock(ebr->orphan_lock);
     }
-
-    handle->retired_count = 0;
 }
 
 void cobalt_ebr_enter(cobalt_ebr_handle_t *handle)
