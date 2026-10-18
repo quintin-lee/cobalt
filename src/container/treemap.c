@@ -518,10 +518,15 @@ typedef struct {
 static void stack_push(treemap_map_iter_t *iter, treemap_node_t *node)
 {
     if (iter->stack_top == iter->stack_cap) {
-        size_t max_cap      = SIZE_MAX / sizeof(treemap_node_t *);
-        size_t new_cap      = iter->stack_cap == 0
-                                  ? 16
-                                  : (iter->stack_cap > max_cap / 2 ? max_cap : iter->stack_cap * 2);
+        size_t max_cap = SIZE_MAX / sizeof(treemap_node_t *);
+        size_t new_cap;
+        if (iter->stack_cap == 0) {
+            new_cap = 16;
+        } else if (iter->stack_cap > max_cap / 2) {
+            new_cap = max_cap; /* capped: retry same size; OOM -> finished */
+        } else {
+            new_cap = iter->stack_cap * 2;
+        }
         treemap_node_t **ns = (treemap_node_t **)iter->alloc->realloc(
             iter->alloc, iter->stack, new_cap * sizeof(treemap_node_t *));
         if (!ns) {
