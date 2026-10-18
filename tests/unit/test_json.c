@@ -20,6 +20,7 @@ void test_json_long_escapes(void);
 void test_json_oom(void);
 void test_json_arena(void);
 void test_json_depth_cap(void);
+void test_json_surrogate_pairs(void);
 
 /* Counting allocator: delegates to libc, counts live blocks.
  * realloc is counted as free(old)+alloc(new) on success, so a full
@@ -576,6 +577,41 @@ void test_json_long_escapes(void)
     printf("  Long escape growth + balance: OK\n");
 }
 
+/**
+ * @brief Regression: DOM parser must synthesize UTF-16 surrogate pairs into a
+ *        single 4-byte UTF-8 sequence and reject lone surrogates.
+ *        Pre-fix, 0xD800-0xDFFF fell into the 3-byte branch and emitted invalid
+ *        UTF-8, and \uD83D\uDE00 was emitted as two 3-byte sequences.
+ */
+void test_json_surrogate_pairs(void)
+{
+    printf("Testing JSON DOM surrogate pairs...\n");
+
+    /* Valid pair: U+1F600 -> UTF-8 F0 9F 98 80 (same expectation as
+     * test_json_sax.c, which the DOM must now match). */
+    json_node_t *pair = json_parse("\"\\uD83D\\uDE00\"");
+    TEST_ASSERT(pair != NULL);
+    const char *s = json_get_string(pair);
+    TEST_ASSERT(s != NULL);
+    unsigned const char *b = (unsigned const char *)s;
+    TEST_ASSERT(strlen(s) == 4 && b[0] == 0xF0 && b[1] == 0x9F && b[2] == 0x98 && b[3] == 0x80);
+    json_destroy(pair);
+
+    /* Lone high surrogate as an object key: string parse fails, the object
+     * loop stops, later members are absent -> partial tree, not a crash. */
+    json_node_t *obj = json_parse("{\"x\":0,\"\\uD800\":1,\"y\":2}");
+    TEST_ASSERT(obj != NULL);
+    TEST_ASSERT(json_tree_get_child(obj, "x") != NULL);
+    TEST_ASSERT(json_tree_get_child(obj, "y") == NULL);
+    json_destroy(obj);
+
+    /* Lone high/low surrogates at the top level: parse fails entirely. */
+    TEST_ASSERT(json_parse("\"\\uD800\"") == NULL);
+    TEST_ASSERT(json_parse("\"\\uDE00\"") == NULL);
+
+    printf("  JSON DOM surrogate pairs: OK\n");
+}
+
 /* Countdown allocator: the next `budget` alloc/realloc calls succeed (via libc),
  * afterwards they fail with NULL. Frees always pass through. Lets OOM paths be
  * probed deterministically: every partial allocation must be released again. */
@@ -710,6 +746,7 @@ void test_json(void)
     printf("Testing json...\n");
     test_json_parse_null();
     test_json_depth_cap();
+    test_json_surrogate_pairs();
     test_json_parse_number();
     test_json_parse_string();
     test_json_parse_bool();

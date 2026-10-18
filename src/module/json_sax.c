@@ -284,7 +284,10 @@ static bool parse_string(sax_parser_t *p, bool is_key)
             size_t need = init_seg > SIZE_MAX - 1 ? SIZE_MAX : init_seg + 1;
             cap         = need > SIZE_MAX / 2 ? SIZE_MAX : need * 2;
             buf         = (char *)malloc(cap);
-            allocated   = true;
+            if (!buf) {
+                return set_error(p, COBALT_JSON_ERR_DEPTH_EXCEEDED, "Out of memory");
+            }
+            allocated = true;
         }
         memcpy(buf, p->str + start_pos, init_seg);
         out_len = init_seg;

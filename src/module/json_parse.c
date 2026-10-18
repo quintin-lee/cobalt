@@ -175,20 +175,58 @@ static char *json_parse_string(json_parse_ctx_t *ctx)
                 char hex[5] = {0};
                 strncpy(hex, ctx->str + ctx->pos + 1, 4);
                 unsigned int cp = (unsigned int)strtol(hex, NULL, 16);
-                if (cp < 0x80) {
-                    escaped[0] = (char)cp;
-                    elen       = 1;
-                } else if (cp < 0x800) {
-                    escaped[0] = (char)(0xC0 | (cp >> 6));
-                    escaped[1] = (char)(0x80 | (cp & 0x3F));
-                    elen       = 2;
+
+                uint32_t unicode = cp;
+                if (cp >= 0xD800u && cp <= 0xDBFFu) {
+                    /* High surrogate: must be followed by \uDC00-\uDFFF.
+                     * Guard: pos+10 < len covers the 4 low digits at pos+7..10. */
+                    if (ctx->pos + 10 < ctx->len && ctx->str[ctx->pos + 5] == '\\' &&
+                        ctx->str[ctx->pos + 6] == 'u') {
+                        char         low_hex[5] = {0};
+                        unsigned int low_cp;
+                        strncpy(low_hex, ctx->str + ctx->pos + 7, 4);
+                        low_cp = (unsigned int)strtol(low_hex, NULL, 16);
+                        if (low_cp >= 0xDC00u && low_cp <= 0xDFFFu) {
+                            unicode = 0x10000u + (((cp - 0xD800u) << 10) | (low_cp - 0xDC00u));
+                            /* Second \uXXXX group spans ctx->pos+5..ctx->pos+10; the
+                             * shared post-switch `ctx->pos++` lands past it. */
+                            ctx->pos += 10;
+                        } else {
+                            /* High surrogate with an invalid low half: lone lead. */
+                            jfree(ctx, result);
+                            return NULL;
+                        }
+                    } else {
+                        jfree(ctx, result);
+                        return NULL;
+                    }
+                } else if (cp >= 0xDC00u && cp <= 0xDFFFu) {
+                    /* Lone low surrogate: no codepoint to represent. */
+                    jfree(ctx, result);
+                    return NULL;
                 } else {
-                    escaped[0] = (char)(0xE0 | (cp >> 12));
-                    escaped[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
-                    escaped[2] = (char)(0x80 | (cp & 0x3F));
-                    elen       = 3;
+                    ctx->pos += 4;
                 }
-                ctx->pos += 4;
+
+                if (unicode < 0x80) {
+                    escaped[0] = (char)unicode;
+                    elen       = 1;
+                } else if (unicode < 0x800) {
+                    escaped[0] = (char)(0xC0 | (unicode >> 6));
+                    escaped[1] = (char)(0x80 | (unicode & 0x3F));
+                    elen       = 2;
+                } else if (unicode < 0x10000) {
+                    escaped[0] = (char)(0xE0 | (unicode >> 12));
+                    escaped[1] = (char)(0x80 | ((unicode >> 6) & 0x3F));
+                    escaped[2] = (char)(0x80 | (unicode & 0x3F));
+                    elen       = 3;
+                } else {
+                    escaped[0] = (char)(0xF0 | (unicode >> 18));
+                    escaped[1] = (char)(0x80 | ((unicode >> 12) & 0x3F));
+                    escaped[2] = (char)(0x80 | ((unicode >> 6) & 0x3F));
+                    escaped[3] = (char)(0x80 | (unicode & 0x3F));
+                    elen       = 4;
+                }
                 break;
             }
             default:

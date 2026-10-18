@@ -159,7 +159,7 @@ typedef struct fd_entry {
 static int                   g_signal_ring[COBALT_SIGNAL_RING_SIZE];
 static volatile sig_atomic_t g_signal_head  = 0;
 static volatile sig_atomic_t g_signal_tail  = 0;
-static int                   g_signal_count = 0;
+static volatile sig_atomic_t g_signal_count = 0;
 
 /* Signal handler table (signum -> callback + user_data) */
 /**
