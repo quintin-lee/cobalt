@@ -150,6 +150,13 @@ size_t cobalt_threadpool_active_tasks(const cobalt_threadpool_t *pool);
 cobalt_waitgroup_t *cobalt_waitgroup_create(void);
 
 /**
+ * @brief Create a WaitGroup using a custom allocator
+ * @param alloc Allocator for the WaitGroup block; NULL selects the system allocator
+ * @return Pointer to created WaitGroup, or NULL on allocation failure
+ */
+cobalt_waitgroup_t *cobalt_waitgroup_create_with_alloc(cobalt_allocator_t *alloc);
+
+/**
  * @brief Add a delta to the WaitGroup counter
  * @param wg Target WaitGroup
  * @param delta Number of tasks to add (may be positive or negative)

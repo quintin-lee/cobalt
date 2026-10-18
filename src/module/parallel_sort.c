@@ -232,6 +232,7 @@ typedef struct {
     size_t              mid;
     size_t              end2;
     cobalt_waitgroup_t *wg;
+    cobalt_allocator_t *alloc;
 } merge_task_t;
 
 static void merge_task_worker(void *arg)
@@ -272,7 +273,7 @@ static void merge_task_worker(void *arg)
     memcpy(srcA, dest, (lenA + lenB) * size);
 
     cobalt_waitgroup_done(task->wg);
-    free(task);
+    task->alloc->free(task->alloc, task);
 }
 
 void cobalt_parallel_stable_sort_with_alloc(cobalt_threadpool_t *pool,
@@ -286,7 +287,8 @@ void cobalt_parallel_stable_sort_with_alloc(cobalt_threadpool_t *pool,
         return;
     }
 
-    size_t num_threads = pool ? cobalt_threadpool_thread_count(pool) : 0;
+    cobalt_allocator_t *eff         = alloc ? alloc : cobalt_allocator_get_system();
+    size_t              num_threads = pool ? cobalt_threadpool_thread_count(pool) : 0;
     if (num_threads <= 1 || nmemb <= 4096) {
         cobalt_stable_sort_with_alloc(base, nmemb, size, compar, alloc);
         return;
@@ -337,7 +339,7 @@ void cobalt_parallel_stable_sort_with_alloc(cobalt_threadpool_t *pool,
 
     /* Phase 2: Hierarchical binary tree merge */
     for (size_t step = 1; step < K; step *= 2) {
-        cobalt_waitgroup_t *level_wg = cobalt_waitgroup_create();
+        cobalt_waitgroup_t *level_wg = cobalt_waitgroup_create_with_alloc(eff);
         if (!level_wg) {
             break;
         }
@@ -348,7 +350,7 @@ void cobalt_parallel_stable_sort_with_alloc(cobalt_threadpool_t *pool,
                 size_t mid    = (i + step) * nmemb / K;
                 size_t end2   = (i + 2 * step < K) ? ((i + 2 * step) * nmemb / K) : nmemb;
 
-                merge_task_t *task = (merge_task_t *)malloc(sizeof(merge_task_t));
+                merge_task_t *task = (merge_task_t *)eff->alloc(eff, sizeof(merge_task_t));
                 if (task) {
                     task->base    = (char *)base;
                     task->scratch = scratch;
@@ -358,11 +360,11 @@ void cobalt_parallel_stable_sort_with_alloc(cobalt_threadpool_t *pool,
                     task->mid     = mid;
                     task->end2    = end2;
                     task->wg      = level_wg;
-
+                    task->alloc   = eff;
                     cobalt_waitgroup_add(level_wg, 1);
                     if (cobalt_threadpool_submit(pool, merge_task_worker, task) != 0) {
                         cobalt_waitgroup_done(level_wg);
-                        free(task);
+                        eff->free(eff, task);
                         /* Synchronous fallback for this pair */
                         size_t lenA = mid - start1;
                         size_t lenB = end2 - mid;

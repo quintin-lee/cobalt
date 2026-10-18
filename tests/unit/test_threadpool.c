@@ -20,6 +20,7 @@ int    cobalt_test_chase_lev_push(void *deque_ptr, void (*fn)(void *), void *arg
 int    cobalt_test_chase_lev_pop(void *deque_ptr, void (**out_fn)(void *), void **out_arg);
 int    cobalt_test_chase_lev_steal(void *deque_ptr, void (**out_fn)(void *), void **out_arg);
 size_t cobalt_test_chase_lev_size(void *deque_ptr);
+void   test_pool_allocator_inject(void);
 
 static void dummy_task_fn(void *arg)
 {
@@ -443,6 +444,73 @@ void test_threadpool_parallel_for(void)
 }
 
 /* -------------------------------------------------------------------------- */
+/* Allocator Injection Parity Test                                            */
+/* -------------------------------------------------------------------------- */
+
+typedef struct {
+    cobalt_allocator_t base;
+    atomic_size_t      alloc_count;
+    atomic_size_t      free_count;
+} tp_counting_alloc_t;
+
+static void *tp_calloc(cobalt_allocator_t *self, size_t size)
+{
+    tp_counting_alloc_t *c = (tp_counting_alloc_t *)self;
+    atomic_fetch_add_explicit(&c->alloc_count, 1, memory_order_relaxed);
+    return malloc(size);
+}
+
+static void tp_cfree(cobalt_allocator_t *self, void *ptr)
+{
+    tp_counting_alloc_t *c = (tp_counting_alloc_t *)self;
+    if (ptr) {
+        atomic_fetch_add_explicit(&c->free_count, 1, memory_order_release);
+    }
+    free(ptr);
+}
+
+static void *tp_crealloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+{
+    tp_counting_alloc_t *c = (tp_counting_alloc_t *)self;
+    void                *p = realloc(ptr, new_size);
+    if (p) {
+        if (ptr) {
+            atomic_fetch_add_explicit(&c->free_count, 1, memory_order_relaxed);
+        }
+        atomic_fetch_add_explicit(&c->alloc_count, 1, memory_order_relaxed);
+    }
+    return p;
+}
+
+static void parallel_noop_fn(size_t index, void *arg)
+{
+    (void)index;
+    (void)arg;
+}
+
+void test_pool_allocator_inject(void)
+{
+    printf("Testing pool allocator injection parity...\n");
+    tp_counting_alloc_t counter = {
+        .base        = {.alloc = tp_calloc, .free = tp_cfree, .realloc = tp_crealloc},
+        .alloc_count = 0,
+        .free_count  = 0};
+    cobalt_allocator_t *alloc = (cobalt_allocator_t *)&counter;
+
+    cobalt_threadpool_config_t cfg = {
+        .num_threads = 2, .local_queue_size = 64, .global_queue_size = 256, .alloc = alloc};
+    cobalt_threadpool_t *pool = cobalt_threadpool_create_with_config(&cfg);
+    TEST_ASSERT(pool != NULL);
+
+    int ret = cobalt_threadpool_parallel_for(pool, 0, 1000, 0, parallel_noop_fn, NULL);
+    TEST_ASSERT(ret == 0);
+
+    cobalt_threadpool_destroy(pool);
+    TEST_ASSERT(atomic_load(&counter.alloc_count) == atomic_load(&counter.free_count));
+    printf("  Pool allocator injection: OK\n");
+}
+
+/* -------------------------------------------------------------------------- */
 /* Main Module Test Entry                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -457,5 +525,6 @@ void test_threadpool(void)
     test_threadpool_waitgroup();
     test_threadpool_recursive_deadlock_free();
     test_threadpool_parallel_for();
+    test_pool_allocator_inject();
     printf("  Threadpool tests completed\n");
 }

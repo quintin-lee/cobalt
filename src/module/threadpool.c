@@ -548,15 +548,23 @@ struct cobalt_waitgroup {
     atomic_int_fast64_t counter;
     cobalt_mutex_t     *mutex;
     cobalt_cond_t      *cond;
+    cobalt_allocator_t *alloc;
 };
 
 cobalt_waitgroup_t *cobalt_waitgroup_create(void)
 {
-    cobalt_waitgroup_t *wg = (cobalt_waitgroup_t *)malloc(sizeof(cobalt_waitgroup_t));
+    return cobalt_waitgroup_create_with_alloc(NULL);
+}
+
+cobalt_waitgroup_t *cobalt_waitgroup_create_with_alloc(cobalt_allocator_t *alloc)
+{
+    cobalt_allocator_t *a  = alloc ? alloc : cobalt_allocator_get_system();
+    cobalt_waitgroup_t *wg = (cobalt_waitgroup_t *)a->alloc(a, sizeof(cobalt_waitgroup_t));
     if (!wg) {
         return NULL;
     }
     atomic_init(&wg->counter, 0);
+    wg->alloc = a;
     wg->mutex = cobalt_mutex_create();
     wg->cond  = cobalt_cond_create();
     if (!wg->mutex || !wg->cond) {
@@ -622,7 +630,7 @@ void cobalt_waitgroup_destroy(cobalt_waitgroup_t *wg)
     if (wg->cond) {
         cobalt_cond_destroy(wg->cond);
     }
-    free(wg);
+    wg->alloc->free(wg->alloc, wg);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -635,6 +643,7 @@ typedef struct {
     cobalt_parallel_for_fn_t fn;
     void                    *arg;
     cobalt_waitgroup_t      *wg;
+    cobalt_allocator_t      *alloc;
 } parallel_chunk_t;
 
 static void parallel_chunk_worker(void *arg)
@@ -644,7 +653,7 @@ static void parallel_chunk_worker(void *arg)
         chunk->fn(i, chunk->arg);
     }
     cobalt_waitgroup_done(chunk->wg);
-    free(chunk);
+    chunk->alloc->free(chunk->alloc, chunk);
 }
 
 int cobalt_threadpool_parallel_for(cobalt_threadpool_t     *pool,
@@ -670,7 +679,7 @@ int cobalt_threadpool_parallel_for(cobalt_threadpool_t     *pool,
         }
     }
 
-    cobalt_waitgroup_t *wg = cobalt_waitgroup_create();
+    cobalt_waitgroup_t *wg = cobalt_waitgroup_create_with_alloc(pool->alloc);
     if (!wg) {
         return -1;
     }
@@ -682,7 +691,8 @@ int cobalt_threadpool_parallel_for(cobalt_threadpool_t     *pool,
             next = end;
         }
 
-        parallel_chunk_t *chunk = (parallel_chunk_t *)malloc(sizeof(parallel_chunk_t));
+        parallel_chunk_t *chunk =
+            (parallel_chunk_t *)pool->alloc->alloc(pool->alloc, sizeof(parallel_chunk_t));
         if (!chunk) {
             /* Execute remaining synchronously */
             for (size_t i = curr; i < end; i++) {
@@ -696,6 +706,7 @@ int cobalt_threadpool_parallel_for(cobalt_threadpool_t     *pool,
         chunk->fn    = fn;
         chunk->arg   = arg;
         chunk->wg    = wg;
+        chunk->alloc = pool->alloc;
 
         cobalt_waitgroup_add(wg, 1);
         if (cobalt_threadpool_submit(pool, parallel_chunk_worker, chunk) != 0) {
