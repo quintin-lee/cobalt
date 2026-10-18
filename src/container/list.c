@@ -586,23 +586,22 @@ static void list_split(cobalt_list_node_t **head_ref,
 static cobalt_list_node_t *
 list_merge(cobalt_list_node_t *a, cobalt_list_node_t *b, compare_func_t compar)
 {
-    cobalt_list_node_t *result = NULL;
+    cobalt_list_node_t dummy;
+    dummy.next               = NULL;
+    cobalt_list_node_t *tail = &dummy;
 
-    if (!a) {
-        return b;
+    while (a != NULL && b != NULL) {
+        if (compar(a->data, b->data) <= 0) {
+            tail->next = a;
+            a          = a->next;
+        } else {
+            tail->next = b;
+            b          = b->next;
+        }
+        tail = tail->next;
     }
-    if (!b) {
-        return a;
-    }
-
-    if (compar(a->data, b->data) <= 0) {
-        result       = a;
-        result->next = list_merge(a->next, b, compar);
-    } else {
-        result       = b;
-        result->next = list_merge(a, b->next, compar);
-    }
-    return result;
+    tail->next = (a != NULL) ? a : b;
+    return dummy.next;
 }
 
 /**
