@@ -10,6 +10,7 @@
 #include "cobalt/interface/iterator.h"
 #include "cobalt/memory/allocator.h"
 #include "cobalt/runtime/error.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -78,8 +79,17 @@ static int vector_push_internal(cobalt_vector_impl_t *vec, void *item)
 {
     // Check if expansion is needed
     if (vec->size >= vec->capacity) {
-        // Capacity doubling strategy; if current capacity is 0, initially allocate 1
-        size_t new_cap = (vec->capacity == 0) ? 1 : vec->capacity * 2;
+        // Capacity doubling strategy; if current capacity is 0, initially allocate 1.
+        // Clamp so that new_cap * sizeof(void *) never wraps below SIZE_MAX.
+        size_t max_cap = SIZE_MAX / sizeof(void *);
+        size_t new_cap;
+        if (vec->capacity == 0) {
+            new_cap = 1;
+        } else if (vec->capacity > max_cap / 2) {
+            new_cap = max_cap;
+        } else {
+            new_cap = vec->capacity * 2;
+        }
         void **new_items =
             (void **)vec->alloc->realloc(vec->alloc, vec->items, new_cap * sizeof(void *));
         if (!new_items) {
@@ -178,6 +188,10 @@ cobalt_vector_t *cobalt_vector_create_with_allocator(size_t              initial
         return NULL;
     }
     vec->alloc = alloc;
+    if (initial_capacity > SIZE_MAX / sizeof(void *)) {
+        alloc->free(alloc, vec);
+        return NULL;
+    }
     vec->items =
         initial_capacity > 0 ? alloc->alloc(alloc, initial_capacity * sizeof(void *)) : NULL;
     vec->capacity = initial_capacity;
@@ -299,6 +313,9 @@ int cobalt_vector_reserve(cobalt_vector_t *vec, size_t n)
     cobalt_vector_impl_t *impl = (cobalt_vector_impl_t *)vec;
     if (impl->capacity >= n) {
         return 0;
+    }
+    if (n > SIZE_MAX / sizeof(void *)) {
+        return -1;
     }
     void *new_items = impl->alloc->realloc(impl->alloc, impl->items, n * sizeof(void *));
     if (!new_items) {
