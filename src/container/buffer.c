@@ -143,8 +143,9 @@ int cobalt_buffer_ensure_writable(cobalt_buffer_t *buf, size_t len)
     }
 
     /* Check if in-place defragmentation satisfies demand */
-    size_t readable    = cobalt_buffer_readable_bytes(buf);
-    size_t discardable = buf->read_pos - buf->prepend_size;
+    size_t readable = cobalt_buffer_readable_bytes(buf);
+    size_t discardable =
+        (buf->read_pos > buf->prepend_size) ? buf->read_pos - buf->prepend_size : 0;
     if (discardable + cobalt_buffer_writable_bytes(buf) >= len) {
         memmove(buf->data + buf->prepend_size, buf->data + buf->read_pos, readable);
         buf->read_pos  = buf->prepend_size;
@@ -153,10 +154,10 @@ int cobalt_buffer_ensure_writable(cobalt_buffer_t *buf, size_t len)
     }
 
     /* Need geometric expansion */
-    size_t new_cap = buf->capacity * 2;
+    size_t new_cap = buf->capacity > SIZE_MAX / 2 ? SIZE_MAX : buf->capacity * 2;
     size_t needed  = buf->write_pos + len;
     if (new_cap < needed) {
-        new_cap = needed + buf->capacity;
+        new_cap = needed > SIZE_MAX - buf->capacity ? SIZE_MAX : needed + buf->capacity;
     }
 
     char *new_data = NULL;
