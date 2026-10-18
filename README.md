@@ -117,7 +117,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 45 unit suites + 16 benchmarks passing (100%)
+ctest --output-on-failure  # 44 unit suites + 17 benchmarks passing (100%)
 # or with verbose output
 ctest --verbose
 ```
@@ -177,7 +177,7 @@ cd build
 |--------|-------|
 | Total lines of code (src + include) | ~23,000 |
 | Git commits | 470+ |
-| CTest status | 61/61 passing (100%: 45 unit suites + 16 benchmarks) |
+| CTest status | 61/61 passing (100%: 44 unit suites + 17 benchmarks) |
 | Sanitizer status | Clean (ASan/LSan 0 leaks, 0 errors) |
 
 
@@ -214,7 +214,7 @@ Available via popular package managers:
 
 ## Performance
 
-Benchmark results (x86_64 Linux, Release build, averaged across iterations):
+Benchmark results from a single reference machine (x86_64 Linux, Release build, averaged across iterations):
 
 | Component / Operation | Workload / Size | Throughput / Time | Notes |
 |-----------------------|-----------------|-------------------|-------|
@@ -248,6 +248,8 @@ Benchmark results (x86_64 Linux, Release build, averaged across iterations):
 | **SHM Throughput (64B)** | 1M messages | ~22.1M msgs/sec (1.32 GB/s) | Lock-free SPSC zero-copy streaming |
 | **SHM Throughput (1KB)** | 200k messages | ~18.7M msgs/sec (17.88 GB/s) | Medium payload streaming |
 | **SHM Throughput (64KB)** | 20k messages | ~10.1M msgs/sec (618.5 GB/s) | Large zero-copy frame throughput |
+
+> **Note**: These are indicative measurements from a single x86_64 Linux reference machine (Release build, averaged across iterations). Actual throughput and latency vary with CPU model, core count, compiler version, and system load — treat them as approximate guidance rather than guarantees, and reproduce locally with the commands below.
 
 Run benchmarks locally:
 ```bash

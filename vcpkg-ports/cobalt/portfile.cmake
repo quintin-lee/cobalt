@@ -4,7 +4,7 @@
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO quintin-lee/cobalt
-    REF "v2.0.0"
+    REF "v2.7.0"
     SHA512 "PLACEHOLDER"
     HEAD_REFS
 )

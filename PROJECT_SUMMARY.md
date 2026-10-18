@@ -73,7 +73,7 @@ Cobalt is a comprehensive C11 framework providing object-oriented capabilities, 
 - **Example files**: 17 (`examples/*.c`)
 - **Total lines of code (src + include)**: ~26,200
 - **Git commits**: 470+
-- **CTest targets passing**: 61/61 (100%: 45 unit suites + 16 benchmarks)
+- **CTest targets passing**: 61/61 (100%: 44 unit suites + 17 benchmarks)
 
 ## Key Features
 
@@ -103,7 +103,7 @@ cd build
 ctest --output-on-failure
 ```
 
-All 61 CTest targets pass (100%): 45 unit suites + 16 benchmarks:
+All 61 CTest targets pass (100%): 44 unit suites + 17 benchmarks:
 - ✅ platform, atomic, allocator, arena, pool, slab, ebr
 - ✅ error, error_stack, logger, object, class, interface
 - ✅ vector, list, hashmap, treemap, string, functional, stream, regex, set, deque

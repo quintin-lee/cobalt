@@ -37,7 +37,7 @@
   - Integrated into unified `tests/benchmark/bench_runner.c` with `--json` reporting support.
 
 ### Changed
-- Total CTest suites expanded from 43 to 45 (44 unit test suites + `bench_shm`), maintaining 100% pass rate under Release, Debug, and AddressSanitizer/LeakSanitizer (`build-asan`).
+- Total CTest suites expanded from 59 to 61 (44 unit test suites + 17 benchmarks; new `test_shm` and `bench_shm`), maintaining 100% pass rate under Release, Debug, and AddressSanitizer/LeakSanitizer (`build-asan`).
 - Full clang-tidy pass across all IPC headers and sources with 0 warnings.
 - Capped JSON DOM parser nesting depth at 128 (matches SAX parser
   `COBALT_JSON_MAX_DEPTH`); over-deep input now returns NULL instead of overflowing
