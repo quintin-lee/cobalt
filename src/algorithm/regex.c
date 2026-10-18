@@ -1117,8 +1117,8 @@ size_t cobalt_regex_capture_count(const cobalt_regex_t *re)
 typedef struct {
     uint32_t pc;
     uint8_t  backref_gid;
-    uint8_t  backref_offset;
-    uint8_t  backref_remaining;
+    size_t   backref_offset;
+    size_t   backref_remaining;
     size_t   slots[2 * COBALT_REGEX_MAX_CAPTURES];
 } pike_thread_t;
 
@@ -1535,7 +1535,7 @@ static int run_vm(const cobalt_regex_t   *re,
                             } else {
                                 t.backref_gid       = gid;
                                 t.backref_offset    = 1;
-                                t.backref_remaining = (uint8_t)(ref_len - 1);
+                                t.backref_remaining = ref_len - 1;
                                 if (nlist.count < nlist.capacity) {
                                     nlist.threads[nlist.count++] = t;
                                 }
