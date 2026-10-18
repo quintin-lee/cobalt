@@ -2,11 +2,11 @@
  * @file test_vector.c
  * @brief Unit test for vector container.
  */
-
 #include "cobalt/container/vector.h"
 #include "cobalt/interface/iterator.h"
 #include "test_framework.h"
 #include <pthread.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -88,7 +88,8 @@ static cobalt_allocator_t mock_allocator = {
 void test_vector_remove_at(void);
 void test_vector_null_safety(void);
 void test_vector_sequence_interface(void);
-void test_vector_allocator_failure(void);
+void test_vector_large_capacity(void);
+void test_vector_overflow_guards(void);
 void test_vector_basic(void)
 {
     printf("Testing vector basic operations...\n");
@@ -416,7 +417,6 @@ void test_vector_alternating_push_set(void)
     printf("  Alternating push/set test passed\n");
 }
 
-
 void test_vector_reserve(void)
 {
     printf("Testing vector reserve and capacity...\n");
@@ -492,7 +492,7 @@ void test_vector_allocator_failure(void)
     mock_fail_next   = 0;
     mock_alloc_count = 0;
     mock_offset      = 0;
-    vec = cobalt_vector_create_with_allocator(2, &mock_allocator);
+    vec              = cobalt_vector_create_with_allocator(2, &mock_allocator);
     TEST_ASSERT(vec != NULL);
 
     int val = 42;
@@ -501,7 +501,7 @@ void test_vector_allocator_failure(void)
     TEST_ASSERT(cobalt_vector_size(vec) == 2);
 
     mock_fail_next = 1;
-    int ret = cobalt_vector_push(vec, &val);
+    int ret        = cobalt_vector_push(vec, &val);
     TEST_ASSERT(ret == -1);
     TEST_ASSERT(cobalt_vector_size(vec) == 2);
     printf("  Push with failing realloc: OK\n");
@@ -510,14 +510,14 @@ void test_vector_allocator_failure(void)
     mock_fail_next   = 0;
     mock_alloc_count = 0;
     mock_offset      = 0;
-    vec = cobalt_vector_create_with_allocator(2, &mock_allocator);
+    vec              = cobalt_vector_create_with_allocator(2, &mock_allocator);
     TEST_ASSERT(vec != NULL);
 
     ret = cobalt_vector_reserve(vec, 100);
     TEST_ASSERT(ret == 0);
 
     mock_fail_next = 1;
-    ret = cobalt_vector_reserve(vec, 200);
+    ret            = cobalt_vector_reserve(vec, 200);
     TEST_ASSERT(ret == -1);
     printf("  Reserve with failing realloc: OK\n");
 
@@ -525,7 +525,7 @@ void test_vector_allocator_failure(void)
     mock_fail_next   = 0;
     mock_alloc_count = 0;
     mock_offset      = 0;
-    vec = cobalt_vector_create_with_allocator(10, &mock_allocator);
+    vec              = cobalt_vector_create_with_allocator(10, &mock_allocator);
     TEST_ASSERT(vec != NULL);
 
     for (int i = 0; i < 5; i++) {
@@ -533,7 +533,7 @@ void test_vector_allocator_failure(void)
     }
 
     mock_fail_next = 1;
-    ret = cobalt_vector_shrink_to_fit(vec);
+    ret            = cobalt_vector_shrink_to_fit(vec);
     TEST_ASSERT(ret == -1);
     printf("  Shrink_to_fit with failing alloc: OK\n");
 
@@ -542,6 +542,42 @@ void test_vector_allocator_failure(void)
     printf("  Vector allocator failure test passed\n");
 }
 
+/**
+ * @brief Regression: capacity math must reject SIZE_MAX-scale requests.
+ *
+ *        Push doubling (`capacity * 2`), `create` and `reserve` multiply the
+ *        requested element count by `sizeof(void *)` without overflow guards,
+ *        so a near-SIZE_MAX request wraps to a short allocation and later
+ *        indexing runs past the block. All three entry points now fail fast
+ *        at the `SIZE_MAX / sizeof(void *)` element limit.
+ */
+void test_vector_overflow_guards(void)
+{
+    printf("Testing vector overflow guards...\n");
+    const size_t max_elements = SIZE_MAX / sizeof(void *);
+
+    /* create: oversized initial capacity must be rejected, not wrapped */
+    TEST_ASSERT(cobalt_vector_create_with_allocator(SIZE_MAX, cobalt_allocator_get_system()) ==
+                NULL);
+    TEST_ASSERT(cobalt_vector_create_with_allocator(max_elements + 1,
+                                                    cobalt_allocator_get_system()) == NULL);
+
+    /* reserve: requests just past the element limit fail fast */
+    cobalt_vector_t *v = cobalt_vector_create(0);
+    TEST_ASSERT(v != NULL);
+    TEST_ASSERT(cobalt_vector_reserve(v, max_elements + 1) == -1);
+    TEST_ASSERT(cobalt_vector_reserve(v, SIZE_MAX) == -1);
+
+    /* normal reservations still work */
+    TEST_ASSERT(cobalt_vector_reserve(v, 1024) == 0);
+    TEST_ASSERT(cobalt_vector_capacity(v) == 1024);
+
+    int x = 0;
+    TEST_ASSERT(cobalt_vector_push(v, &x) == 0);
+    TEST_ASSERT(cobalt_vector_size(v) == 1);
+    cobalt_vector_destroy(v);
+    printf("  vector overflow guards: OK\n");
+}
 void test_vector(void)
 {
     printf("Testing vector...\n");
@@ -557,8 +593,8 @@ void test_vector(void)
     test_vector_null_safety();
     test_vector_sequence_interface();
     test_vector_allocator_failure();
+    test_vector_overflow_guards();
 }
-
 
 void test_vector_remove_at(void)
 {

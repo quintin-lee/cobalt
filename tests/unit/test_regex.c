@@ -545,6 +545,45 @@ static void test_regex_backreferences(void)
     printf("  backreferences: OK\n");
 }
 
+/**
+ * @brief Regression: backreference counter must not truncate past 256 chars.
+ *
+ *        `backref_remaining` and `backref_offset` used to be `uint8_t`, so a
+ *        capture longer than 255 characters (reachable via concatenated
+ *        quantifiers like (a{128}a{128}a{128})) wrapped the counters: only the
+ *        first 128 of 384 characters were checked and the engine accepted a
+ *        mismatched tail (false-positive match). Probes confirmed a 640xa
+ *        prefix + 128xb tail matched when it must not. The counters are now
+ *        `size_t`, so the full 384-char reference is verified and the match is
+ *        rejected.
+ */
+static void test_regex_backref_no_truncation(void)
+{
+    printf("Testing regex backref no truncation (regression)...\n");
+
+    cobalt_regex_t *re = cobalt_regex_compile("(a{128}a{128}a{128})\\1", COBALT_REGEX_DEFAULT);
+    TEST_ASSERT(re != NULL);
+
+    char   text[769];
+    size_t cap_len = 384; /* group 1 captures 384 'a' chars */
+
+    /* Valid case: 384 a's followed by the same 384 a's must match */
+    memset(text, 'a', 2 * cap_len);
+    text[2 * cap_len] = 0;
+    cobalt_regex_capture_t caps[2];
+    TEST_EQUAL(cobalt_regex_search(re, text, caps, 2), 1);
+    TEST_EQUAL(caps[0].end, 768U);
+
+    /* Invalid case: 384 a's followed by 256 a + 128 b.
+       The backreference must fail at the first 'b' (offset 640). */
+    memset(text, 'a', cap_len + 256);
+    memset(text + cap_len + 256, 'b', 128);
+    text[2 * cap_len] = 0;
+    TEST_EQUAL(cobalt_regex_search(re, text, NULL, 0), 0);
+
+    cobalt_regex_destroy(re);
+    printf("  regex backref no truncation: OK\n");
+}
 void test_regex(void)
 {
     printf("=== Regex Engine Tests ===\n");
@@ -561,5 +600,6 @@ void test_regex(void)
     test_regex_convenience();
     test_regex_capture_groups();
     test_regex_backreferences();
+    test_regex_backref_no_truncation();
     printf("All regex unit tests passed!\n");
 }

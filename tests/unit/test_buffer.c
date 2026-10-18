@@ -153,6 +153,46 @@ static void test_buffer_defragment_and_expand(void)
     printf("  buffer defragment/expand: OK\n");
 }
 
+/**
+ * @brief Regression: defragmentation must not underflow when read_pos dropped
+ *        below prepend_size via prepend().
+ *
+ *        prepend() moves read_pos down toward 0 while prepend_size stays fixed.
+ *        A subsequent full append makes the defragmentation branch compute
+ *        `read_pos - prepend_size`, which underflows to SIZE_MAX-8 on a
+ *        40-byte capacity buffer and caused a 40-byte heap out-of-bounds write
+ *        (ASan-confirmed). The fix clamps discardable to 0 and routes to the
+ *        geometric expansion branch instead.
+ */
+static void test_buffer_defrag_prepend_no_underflow(void)
+{
+    printf("Testing buffer defrag guard after prepend (regression)...\n");
+
+    /* capacity = 32 + 8 = 40 bytes total */
+    cobalt_buffer_t *buf = cobalt_buffer_create_with_alloc(32, 8, NULL);
+    TEST_ASSERT(buf != NULL);
+
+    char p[8];
+    memset(p, 0xAB, sizeof(p));
+    TEST_EQUAL(cobalt_buffer_prepend(buf, p, 8), 0);
+    /* read_pos is now 0, below prepend_size (8) */
+
+    char q[32];
+    memset(q, 'Z', sizeof(q));
+    TEST_EQUAL(cobalt_buffer_append(buf, q, 32), 0);
+
+    /* Force the expansion/defrag path: 1 more byte must be writable */
+    TEST_EQUAL(cobalt_buffer_ensure_writable(buf, 1), 0);
+    TEST_EQUAL(cobalt_buffer_readable_bytes(buf), 40U);
+
+    /* Content must be intact: 8 bytes of p then 32 bytes of q */
+    const char *data = cobalt_buffer_peek(buf);
+    TEST_ASSERT(memcmp(data, p, 8) == 0);
+    TEST_ASSERT(memcmp(data + 8, q, 32) == 0);
+
+    cobalt_buffer_destroy(buf);
+    printf("  buffer defrag guard: OK\n");
+}
 #ifndef _WIN32
 static void test_buffer_read_write_fd(void)
 {
@@ -266,6 +306,7 @@ void test_buffer(void)
     test_buffer_append_read_retrieve();
     test_buffer_prepend();
     test_buffer_defragment_and_expand();
+    test_buffer_defrag_prepend_no_underflow();
 #ifndef _WIN32
     test_buffer_read_write_fd();
 #endif
