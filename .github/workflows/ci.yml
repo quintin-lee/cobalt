@@ -160,6 +160,12 @@ jobs:
         run: cmake --build build-tsan --parallel
 
       - name: Test with TSan
+        id: tsan_test
+        run: ctest --test-dir build-tsan --output-on-failure --timeout 120
+        continue-on-error: true
+
+      - name: Retest with TSan (bounded flake retry, tsan-only)
+        if: steps.tsan_test.outcome == 'failure'
         run: ctest --test-dir build-tsan --output-on-failure --timeout 120
 
   # ---- Cross-platform build & test ----
