@@ -60,6 +60,13 @@
 - `list_merge` (used by `cobalt_list_merge_sort` / `cobalt_list_sort`) converted
   from per-node recursion to a single-pass iterative merge, bounding merge-sort
   stack depth to O(log n) instead of O(n) for very large lists.
+- `tsan` CI job now runs a bounded retry: the test step is `continue-on-error`
+  with a single re-run on failure, so the documented EBR reclaim-vs-read
+  `heap-use-after-free` false positive (a TSan blind spot to the epoch barrier,
+  not a protocol race — all six skiplist read paths are epoch-enclosed) no longer
+  flakes the gate. The retry is capped at one and scoped to the tsan job only; a
+  genuine race still fails twice and is not masked. Design:
+  `docs/superpowers/specs/2026-10-19-ci-reliability-tsan-flake-design.md`.
 
 
 ### Fixed
