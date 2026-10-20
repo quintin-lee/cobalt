@@ -27,3 +27,8 @@ Approach: Only split if clean boundaries exist; preserve APIs and behavior.
 - **threadsafewrapper.c**: candidate for minimal split (type-based) if done carefully
 - **eventloop.c/regex.c**: defer - no clean boundary with acceptable coupling
 - Proceed with targeted split of threadsafewrapper.c only if it can be done without API changes and tests pass.
+
+## Final Decision
+Decision: SKIP_SPLIT
+Rationale: Only threadsafewrapper.c shows potential type-based boundaries, but boundaries are not sufficiently clean to split without risk of header churn. Per conservative principle (API-stable, behavior-preserving), no splits performed. eventloop.c and regex.c have tight coupling, defer splitting.
+Files split (if any): []
