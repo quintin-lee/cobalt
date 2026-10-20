@@ -46,6 +46,7 @@ void test_taskgraph(void);
 void test_regex(void);
 void test_ebr(void);
 void test_lfskiplist(void);
+void test_lfhashmap(void);
 void test_shm(void);
 
 typedef struct {
@@ -98,6 +99,7 @@ static const TestEntry test_registry[] = {
     {"regex", test_regex},
     {"ebr", test_ebr},
     {"lfskiplist", test_lfskiplist},
+    {"lfhashmap", test_lfhashmap},
     {"shm", test_shm},
 };
 
