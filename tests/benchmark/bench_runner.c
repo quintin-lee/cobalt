@@ -8,6 +8,7 @@
 #include "cobalt/container/buffer.h"
 #include "cobalt/container/deque.h"
 #include "cobalt/container/hashmap.h"
+#include "cobalt/container/lfhashmap.h"
 #include "cobalt/container/lfqueue.h"
 #include "cobalt/container/lfskiplist.h"
 #include "cobalt/container/list.h"
@@ -530,6 +531,19 @@ static void bench_lfskiplist_ops(void)
     cobalt_lfskiplist_destroy(sl);
 }
 
+static void bench_lfhashmap_ops(void)
+{
+    cobalt_lfhashmap_t *map = cobalt_lfhashmap_create_ptr();
+    for (int i = 0; i < 50000; i++) {
+        cobalt_lfhashmap_insert(map, (void *)(intptr_t)i, (void *)(intptr_t)i);
+    }
+    for (int i = 0; i < 50000; i++) {
+        void *val = NULL;
+        cobalt_lfhashmap_get(map, (void *)(intptr_t)i, &val);
+    }
+    cobalt_lfhashmap_destroy(map);
+}
+
 static void cleanup_runner_shm(const char *name)
 {
     if (!name) {
@@ -603,7 +617,7 @@ int main(int argc, char *argv[])
     }
 
     if (json_mode) {
-        cobalt_bench_result_t results[32];
+        cobalt_bench_result_t results[35];
         memset(results, 0, sizeof(results));
 
         results[0].name = "vector_push";
@@ -667,7 +681,9 @@ int main(int argc, char *argv[])
         cobalt_bench_run("lfskiplist_ops", 3, bench_lfskiplist_ops, &results[28]);
         results[29].name = "shm_channel_ops";
         cobalt_bench_run("shm_channel_ops", 3, bench_shm_channel_ops, &results[29]);
-        results[30].name = NULL;
+        results[30].name = "lfhashmap_ops";
+        cobalt_bench_run("lfhashmap_ops", 3, bench_lfhashmap_ops, &results[30]);
+        results[31].name = NULL;
 
         cobalt_bench_output_json(results, stdout);
         free(g_bench_random_ints);
@@ -739,6 +755,9 @@ int main(int argc, char *argv[])
 
     printf("--- Shared Memory IPC ---\n");
     BENCH_RUN("shm spsc channel (50k)", 3, bench_shm_channel_ops);
+
+    printf("--- Lock-Free Hashmap ---\n");
+    BENCH_RUN("lfhashmap put/get (50k)", 3, bench_lfhashmap_ops);
 
     printf("\nBenchmark suite complete.\n");
     free(g_bench_random_ints);

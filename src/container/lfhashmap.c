@@ -22,7 +22,6 @@
 #define COBALT_LFHASHMAP_MAX_LOAD 0.75
 
 #define SO_REGULAR_BIT ((uint64_t)1 << 63)
-#define SO_DUMMY_MASK (~SO_REGULAR_BIT)
 
 /**
  * @brief Internal node structure for the split-ordered list
@@ -139,6 +138,21 @@ static inline uint64_t reverse_bits64(uint64_t v)
     v = ((v >> 8) & 0x00FF00FF00FF00FFULL) | ((v & 0x00FF00FF00FF00FFULL) << 8);
     v = ((v >> 16) & 0x0000FFFF0000FFFFULL) | ((v & 0x0000FFFF0000FFFFULL) << 16);
     return (v >> 32) | (v << 32);
+}
+
+static inline uint64_t make_regular_so_key(uint64_t hash)
+{
+    return reverse_bits64(hash | SO_REGULAR_BIT);
+}
+
+static inline uint64_t make_dummy_so_key(size_t bucket_idx)
+{
+    return reverse_bits64((uint64_t)bucket_idx);
+}
+
+static inline bool is_regular_node(uint64_t so_key)
+{
+    return (so_key & 1ULL) != 0;
 }
 
 static uint64_t default_str_hash(const void *key)
@@ -303,7 +317,12 @@ retry:;
         }
 
         if (curr->so_key == target_so_key) {
-            if (target_key != NULL && curr->key != NULL && keys_equal(map, curr->key, target_key)) {
+            if (target_key == NULL) {
+                *out_pred = pred;
+                *out_curr = curr;
+                return true; /* Exact dummy sentinel found */
+            }
+            if (curr->key != NULL && keys_equal(map, curr->key, target_key)) {
                 *out_pred = pred;
                 *out_curr = curr;
                 return true; /* Exact key match found and unmarked */
@@ -363,7 +382,7 @@ get_or_init_bucket(cobalt_lfhashmap_t *map, size_t bucket_idx, cobalt_ebr_handle
         return NULL;
     }
 
-    uint64_t                 dummy_so_key = reverse_bits64((uint64_t)bucket_idx) & SO_DUMMY_MASK;
+    uint64_t                 dummy_so_key = make_dummy_so_key(bucket_idx);
     cobalt_lfhashmap_node_t *dummy        = node_create(map, dummy_so_key, NULL, NULL);
     if (!dummy) {
         return NULL;
@@ -371,6 +390,12 @@ get_or_init_bucket(cobalt_lfhashmap_t *map, size_t bucket_idx, cobalt_ebr_handle
 
     /* Insert dummy sentinel into global linked list starting from parent */
     while (1) {
+        cobalt_lfhashmap_node_t *existing = atomic_load_explicit(slot, memory_order_acquire);
+        if (existing != NULL) {
+            sl_free(map, dummy);
+            return existing;
+        }
+
         cobalt_lfhashmap_node_t *pred = NULL;
         cobalt_lfhashmap_node_t *curr = NULL;
 
@@ -522,7 +547,7 @@ int cobalt_lfhashmap_insert(cobalt_lfhashmap_t *map, void *key, void *value)
     cobalt_ebr_enter(h);
 
     uint64_t hash       = compute_hash(map, key);
-    uint64_t so_key     = reverse_bits64(hash) | SO_REGULAR_BIT;
+    uint64_t so_key     = make_regular_so_key(hash);
     size_t   cap        = atomic_load_explicit(&map->bucket_count, memory_order_acquire);
     size_t   bucket_idx = hash & (cap - 1);
 
@@ -587,7 +612,7 @@ int cobalt_lfhashmap_put(cobalt_lfhashmap_t *map, void *key, void *value, void *
     cobalt_ebr_enter(h);
 
     uint64_t hash       = compute_hash(map, key);
-    uint64_t so_key     = reverse_bits64(hash) | SO_REGULAR_BIT;
+    uint64_t so_key     = make_regular_so_key(hash);
     size_t   cap        = atomic_load_explicit(&map->bucket_count, memory_order_acquire);
     size_t   bucket_idx = hash & (cap - 1);
 
@@ -672,7 +697,7 @@ int cobalt_lfhashmap_get(cobalt_lfhashmap_t *map, const void *key, void **out_va
     cobalt_ebr_enter(h);
 
     uint64_t hash       = compute_hash(map, key);
-    uint64_t so_key     = reverse_bits64(hash) | SO_REGULAR_BIT;
+    uint64_t so_key     = make_regular_so_key(hash);
     size_t   cap        = atomic_load_explicit(&map->bucket_count, memory_order_acquire);
     size_t   bucket_idx = hash & (cap - 1);
 
@@ -722,7 +747,7 @@ int cobalt_lfhashmap_remove(cobalt_lfhashmap_t *map, const void *key, void **out
     cobalt_ebr_enter(h);
 
     uint64_t hash       = compute_hash(map, key);
-    uint64_t so_key     = reverse_bits64(hash) | SO_REGULAR_BIT;
+    uint64_t so_key     = make_regular_so_key(hash);
     size_t   cap        = atomic_load_explicit(&map->bucket_count, memory_order_acquire);
     size_t   bucket_idx = hash & (cap - 1);
 
@@ -854,8 +879,8 @@ bool cobalt_lfhashmap_iter_next(cobalt_lfhashmap_iter_t *iter, void **out_key, v
             continue;
         }
 
-        /* Skip dummy sentinel nodes (MSB == 0) */
-        if ((n->so_key & SO_REGULAR_BIT) == 0) {
+        /* Skip dummy sentinel nodes (LSB == 0) */
+        if (!is_regular_node(n->so_key)) {
             continue;
         }
 

@@ -158,6 +158,11 @@ target_link_libraries(benchmark_lfskiplist cobalt pthread m)
 add_test(NAME bench_lfskiplist COMMAND benchmark_lfskiplist
          PASS_REGULAR_EXPRESSION "Benchmark completed")
 
+add_executable(benchmark_lfhashmap benchmark/benchmark_lfhashmap.c)
+target_link_libraries(benchmark_lfhashmap cobalt pthread m)
+add_test(NAME bench_lfhashmap COMMAND benchmark_lfhashmap
+         PASS_REGULAR_EXPRESSION "All Lock-Free Hashmap benchmarks finished successfully")
+
 add_executable(benchmark_shm benchmark/benchmark_shm.c)
 target_link_libraries(benchmark_shm cobalt pthread m)
 add_test(NAME bench_shm COMMAND benchmark_shm

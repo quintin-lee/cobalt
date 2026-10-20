@@ -35,7 +35,7 @@
 - Modify: `include/cobalt/cobalt.h`
 - Modify: `CMakeLists.txt`
 
-- [ ] **Step 1: Create `include/cobalt/container/lfhashmap.h`**
+- [x] **Step 1: Create `include/cobalt/container/lfhashmap.h`**
 
 ```c
 #ifndef COBALT_CONTAINER_LFHASHMAP_H
@@ -129,9 +129,9 @@ void                     cobalt_lfhashmap_iter_destroy(cobalt_lfhashmap_iter_t *
 #endif /* COBALT_CONTAINER_LFHASHMAP_H */
 ```
 
-- [ ] **Step 2: Create stub `src/container/lfhashmap.c`**
-- [ ] **Step 3: Update `include/cobalt/cobalt.h` and `CMakeLists.txt`**
-- [ ] **Step 4: Verify build succeeds** (`cmake --build build -j4`)
+- [x] **Step 2: Create stub `src/container/lfhashmap.c`**
+- [x] **Step 3: Update `include/cobalt/cobalt.h` and `CMakeLists.txt`**
+- [x] **Step 4: Verify build succeeds** (`cmake --build build -j4`)
 
 ---
 
@@ -140,27 +140,27 @@ void                     cobalt_lfhashmap_iter_destroy(cobalt_lfhashmap_iter_t *
 **Files:**
 - Modify: `src/container/lfhashmap.c`
 
-- [ ] **Step 1: Implement Bit-Reversal, Hash, and Key Equality Helpers**
+- [x] **Step 1: Implement Bit-Reversal, Hash, and Key Equality Helpers**
   - Implement `reverse_bits64(v)` using `__builtin_bitreverse64` or portable 64-bit parallel shifts.
   - Implement default fast FNV-1a 64-bit string hash and `strcmp` equality.
   - Implement SplitMix64 inline hash for pointer/integer mode.
-- [ ] **Step 2: Implement Two-Level Segmented Directory Math and Allocation**
+- [x] **Step 2: Implement Two-Level Segmented Directory Math and Allocation**
   - `get_bucket_location(bucket_idx, &seg, &offset)` with `__builtin_clzll`.
   - Lazy segment allocation and atomic installation via CAS into `map->segments[seg]`.
-- [ ] **Step 3: Implement Lazy Sentinel Bucket Initialization**
+- [x] **Step 3: Implement Lazy Sentinel Bucket Initialization**
   - Parent calculation: `parent = B ^ (1ULL << (63 - __builtin_clzll(B)))`.
   - Recursive initialization of parent bucket.
   - Sentinel creation with `so_key = reverse_bits64(B) & ~MSB`.
   - Lock-free CAS insertion of sentinel into the global sorted linked list starting from parent.
-- [ ] **Step 4: Implement `find_pred_curr` with Cooperative Physical Unlinking**
+- [x] **Step 4: Implement `find_pred_curr` with Cooperative Physical Unlinking**
   - Traversal while `curr->so_key < target_so_key` or keys don't match.
   - Detecting marked `curr->next`, CAS unlinking, and `cobalt_ebr_retire`.
-- [ ] **Step 5: Implement `insert`, `put`, `get`, `contains`, and `remove`**
+- [x] **Step 5: Implement `insert`, `put`, `get`, `contains`, and `remove`**
   - Wait-Free `get` and `contains`.
   - `insert` with duplicate detection and dynamic load factor checking (`count / bucket_count > 0.75`).
   - `put` upsert with atomic CAS on `curr->value`.
   - `remove` with bit-0 marking on `curr->next`, decrementing `count`, cooperative unlinking, and `cobalt_ebr_retire`.
-- [ ] **Step 6: Implement `cobalt_lfhashmap_destroy`**
+- [x] **Step 6: Implement `cobalt_lfhashmap_destroy`**
   - Walk the global linked list from Dummy 0, free all nodes.
   - Free all allocated segments and destroy internal EBR if `owns_ebr`.
 
@@ -171,9 +171,9 @@ void                     cobalt_lfhashmap_iter_destroy(cobalt_lfhashmap_iter_t *
 **Files:**
 - Modify: `src/container/lfhashmap.c`
 
-- [ ] **Step 1: Implement `cobalt_lfhashmap_pin` and `cobalt_lfhashmap_unpin`**
+- [x] **Step 1: Implement `cobalt_lfhashmap_pin` and `cobalt_lfhashmap_unpin`**
   - Acquire thread EBR handle, call `cobalt_ebr_enter(h)` and `cobalt_ebr_exit(h)`.
-- [ ] **Step 2: Implement `cobalt_lfhashmap_iter_create`, `iter_next`, `iter_destroy`**
+- [x] **Step 2: Implement `cobalt_lfhashmap_iter_create`, `iter_next`, `iter_destroy`**
   - `iter_create`: Allocate iterator, enter EBR epoch, initialize `curr = map->segments[0][0]` (Dummy 0).
   - `iter_next`: Walk forwards across `curr = COBALT_GET_UNMARKED(curr->next)`.
   - Automatically skip all Dummy nodes (`(curr->so_key & (1ULL << 63)) == 0`).
@@ -190,7 +190,7 @@ void                     cobalt_lfhashmap_iter_destroy(cobalt_lfhashmap_iter_t *
 - Modify: `tests/test_runner.c`
 - Modify: `tests/CMakeLists.txt`
 
-- [ ] **Step 1: Create `tests/unit/test_lfhashmap.c`**
+- [x] **Step 1: Create `tests/unit/test_lfhashmap.c`**
   - `test_lfhashmap_create_destroy`: Generic and pointer modes, allocator injection, NULL handling.
   - `test_lfhashmap_insert_get_contains`: Standard key-value insertion, lookup, duplicate rejection.
   - `test_lfhashmap_put`: Value updates, verifying old value returns.
@@ -199,8 +199,8 @@ void                     cobalt_lfhashmap_iter_destroy(cobalt_lfhashmap_iter_t *
   - `test_lfhashmap_iterator`: Verifying iterator visits all active elements, count equals `size`, sentinels skipped.
   - `test_lfhashmap_pin_unpin`: Verifying batch operations under guard.
   - `test_lfhashmap_concurrency_stress`: 4 worker threads performing 25,000 mixed operations each (100,000 total ops) with atomic checksum and count verification.
-- [ ] **Step 2: Register test in `tests/test_runner.c` and `tests/CMakeLists.txt`**
-- [ ] **Step 3: Run unit test** (`./build/tests/cobalt_test --filter lfhashmap`) and verify 100% pass.
+- [x] **Step 2: Register test in `tests/test_runner.c` and `tests/CMakeLists.txt`**
+- [x] **Step 3: Run unit test** (`./build/tests/cobalt_test --filter lfhashmap`) and verify 100% pass.
 
 ---
 
@@ -211,15 +211,15 @@ void                     cobalt_lfhashmap_iter_destroy(cobalt_lfhashmap_iter_t *
 - Modify: `tests/benchmark/bench_runner.c`
 - Modify: `tests/CMakeLists.txt`
 
-- [ ] **Step 1: Create `tests/benchmark/benchmark_lfhashmap.c`**
+- [x] **Step 1: Create `tests/benchmark/benchmark_lfhashmap.c`**
   - Benchmark 1: Read-dominant (90% Get, 10% Put) measuring M ops/sec.
   - Benchmark 2: Write-heavy (50% Insert, 50% Remove).
   - Benchmark 3: Concurrency scaling (1, 2, 4, 8 threads) measuring speedup ratio.
   - Benchmark 4: Resizing latency (measuring P50/P99 latency during bucket expansion).
-- [ ] **Step 2: Integrate into `tests/benchmark/bench_runner.c`**
+- [x] **Step 2: Integrate into `tests/benchmark/bench_runner.c`**
   - Add `bench_lfhashmap` to table and `--json` outputs.
-- [ ] **Step 3: Register executable in `tests/CMakeLists.txt`**
-- [ ] **Step 4: Execute benchmark** (`./build/tests/benchmark_lfhashmap`) and verify target performance (>50M ops/sec read throughput).
+- [x] **Step 3: Register executable in `tests/CMakeLists.txt`**
+- [x] **Step 4: Execute benchmark** (`./build/tests/benchmark_lfhashmap`) and verify target performance (>50M ops/sec read throughput).
 
 ---
 
@@ -229,9 +229,9 @@ void                     cobalt_lfhashmap_iter_destroy(cobalt_lfhashmap_iter_t *
 - Modify: `CHANGELOG.md`
 - Run: Clang-Format, ASan/LSan, UBSan, Valgrind
 
-- [ ] **Step 1: Run `clang-format -i` across all new and modified files**
-- [ ] **Step 2: Verify zero warnings under `-Wall -Wextra -Werror` (`COBALT_STRICT_WARNINGS=ON`)**
-- [ ] **Step 3: Run AddressSanitizer/LeakSanitizer test** (`ctest --test-dir build-asan -R test_lfhashmap`)
-- [ ] **Step 4: Run full CTest suite** (all 62 test cases pass)
-- [ ] **Step 5: Update `CHANGELOG.md` under `## Unreleased`**
-- [ ] **Step 6: Commit all changes with conventional gitmoji message**
+- [x] **Step 1: Run `clang-format -i` across all new and modified files**
+- [x] **Step 2: Verify zero warnings under `-Wall -Wextra -Werror` (`COBALT_STRICT_WARNINGS=ON`)**
+- [x] **Step 3: Run AddressSanitizer/LeakSanitizer test** (`ctest --test-dir build-asan -R test_lfhashmap`)
+- [x] **Step 4: Run full CTest suite** (all 62 test cases pass)
+- [x] **Step 5: Update `CHANGELOG.md` under `## Unreleased`**
+- [x] **Step 6: Commit all changes with conventional gitmoji message**

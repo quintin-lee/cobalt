@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Added
+- **Layer 4 Lock-Free Concurrent Split-Ordered Hashmap (`cobalt/container/lfhashmap.h`)**:
+  - 100% lock-free concurrent extensible hashmap (`cobalt_lfhashmap_t`) implementing the Split-Ordered List algorithm (Shalev & Shavit 2006).
+  - Two-level segmented directory scaling dynamically from 4 up to 2.14 billion buckets without copying or moving existing key-value pairs (zero-copy dynamic expansion).
+  - Wait-free point lookups (`cobalt_lfhashmap_get`, `cobalt_lfhashmap_contains`) traversing single-digit node hops with zero CAS or lock operations.
+  - Harris marked-pointer cooperative deletion (`cobalt_lfhashmap_remove`) combined with Layer 7 Epoch-Based Reclamation (`cobalt_ebr_t`) for thread-safe deferred node freeing without ABA issues.
+  - Concurrent safe iterator (`cobalt_lfhashmap_iter_t`) with epoch pinning and automatic skipping of marked and dummy sentinel nodes.
+  - Comprehensive unit test suite (`tests/unit/test_lfhashmap.c`) covering CRUD, dynamic resizing across 16,384 buckets, iterators, generic/pointer keys, and 4-thread 100k contention stress tests.
+  - Dedicated benchmark suite (`tests/benchmark/benchmark_lfhashmap.c`) and runner integration, achieving >14.3M ops/sec multi-threaded throughput.
 - **Layer 8 Platform Shared Memory Primitive (`cobalt/platform/shm.h`)**:
   - Cross-platform shared memory mapping (`cobalt_shm_t`) with POSIX `shm_open`, `ftruncate`, `mmap`, `munmap`, `shm_unlink` and Windows `CreateFileMappingA`, `MapViewOfFile`, `UnmapViewOfFile`, `CloseHandle`.
   - Automatic leading slash normalization, argument validation, and fine-grained resource cleanup.
@@ -45,7 +53,7 @@
     NULL at the top level).
 
 ### Changed
-- Total CTest suites expanded from 59 to 61 (44 unit test suites + 17 benchmarks; new `test_shm` and `bench_shm`), maintaining 100% pass rate under Release, Debug, and AddressSanitizer/LeakSanitizer (`build-asan`).
+- Total CTest suites expanded from 61 to 63 (45 unit test suites + 18 benchmarks; new `test_lfhashmap` and `bench_lfhashmap`), maintaining 100% pass rate under Release, Debug, and AddressSanitizer/LeakSanitizer (`build-asan`).
 - Full clang-tidy pass across all IPC headers and sources with 0 warnings.
 - Capped JSON DOM parser nesting depth at 128 (matches SAX parser
   `COBALT_JSON_MAX_DEPTH`); over-deep input now returns NULL instead of overflowing
