@@ -28,9 +28,15 @@ extern "C" {
 #define COBALT_LFSKIPLIST_MAX_LEVEL 32
 #define COBALT_LFSKIPLIST_MARK_BIT ((uintptr_t)0x1)
 
+#ifndef COBALT_IS_MARKED
 #define COBALT_IS_MARKED(ptr) (((uintptr_t)(ptr) & COBALT_LFSKIPLIST_MARK_BIT) != 0)
+#endif
+#ifndef COBALT_GET_UNMARKED
 #define COBALT_GET_UNMARKED(ptr) ((void *)((uintptr_t)(ptr) & ~COBALT_LFSKIPLIST_MARK_BIT))
+#endif
+#ifndef COBALT_GET_MARKED
 #define COBALT_GET_MARKED(ptr) ((void *)((uintptr_t)(ptr) | COBALT_LFSKIPLIST_MARK_BIT))
+#endif
 
 /**
  * @brief Opaque structure representing the lock-free skip list

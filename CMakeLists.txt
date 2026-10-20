@@ -88,6 +88,7 @@ set(SOURCES
     src/container/queue.c
     src/container/lfqueue.c
     src/container/lfskiplist.c
+    src/container/lfhashmap.c
     src/container/set.c
     src/container/deque.c
     src/container/threadsafewrapper.c

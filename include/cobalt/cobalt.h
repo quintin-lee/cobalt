@@ -42,6 +42,7 @@
 #include <cobalt/container/buffer.h>
 #include <cobalt/container/deque.h>
 #include <cobalt/container/hashmap.h>
+#include <cobalt/container/lfhashmap.h>
 #include <cobalt/container/lfqueue.h>
 #include <cobalt/container/lfskiplist.h>
 #include <cobalt/container/list.h>
