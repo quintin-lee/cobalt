@@ -57,3 +57,8 @@ Proceed to targeted refactoring only if audit reveals concrete issues whose reme
 - **Potential focus areas**: verify lfhashmap epoch coverage, check threadsafewrapper for any blocking/ordering edge cases, confirm lfqueue ABA safety.
 - **Refactoring triggers**: None obvious from initial audit; large files (eventloop/regex/threadsafewrapper) likely fine as-is unless audit uncovers coupling that impedes fixing a real issue.
 
+
+## Refactoring Decision
+Decision: SKIP_SPLIT
+Rationale: Initial audit of EBR and lock-free components (ebr, lfskiplist, lfhashmap, lfqueue, threadsafewrapper) shows sound protocol (epoch barriers, handle lifecycle hardened, orphan handling correct, all lfskiplist reader paths epoch-pinned). No concrete bugs found that would require responsibility-splitting of large files. Large files (eventloop/regex/threadsafewrapper) remain reasonable as-is per current evidence.
+Files to split (if any): []
