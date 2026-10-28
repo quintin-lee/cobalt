@@ -60,6 +60,22 @@
   the stack.
 - Thread-pool `parallel_for`, its waitgroup, and `cobalt_parallel_stable_sort_with_alloc`
   now honor the injected allocator (new `cobalt_waitgroup_create_with_alloc`).
+- Test coverage extended for previously untested API surface:
+  `cobalt_interface_new_with_allocator`/`destroy_with_allocator`,
+  `cobalt_class_create_with_allocator` (name/base-class/alloc round-trip and the
+  matching `cobalt_class_destroy` free path), and
+  `cobalt_iterator_new_with_allocator` (context and shell both released through the
+  creation allocator).
+- `test_threadsafewrapper` gained NULL-guard and behavioral coverage that only existed
+  for vector/hashmap/list: full NULL-safety suites plus single-thread basic suites for
+  the thread-safe deque, queue, stack, set, and treemap; bounded-access semantics for
+  `tsvector_get`/`set`/`reserve`/`shrink_to_fit`; `tslist_remove_at` in-range and
+  out-of-range; same-key overwrite and missing-key reads for `tshashmap` and
+  `tstreemap` (including `min_key`/`max_key` bounds).
+- `test_logger` now asserts log content rather than just call return: level filtering
+  counts emitted lines by severity, asserts `TRACE`/`DEBUG` are suppressed below the
+  threshold, verifies the NULL output stream falls back to `stdout`, and verifies
+  `min_log_level` can be re-set mid-run in both directions.
 - Added `COBALT_STRICT_WARNINGS` CMake option (default ON) controlling
   `-Wall -Wextra -Werror`; removed unused `test_registry.ld` / `TEST_REGISTER` /
   `TEST_AUTO_REGISTER` dead code.
@@ -78,6 +94,8 @@
 
 
 ### Fixed
+- **Test suite silently passing on failure (`test_object`, `test_interface`, `test_iterator`, `test_atomic`, `test_logger`, `test_platform`)**: all six suites used `if (ok) printf("OK") else fprintf(stderr, ...)`, which printed an error but never exited non-zero, so unit tests reported `ctest` green even when assertions had failed. All six now use `TEST_ASSERT`/`TEST_EQUAL` from `test_framework.h`, which abort the process on failure. This restored genuine failure detection for object reference counting, interface creation, iterator traversal, atomic concurrency (race detection), log-level filtering, and platform detection.
+- **`test_iterator.c` vector capacity argument bug**: `cobalt_vector_create(4)` treated the initial *capacity* parameter as an element size, undersizing the backing store for the 5-element array. Now `cobalt_vector_create(5)`, matching `test_vector.c` conventions, plus size assertions.
 - EBR: `cobalt_ebr_sync` no longer reclaims the orphan pool prematurely — orphaned
   reclamation is now epoch-bounded (3-epoch rule), so nodes retired after the sync
   point are kept until a later advance instead of being freed while active readers
