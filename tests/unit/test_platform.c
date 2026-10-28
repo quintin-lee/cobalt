@@ -13,16 +13,12 @@ void test_platform(void)
 
     /* Test: Platform ID should be non-zero and valid */
     cobalt_platform_id_t pid = cobalt_platform_get_id();
-    if (pid == 0) {
-        fprintf(stderr, "ERROR: Platform ID is unknown/unset\n");
-    }
+    TEST_ASSERT(pid != 0);
     printf("  Platform ID detected: %d\n", pid);
 
     /* Test: Platform handle returns NULL */
     void *handle = cobalt_platform_get_handle();
-    if (handle != NULL) {
-        fprintf(stderr, "ERROR: Platform handle is not NULL\n");
-    }
+    TEST_ASSERT(handle == NULL);
     printf("  Platform handle is NULL (as expected)\n");
 
 #ifdef COBALT_IS_WINDOWS

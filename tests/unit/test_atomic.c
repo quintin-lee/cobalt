@@ -42,35 +42,23 @@ void test_atomic_basic(void)
 
     cobalt_atomic_t a   = cobalt_atomic_create(42);
     int             val = cobalt_atomic_get(&a);
-    if (val == 42) {
-        printf("  Create + get initial value: OK\n");
-    } else {
-        fprintf(stderr, "ERROR: expected 42, got %d\n", val);
-    }
+    TEST_EQUAL(val, 42);
+    printf("  Create + get initial value: OK\n");
 
     cobalt_atomic_set(&a, 100);
     val = cobalt_atomic_get(&a);
-    if (val == 100) {
-        printf("  Set + get: OK\n");
-    } else {
-        fprintf(stderr, "ERROR: expected 100, got %d\n", val);
-    }
+    TEST_EQUAL(val, 100);
+    printf("  Set + get: OK\n");
 
     cobalt_atomic_increment(&a);
     val = cobalt_atomic_get(&a);
-    if (val == 101) {
-        printf("  Increment: OK\n");
-    } else {
-        fprintf(stderr, "ERROR: expected 101, got %d\n", val);
-    }
+    TEST_EQUAL(val, 101);
+    printf("  Increment: OK\n");
 
     cobalt_atomic_decrement(&a);
     val = cobalt_atomic_get(&a);
-    if (val == 100) {
-        printf("  Decrement: OK\n");
-    } else {
-        fprintf(stderr, "ERROR: expected 100, got %d\n", val);
-    }
+    TEST_EQUAL(val, 100);
+    printf("  Decrement: OK\n");
 }
 
 /* Test thread safety with concurrent increments */
@@ -87,10 +75,7 @@ void test_atomic_concurrent_inc(void)
     pthread_t threads[g_threads];
     for (int i = 0; i < g_threads; i++) {
         int ret = pthread_create(&threads[i], NULL, thread_inc, NULL);
-        if (ret != 0) {
-            fprintf(stderr, "ERROR: Failed to create thread %d\n", i);
-            return;
-        }
+        TEST_ASSERT(ret == 0);
     }
 
     /* Wait for all threads */
@@ -101,12 +86,8 @@ void test_atomic_concurrent_inc(void)
     /* Check result */
     int final    = cobalt_atomic_get(&g_counter);
     int expected = g_threads * increments_per_thread;
-    if (final == expected) {
-        printf("  Final counter %d (expected %d): OK\n", final, expected);
-    } else {
-        fprintf(
-            stderr, "ERROR: Expected %d but got %d (race condition detected!)\n", expected, final);
-    }
+    TEST_EQUAL(final, expected);
+    printf("  Final counter %d (expected %d): OK\n", final, expected);
 }
 
 /* Test thread safety with mixed inc/dec */
@@ -120,8 +101,8 @@ void test_atomic_concurrent_mixed(void)
     /* Create alternating inc/dec threads */
     pthread_t threads[g_threads * 2];
     for (int i = 0; i < g_threads; i++) {
-        pthread_create(&threads[i], NULL, thread_inc, NULL);
-        pthread_create(&threads[i + g_threads], NULL, thread_dec, NULL);
+        TEST_ASSERT(pthread_create(&threads[i], NULL, thread_inc, NULL) == 0);
+        TEST_ASSERT(pthread_create(&threads[i + g_threads], NULL, thread_dec, NULL) == 0);
     }
 
     /* Wait for all threads */
@@ -131,11 +112,8 @@ void test_atomic_concurrent_mixed(void)
 
     /* Result should be zero (equal number of inc and dec) */
     int final = cobalt_atomic_get(&g_counter);
-    if (final == 0) {
-        printf("  Final counter %d (should be 0): OK\n", final);
-    } else {
-        fprintf(stderr, "ERROR: Expected 0 but got %d\n", final);
-    }
+    TEST_EQUAL(final, 0);
+    printf("  Final counter %d (should be 0): OK\n", final);
 }
 
 void test_atomic(void)
