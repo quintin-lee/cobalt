@@ -193,6 +193,42 @@ void test_class_inheritance(void)
     cobalt_class_destroy(base);
 }
 
+void test_class_with_allocator(void)
+{
+    printf("Testing class with custom allocator...\n");
+
+    cobalt_allocator_t *sys = cobalt_allocator_get_system();
+
+    /* NULL allocator falls back to the system allocator; the name is strdup'd */
+    cobalt_class_t *cls = cobalt_class_create_with_allocator("AllocClass", NULL, NULL);
+    TEST_ASSERT(cls != NULL);
+    TEST_ASSERT(cls->name != NULL);
+    TEST_ASSERT(strcmp(cls->name, "AllocClass") == 0);
+    TEST_ASSERT(cls->base_class == NULL);
+    TEST_ASSERT(cls->abstract == 0);
+    cobalt_class_destroy(cls);
+    printf("  NULL allocator falls back to system: OK\n");
+
+    /* Explicit system allocator, with a base class */
+    cobalt_class_t *base = cobalt_class_create_with_allocator("BaseClass", NULL, sys);
+    TEST_ASSERT(base != NULL);
+    cobalt_class_t *derived = cobalt_class_create_with_allocator("DerivedClass", base, sys);
+    TEST_ASSERT(derived != NULL);
+    TEST_ASSERT(derived->base_class == base);
+    printf("  System allocator sets base_class: OK\n");
+
+    /* Add methods and properties, then destroy through the same allocator path
+       (valgrind must see no leaks for either allocation route) */
+    TEST_ASSERT(cobalt_class_add_method(derived, "m", dummy_method) == 0);
+    TEST_ASSERT(cobalt_class_add_property(derived, "p", NULL, NULL) == 0);
+    TEST_ASSERT(derived->method_count == 1);
+    TEST_ASSERT(derived->property_count == 1);
+
+    cobalt_class_destroy(derived);
+    cobalt_class_destroy(base);
+    printf("  Allocator-backed class destroy: OK\n");
+}
+
 void test_class(void)
 {
     printf("Testing class...\n");
@@ -201,6 +237,7 @@ void test_class(void)
     test_class_properties();
     test_class_abstract();
     test_class_inheritance();
+    test_class_with_allocator();
     printf("  Class tests completed\n");
 }
 
