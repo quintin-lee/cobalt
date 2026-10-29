@@ -51,4 +51,17 @@ static TestResults g_test_results __attribute__((unused)) = {0, 0, 0};
         }                                                                                          \
     } while (0)
 
+/* Unnamed, auto-deleted scratch file for tests.
+ * C89 tmpfile(): no path construction, no name collision, removed on close.
+ * Portable across POSIX and Windows (MinGW). Returns NULL on failure.
+ *
+ * Tests MUST NOT hardcode absolute paths such as "/tmp/...": they silently
+ * fail on Windows, where such directories do not exist. Use this helper
+ * whenever a test needs a readable-back stream. */
+static FILE *cobalt_test_tmpfile(void) __attribute__((unused));
+static FILE *cobalt_test_tmpfile(void)
+{
+    return tmpfile();
+}
+
 #endif /* TEST_FRAMEWORK_H */
