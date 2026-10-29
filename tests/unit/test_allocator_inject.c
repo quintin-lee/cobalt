@@ -138,6 +138,44 @@ static cobalt_allocator_t mock_allocator = {
     .realloc = mock_realloc,
 };
 
+/* -------------------------------------------------------------------------- */
+/* Counting allocator — delegates to the system allocator, records traffic     */
+/* -------------------------------------------------------------------------- */
+
+static cobalt_allocator_t *count_sys;
+static int                 count_allocs;
+static int                 count_frees;
+
+static void *counting_alloc(cobalt_allocator_t *self, size_t size)
+{
+    (void)self;
+    count_allocs++;
+    return count_sys->alloc(count_sys, size);
+}
+
+static void counting_free(cobalt_allocator_t *self, void *ptr)
+{
+    (void)self;
+    count_frees++;
+    count_sys->free(count_sys, ptr);
+}
+
+static void *counting_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+{
+    (void)self;
+    return count_sys->realloc(count_sys, ptr, new_size);
+}
+
+static cobalt_allocator_t counting_v = {
+    .alloc = counting_alloc, .free = counting_free, .realloc = counting_realloc};
+
+static void counting_init(void)
+{
+    count_sys    = cobalt_allocator_get_system();
+    count_allocs = 0;
+    count_frees  = 0;
+}
+
 void test_allocator_inject_vector(void)
 {
     printf("Testing vector with injected allocator...\n");
@@ -430,6 +468,28 @@ void test_allocator_inject_iterator(void)
     printf("  Iterator with injected allocator: OK\n");
 }
 
+void test_allocator_inject_counting_wrapper(void)
+{
+    printf("Testing counting allocator wrapper...\n");
+
+    counting_init();
+    TEST_ASSERT(count_sys != NULL);
+
+    cobalt_set_t *set = cobalt_set_create_with_allocator(16, &counting_v);
+    TEST_ASSERT(set != NULL);
+    TEST_ASSERT(count_allocs > 0); /* wrapper saw the allocation */
+
+    int after_create = count_allocs;
+    TEST_ASSERT(cobalt_set_insert(set, "k") == 0);
+    TEST_EQUAL(count_allocs - after_create, 1); /* key copy via the wrapper */
+
+    cobalt_set_destroy(set);
+    /* Verified: 3 allocations at create + 1 for the key, all 4 released */
+    TEST_EQUAL(count_frees, 4);
+
+    printf("  Counting wrapper observes alloc/free traffic: OK\n");
+}
+
 void test_allocator_inject(void)
 {
     printf("Testing allocator injection...\n");
@@ -446,5 +506,6 @@ void test_allocator_inject(void)
     test_allocator_inject_core_interface();
     test_allocator_inject_iterator();
     test_allocator_alloc_failure();
+    test_allocator_inject_counting_wrapper();
     printf("  Allocator injection tests completed\n");
 }
