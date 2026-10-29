@@ -15,8 +15,8 @@ void test_logger_levels(void)
 {
     printf("Testing log level filtering...\n");
 
-    /* Open a temp file for capturing */
-    log_fp = fopen("/tmp/cobalt_test_log.txt", "w");
+    /* Open an unnamed temp file for capturing (portable: no /tmp path) */
+    log_fp = cobalt_test_tmpfile();
     TEST_ASSERT(log_fp != NULL);
 
     /* Initialize with INFO level */
@@ -31,12 +31,9 @@ void test_logger_levels(void)
     cobalt_warning("warning message");
     cobalt_error("error message");
 
-    TEST_ASSERT(fclose(log_fp) == 0);
-    log_fp = NULL;
-
-    /* Read back and verify */
-    log_fp = fopen("/tmp/cobalt_test_log.txt", "r");
-    TEST_ASSERT(log_fp != NULL);
+    /* tmpfile() cannot be reopened: flush then rewind the same handle */
+    TEST_ASSERT(fflush(log_fp) == 0);
+    rewind(log_fp);
 
     char line[256];
     int  info_count  = 0;
@@ -64,7 +61,7 @@ void test_logger_levels(void)
             err_count++;
         }
     }
-    fclose(log_fp);
+    TEST_ASSERT(fclose(log_fp) == 0);
     log_fp = NULL;
 
     printf("  Log levels filtered: INFO=%d WARN=%d ERR=%d\n", info_count, warn_count, err_count);
@@ -99,7 +96,7 @@ void test_logger_level_reset(void)
 {
     printf("Testing logger level re-set mid-run...\n");
 
-    FILE *fp = fopen("/tmp/cobalt_test_log_level.txt", "w");
+    FILE *fp = cobalt_test_tmpfile();
     TEST_ASSERT(fp != NULL);
 
     /* Raise the threshold to ERROR: info/warning must be suppressed */
@@ -110,9 +107,8 @@ void test_logger_level_reset(void)
     cobalt_warning("reset warning");
     cobalt_error("reset error");
 
-    TEST_ASSERT(fclose(fp) == 0);
-    fp = fopen("/tmp/cobalt_test_log_level.txt", "r");
-    TEST_ASSERT(fp != NULL);
+    TEST_ASSERT(fflush(fp) == 0);
+    rewind(fp);
 
     char line[256];
     int  total       = 0;
@@ -140,7 +136,6 @@ void test_logger_level_reset(void)
             err_count++;
         }
     }
-    fclose(fp);
 
     /* min_log_level is mutable: resetting it to ERROR suppresses everything below,
        and accepts ERROR. */
@@ -153,21 +148,21 @@ void test_logger_level_reset(void)
     printf("  Level re-set to ERROR suppresses lower levels: OK\n");
 
     /* Lower the threshold again to prove the reset is not one-way */
-    fp = fopen("/tmp/cobalt_test_log_level.txt", "w");
+    TEST_ASSERT(fclose(fp) == 0);
+    fp = cobalt_test_tmpfile();
     TEST_ASSERT(fp != NULL);
     cobalt_logger_init(fp, LOG_LEVEL_TRACE);
     cobalt_trace("reset trace 2");
-    TEST_ASSERT(fclose(fp) == 0);
 
-    fp = fopen("/tmp/cobalt_test_log_level.txt", "r");
-    TEST_ASSERT(fp != NULL);
+    TEST_ASSERT(fflush(fp) == 0);
+    rewind(fp);
     int trace_found = 0;
     while (fgets(line, sizeof(line), fp)) {
         if (strstr(line, "TRACE")) {
             trace_found = 1;
         }
     }
-    fclose(fp);
+    TEST_ASSERT(fclose(fp) == 0);
     TEST_EQUAL(trace_found, 1);
     printf("  Level re-set to TRACE re-enables trace: OK\n");
 
