@@ -330,6 +330,37 @@ static void test_taskgraph_edge_cases(void)
     printf("  TaskGraph edge cases: OK\n");
 }
 
+void test_taskgraph_reset_and_alloc(void)
+{
+    printf("Testing taskgraph reset and create_with_alloc...\n");
+
+    /* Verified against taskgraph.c: NULL alloc falls back to malloc, non-NULL
+       result. This differs from the containers, which reject NULL outright. */
+    cobalt_taskgraph_t *graph = cobalt_taskgraph_create_with_alloc(NULL);
+    TEST_ASSERT(graph != NULL);
+
+    cobalt_task_id_t a = cobalt_taskgraph_add_node(graph, dummy_task_fn, NULL);
+    cobalt_task_id_t b = cobalt_taskgraph_add_node(graph, dummy_task_fn, NULL);
+    TEST_ASSERT(a != COBALT_INVALID_TASK_ID);
+    TEST_ASSERT(b != COBALT_INVALID_TASK_ID);
+    TEST_ASSERT(a != b);
+    TEST_EQUAL(cobalt_taskgraph_node_count(graph), (size_t)2);
+
+    TEST_ASSERT(cobalt_taskgraph_add_edge(graph, a, b) == 0);
+
+    /* Reset restores each node's remaining_in_degree from its static value so a
+       consumed graph can run again. The topology itself (nodes and edges)
+       survives the reset: node count is unchanged and the edge is still
+       present. Probe-verified: add_edge returns 0 again after a reset. */
+    cobalt_taskgraph_reset(graph);
+    TEST_EQUAL(cobalt_taskgraph_node_count(graph), (size_t)2);
+    TEST_ASSERT(cobalt_taskgraph_add_edge(graph, a, b) == 0);
+
+    cobalt_taskgraph_reset(NULL); /* must not crash */
+    cobalt_taskgraph_destroy(graph);
+    printf("  Taskgraph reset and allocator fallback: OK\n");
+}
+
 void test_taskgraph(void)
 {
     printf("=== Starting TaskGraph Tests ===\n");
@@ -340,5 +371,6 @@ void test_taskgraph(void)
     test_taskgraph_reusability_100x();
     test_taskgraph_forest();
     test_taskgraph_edge_cases();
+    test_taskgraph_reset_and_alloc();
     printf("=== TaskGraph Tests Completed Successfully ===\n");
 }

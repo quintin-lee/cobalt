@@ -159,6 +159,32 @@ void test_arena_pointer_stability(void)
     printf("  Arena pointer stability test passed\n");
 }
 
+void test_arena_with_allocator(void)
+{
+    printf("Testing arena with custom allocator...\n");
+
+    /* Verified against arena.c: NULL allocator is rejected, not defaulted */
+    TEST_ASSERT(cobalt_arena_create_with_allocator(1024, NULL) == NULL);
+
+    cobalt_test_counting_init();
+    cobalt_arena_t *arena = cobalt_arena_create_with_allocator(1024, &cobalt_test_counting_v);
+    TEST_ASSERT(arena != NULL);
+    TEST_ASSERT(cobalt_test_count_allocs > 0); /* arena came from the wrapper */
+
+    void *p1 = cobalt_arena_alloc(arena, 64);
+    void *p2 = cobalt_arena_alloc(arena, 128);
+    TEST_ASSERT(p1 != NULL);
+    TEST_ASSERT(p2 != NULL);
+
+    /* Probe-verified: the arena pre-bundles its chunk, so inner allocations
+       do not add allocator traffic. */
+    TEST_EQUAL(cobalt_test_count_allocs, 2);
+
+    cobalt_arena_destroy(arena);
+    TEST_EQUAL(cobalt_test_count_frees, 2); /* chunk + arena, both via wrapper */
+    printf("  Arena allocator injection boundary: OK\n");
+}
+
 void test_arena(void)
 {
     printf("Testing arena...\n");
@@ -167,5 +193,6 @@ void test_arena(void)
     test_arena_boundary();
     test_arena_alignment();
     test_arena_pointer_stability();
+    test_arena_with_allocator();
     printf("  Arena tests completed\n");
 }

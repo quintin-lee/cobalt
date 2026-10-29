@@ -177,11 +177,33 @@ void test_lfqueue_multi_thread(void)
     printf("  lfqueue multi-threaded concurrency: OK\n");
 }
 
+void test_lfqueue_with_allocator(void)
+{
+    printf("Testing lfqueue with custom allocator...\n");
+
+    /* Verified against lfqueue.c: NULL allocator is rejected, not defaulted */
+    TEST_ASSERT(cobalt_lfqueue_create_with_allocator(8, NULL) == NULL);
+
+    cobalt_test_counting_init();
+    cobalt_lfqueue_t *q = cobalt_lfqueue_create_with_allocator(8, &cobalt_test_counting_v);
+    TEST_ASSERT(q != NULL);
+    /* Probe-verified: node slab + free-list, 2 allocations */
+    TEST_EQUAL(cobalt_test_count_allocs, 2);
+
+    int item = 7;
+    TEST_ASSERT(cobalt_lfqueue_enqueue(q, &item) == 0);
+    TEST_EQUAL(cobalt_lfqueue_size(q), (size_t)1);
+
+    cobalt_lfqueue_destroy(q);
+    printf("  Lfqueue allocator injection boundary: OK\n");
+}
+
 void test_lfqueue(void)
 {
     printf("Testing lfqueue...\n");
     test_lfqueue_create_destroy();
     test_lfqueue_single_thread();
     test_lfqueue_multi_thread();
+    test_lfqueue_with_allocator();
     printf("  lfqueue tests completed\n");
 }

@@ -12,6 +12,7 @@ void test_treemap_iterator(void);
 void test_treemap_edge_cases(void);
 void test_treemap_duplicate_keys(void);
 void test_treemap_large_scale(void);
+void test_treemap_with_allocator(void);
 void test_treemap_basic(void)
 {
     printf("Testing treemap basic operations...\n");
@@ -174,6 +175,34 @@ void test_treemap(void)
     test_treemap_single_element_cycle();
     test_treemap_rebalance();
     test_treemap_generic_keys();
+    test_treemap_with_allocator();
+}
+
+void test_treemap_with_allocator(void)
+{
+    printf("Testing treemap with custom allocator...\n");
+
+    /* Verified against treemap.c: NULL allocator is rejected, not defaulted */
+    TEST_ASSERT(cobalt_treemap_create_with_allocator(NULL) == NULL);
+
+    cobalt_test_counting_init();
+    cobalt_treemap_t *map = cobalt_treemap_create_with_allocator(&cobalt_test_counting_v);
+    TEST_ASSERT(map != NULL);
+    int base = cobalt_test_count_allocs;
+    TEST_ASSERT(base > 0); /* map struct came from the wrapper */
+
+    int v1 = 1, v2 = 2;
+    TEST_ASSERT(cobalt_treemap_put(map, "a", &v1) == 0);
+    TEST_ASSERT(cobalt_treemap_put(map, "b", &v2) == 0);
+    TEST_EQUAL(cobalt_treemap_size(map), (size_t)2);
+
+    /* Probe-verified: 2 allocations per put (node + key copy) */
+    TEST_EQUAL(cobalt_test_count_allocs - base, 4);
+
+    cobalt_treemap_destroy(map);
+    /* Probe-verified: destroy releases all 5 through the wrapper */
+    TEST_EQUAL(cobalt_test_count_frees, 5);
+    printf("  Treemap allocator injection boundary: OK\n");
 }
 
 void test_treemap_iterator(void)

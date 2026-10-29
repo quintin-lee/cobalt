@@ -539,6 +539,23 @@ void test_eventloop_rapid_signals(void)
 #endif
 }
 
+void test_eventloop_with_allocator(void)
+{
+    printf("Testing eventloop with custom allocator...\n");
+
+    /* Verified against eventloop.c: NULL allocator is rejected, not defaulted.
+       Note this differs from taskgraph, which falls back to malloc on NULL. */
+    TEST_ASSERT(cobalt_eventloop_create_with_allocator(NULL) == NULL);
+
+    cobalt_test_counting_init();
+    cobalt_eventloop_t *loop = cobalt_eventloop_create_with_allocator(&cobalt_test_counting_v);
+    TEST_ASSERT(loop != NULL);
+    TEST_ASSERT(cobalt_test_count_allocs > 0); /* loop came through the wrapper */
+
+    cobalt_eventloop_destroy(loop);
+    printf("  Eventloop allocator injection boundary: OK\n");
+}
+
 void test_eventloop(void)
 {
     printf("Testing eventloop...\n");
@@ -563,6 +580,7 @@ void test_eventloop(void)
     test_eventloop_timing_wheel_repeating();
     test_eventloop_cross_thread_post();
     test_eventloop_stream_echo();
+    test_eventloop_with_allocator();
     printf("  Eventloop tests completed\n");
 }
 
