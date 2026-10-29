@@ -7,6 +7,7 @@
 #ifndef TEST_FRAMEWORK_H
 #define TEST_FRAMEWORK_H
 
+#include "cobalt/memory/allocator.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -62,6 +63,55 @@ static FILE *cobalt_test_tmpfile(void) __attribute__((unused));
 static FILE *cobalt_test_tmpfile(void)
 {
     return tmpfile();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Counting allocator — delegates to the system allocator, records traffic     */
+/* -------------------------------------------------------------------------- */
+/* Proves that an injected allocator actually receives allocations and that   */
+/* every allocation is released. Wrap with cobalt_test_counting_allocator()    */
+/* and query cobalt_test_count_allocs / cobalt_test_count_frees.               */
+
+static cobalt_allocator_t *cobalt_test_count_sys __attribute__((unused));
+static int                 cobalt_test_count_allocs __attribute__((unused));
+static int                 cobalt_test_count_frees __attribute__((unused));
+
+static void *cobalt_test_counting_alloc(cobalt_allocator_t *self, size_t size) __attribute__((unused));
+static void *cobalt_test_counting_alloc(cobalt_allocator_t *self, size_t size)
+{
+    (void)self;
+    cobalt_test_count_allocs++;
+    return cobalt_test_count_sys->alloc(cobalt_test_count_sys, size);
+}
+
+static void cobalt_test_counting_free(cobalt_allocator_t *self, void *ptr) __attribute__((unused));
+static void cobalt_test_counting_free(cobalt_allocator_t *self, void *ptr)
+{
+    (void)self;
+    cobalt_test_count_frees++;
+    cobalt_test_count_sys->free(cobalt_test_count_sys, ptr);
+}
+
+static void *cobalt_test_counting_realloc(cobalt_allocator_t *self,
+                                          void          *ptr,
+                                          size_t         new_size) __attribute__((unused));
+static void *cobalt_test_counting_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+{
+    (void)self;
+    return cobalt_test_count_sys->realloc(cobalt_test_count_sys, ptr, new_size);
+}
+
+static cobalt_allocator_t cobalt_test_counting_v __attribute__((unused)) = {
+    .alloc = cobalt_test_counting_alloc,
+    .free = cobalt_test_counting_free,
+    .realloc = cobalt_test_counting_realloc};
+
+static void cobalt_test_counting_init(void) __attribute__((unused));
+static void cobalt_test_counting_init(void)
+{
+    cobalt_test_count_sys    = cobalt_allocator_get_system();
+    cobalt_test_count_allocs = 0;
+    cobalt_test_count_frees  = 0;
 }
 
 #endif /* TEST_FRAMEWORK_H */
