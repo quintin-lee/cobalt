@@ -91,6 +91,42 @@
   flakes the gate. The retry is capped at one and scoped to the tsan job only; a
   genuine race still fails twice and is not masked. Design:
   `docs/superpowers/specs/2026-10-19-ci-reliability-tsan-flake-design.md`.
+- **Allocator-injection boundary tests** across five modules
+  (`tests/unit/test_{arena,treemap,lfqueue,taskgraph,eventloop}.c`): each
+  `*_create_with_allocator` previously had no direct test of its non-default
+  path. NULL-allocator handling is not uniform, so each case pins the
+  implementation's actual behavior: arena / treemap / lfqueue / eventloop
+  reject a NULL allocator and return NULL; `cobalt_taskgraph_create_with_alloc`
+  falls back to `malloc`. The shared counting wrapper
+  (`cobalt_test_counting_v` in `test_framework.h`) proves allocations flow
+  through the injected allocator and are fully released.
+- **`test_set` gained binary-key and iterator coverage**: the `cobalt_set_*_ext`
+  family (`create_ext_with_allocator`, `insert_ext`, `contains_ext`,
+  `remove_ext`, `get`) is exercised with struct keys so membership uses the
+  length-aware path, plus `cobalt_set_iterator_create` walked through the
+  map-compatible iterator. NULL-allocator rejection and NULL-set guards are
+  asserted.
+- **`test_threadsafewrapper` allocator-variant coverage**: all seven
+  `*_create_with_allocator` entry points (list, stack, queue, deque,
+  hashmap, set, treemap) reject a NULL allocator; a system-allocator
+  create/insert/destroy round trip covers each type, and
+  `cobalt_tstreemap_create_ext` (comparator path) is exercised.
+- **`test_eventloop` accept coverage**: `cobalt_eventloop_accept`
+  (POSIX-guarded) now tested — argument guards (NULL loop, NULL callback,
+  negative listen fd) return -1 before any `accept()`, and the success path
+  accepts a pending UNIX-domain connection and registers its new fd with the
+  loop.
+- **`test_logger` direct-call coverage**: `cobalt_logger_log` is exercised
+  without the convenience macros to pin the exact `[LEVEL] file:line: msg`
+  line and the DEBUG-suppressed / WARNING-emitted level boundary.
+- **`test_string` `cobalt_vformat_with_alloc` coverage**: the va_list
+  allocator variant (previously only the variadic `snprintf_with_alloc` was
+  covered) is tested through a variadic trampoline — NULL out/fmt guards,
+  injected-allocator round trip with balanced alloc/free, and the
+  NULL-allocator system fallback.
+- **`test_sort` `cobalt_stable_sort` guard coverage**: the early-return
+  guards (NULL base, `nmemb <= 1`, `size == 0`, NULL comparator) are pinned
+  so a degenerate argument never mutates the input buffer.
 
 
 ### Fixed
