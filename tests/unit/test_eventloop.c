@@ -70,6 +70,7 @@ void test_eventloop_cross_thread_post(void);
 void test_eventloop_stream_echo(void);
 #ifndef _WIN32
 void test_eventloop_unix_socket(void);
+void test_eventloop_accept(void);
 
 typedef struct {
     int accept_count;
@@ -86,6 +87,50 @@ static void unix_server_cb(cobalt_fd_t fd, cobalt_events_t events, void *ud)
         ctx->accept_count++;
         close(cfd);
     }
+}
+#endif
+
+#ifndef _WIN32
+void test_eventloop_accept(void)
+{
+    printf("Testing cobalt_eventloop_accept...\n");
+
+    const char *sock_path = "/tmp/cobalt_accept_test.sock";
+    unlink(sock_path);
+
+    /* Argument guards: each returns -1 before any accept() syscall. */
+    TEST_ASSERT(cobalt_eventloop_accept(NULL, 0, POLLIN, unix_server_cb, NULL) == -1);
+    TEST_ASSERT(cobalt_eventloop_accept(NULL, 0, POLLIN, NULL, NULL) == -1);
+
+    cobalt_eventloop_t *loop = cobalt_eventloop_create();
+    TEST_ASSERT(loop != NULL);
+    TEST_ASSERT(cobalt_eventloop_accept(loop, -1, POLLIN, unix_server_cb, NULL) == -1);
+    TEST_ASSERT(cobalt_eventloop_accept(loop, 0, POLLIN, NULL, NULL) == -1);
+
+    /* Success path: a pending connection is accepted and its new fd
+       registered with the loop; the doc note requires the listen fd to
+       already be registered, so mirror that. */
+    cobalt_fd_t server_fd = -1;
+    TEST_ASSERT(cobalt_eventloop_create_unix_server(sock_path, &server_fd) == 0);
+    TEST_ASSERT(server_fd >= 0);
+    TEST_ASSERT(cobalt_eventloop_add_fd(loop, server_fd, POLLIN, unix_server_cb, NULL) == 0);
+
+    cobalt_fd_t client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    TEST_ASSERT(client_fd >= 0);
+    struct sockaddr_un cli_addr = {};
+    cli_addr.sun_family = AF_UNIX;
+    strncpy(cli_addr.sun_path, sock_path, sizeof(cli_addr.sun_path) - 1);
+    TEST_ASSERT(connect(client_fd, (struct sockaddr *)&cli_addr, sizeof(cli_addr)) == 0);
+
+    unix_test_ctx_t ctx = {0};
+    TEST_ASSERT(cobalt_eventloop_accept(loop, server_fd, POLLIN, unix_server_cb, &ctx) == 0);
+
+    cobalt_eventloop_del_fd(loop, server_fd);
+    close(client_fd);
+    cobalt_eventloop_destroy(loop);
+    unlink(sock_path);
+
+    printf("  eventloop_accept test passed\n");
 }
 #endif
 
@@ -572,6 +617,7 @@ void test_eventloop(void)
     test_eventloop_signal();
     test_eventloop_close_callback();
     test_eventloop_unix_socket();
+    test_eventloop_accept();
     test_eventloop_rapid_signals();
 #endif
     test_eventloop_timer_periodic();
