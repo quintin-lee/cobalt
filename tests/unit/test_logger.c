@@ -189,11 +189,47 @@ void test_logger_macros(void)
     printf("  Logger macros compile and execute\n");
 }
 
+void test_logger_log_direct(void)
+{
+    printf("Testing cobalt_logger_log called directly (not via macros)...\n");
+
+    FILE *fp = cobalt_test_tmpfile();
+    TEST_ASSERT(fp != NULL);
+    cobalt_logger_init(fp, LOG_LEVEL_WARNING);
+
+    /* Direct function call: verifies the exact "[LEVEL] file:line: msg" line
+       and the level boundary (DEBUG suppressed, WARNING/ERROR emitted). */
+    cobalt_logger_log(LOG_LEVEL_DEBUG, "virt.c", 99, "debug val=%d", 5); /* below threshold: suppressed */
+    cobalt_logger_log(LOG_LEVEL_WARNING, "virt.c", 100, "warn val=%d", 21);
+    cobalt_logger_log(LOG_LEVEL_ERROR, "virt.c", 101, "err");
+
+    TEST_ASSERT(fflush(fp) == 0);
+    rewind(fp);
+
+    char line[256];
+    int  n = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        n++;
+    }
+    /* Read back to verify the exact formatted content of each emitted line */
+    rewind(fp);
+    TEST_ASSERT(fgets(line, sizeof(line), fp) != NULL);
+    TEST_ASSERT(strstr(line, "[WARNING] virt.c:100: warn val=21") != NULL);
+    TEST_ASSERT(fgets(line, sizeof(line), fp) != NULL);
+    TEST_ASSERT(strstr(line, "[ERROR] virt.c:101: err") != NULL);
+    TEST_EQUAL(n, 2); /* DEBUG was filtered out, only 2 lines written */
+
+    TEST_ASSERT(fclose(fp) == 0);
+    cobalt_logger_init(stdout, LOG_LEVEL_INFO);
+    printf("  logger_log direct + level boundary: OK\n");
+}
+
 void test_logger(void)
 {
     printf("Testing logger...\n");
     test_logger_levels();
     test_logger_null_stream();
+    test_logger_log_direct();
     test_logger_level_reset();
     test_logger_macros();
     printf("  Logger tests completed\n");

@@ -6,6 +6,7 @@
 #include "cobalt/memory/allocator.h"
 #include "cobalt/utils/string.h"
 #include "test_framework.h"
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -331,6 +332,57 @@ void test_string_with_alloc(void)
     printf("  _with_alloc balance: OK\n");
 }
 
+/* Trampoline: cobalt_vformat_with_alloc takes a va_list, so a variadic helper
+   is required to build a real one. out/fmt/alloc are fixed params; ... carries
+   the format arguments. A zero-argument call (used for the NULL-out /
+   NULL-fmt guards) is valid C. */
+static int vfa_probe(char **out, const char *fmt, cobalt_allocator_t *alloc, ...)
+{
+    va_list ap;
+    va_start(ap, alloc);
+    int ret = cobalt_vformat_with_alloc(out, fmt, ap, alloc);
+    va_end(ap);
+    if (ret >= 0) {
+        TEST_ASSERT(*out != NULL);
+        if (alloc) {
+            cobalt_allocator_free(alloc, *out);
+        } else {
+            free(*out);
+        }
+        *out = NULL;
+    }
+    return ret;
+}
+
+void test_string_vformat_with_alloc(void)
+{
+    printf("Testing cobalt_vformat_with_alloc (va_list + custom allocator)...\n");
+    cobalt_allocator_t *a = &mock_str_alloc_inst;
+    char               *buf = NULL;
+
+    /* NULL out / NULL fmt are rejected and allocate nothing */
+    TEST_EQUAL(vfa_probe(NULL, "x", a), -1);
+    TEST_EQUAL(vfa_probe(&buf, NULL, a), -1);
+
+    /* Formatter through the injected allocator: writes the buffer, returns
+       the length, and the single allocation is freed again by the helper. */
+    mock_str_reset();
+    TEST_EQUAL(vfa_probe(&buf, "hello %s", a, "world"), 11);
+    TEST_EQUAL(mock_str_alloc_count, 1);
+    TEST_EQUAL(mock_str_free_count, 1);
+
+    /* A multi-argument format still routes through the allocator */
+    mock_str_reset();
+    TEST_EQUAL(vfa_probe(&buf, "%s:%d:%d", a, "k", 1, 2), 5); /* "k:1:2" */
+    TEST_EQUAL(mock_str_alloc_count, 1);
+    TEST_EQUAL(mock_str_free_count, 1);
+
+    /* NULL allocator falls back to the system allocator */
+    TEST_EQUAL(vfa_probe(&buf, "const", NULL), 5);
+
+    printf("  vformat_with_alloc: OK\n");
+}
+
 void test_string(void)
 {
     printf("Testing string utilities...\n");
@@ -338,8 +390,8 @@ void test_string(void)
     test_string_starts_with();
     test_string_ends_with();
     test_string_contains();
-    test_string_snprintf();
     test_string_vformat();
+    test_string_vformat_with_alloc();
     test_string_split();
     test_string_join();
     test_string_strip();

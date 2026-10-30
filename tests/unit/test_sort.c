@@ -611,6 +611,8 @@ void test_sort_partition(void);
 void test_partition_edge_cases(void);
 void test_sort_unique(void);
 void test_sort_with_alloc(void);
+void test_stable_sort_guards(void);
+
 
 void test_predicate_helpers(void)
 {
@@ -644,6 +646,7 @@ void test_sort(void)
     test_heapsort();
     test_sort_stable();
     test_stable_sort_large();
+    test_stable_sort_guards();
     test_sort_partition();
     test_partition_edge_cases();
     test_sort_unique();
@@ -757,6 +760,36 @@ void test_stable_sort_large(void)
 
     free(items);
     printf("  stable_sort large: OK\n");
+}
+
+void test_stable_sort_guards(void)
+{
+    printf("Testing cobalt_stable_sort guard early-returns...\n");
+
+    /* Each guard returns immediately without touching the array, so a
+       known-unsorted buffer must remain unsorted when a degenerate argument
+       triggers the early return. */
+
+    /* NULL base: no crash, nothing to observe on a null input */
+    cobalt_stable_sort(NULL, 4, sizeof(int), cmp_int);
+
+    /* nmemb == 0 and nmemb == 1: below the work threshold, array untouched */
+    int single[] = {5, 3, 1, 8};
+    cobalt_stable_sort(single, 0, sizeof(int), cmp_int);
+    TEST_EQUAL(single[0], 5);
+    cobalt_stable_sort(single, 1, sizeof(int), cmp_int);
+    TEST_EQUAL(single[0], 5);
+
+    /* size == 0: no crash */
+    int zero_size[] = {5, 3, 1, 8};
+    cobalt_stable_sort(zero_size, 4, 0, cmp_int);
+    TEST_EQUAL(zero_size[0], 5); /* unchanged */
+
+    /* NULL comparator: rejected, array untouched */
+    cobalt_stable_sort(single, 4, sizeof(int), NULL);
+    TEST_EQUAL(single[0], 5); /* still unsorted: the sort never ran */
+
+    printf("  stable_sort guards: OK\n");
 }
 
 void test_sort_partition(void)
