@@ -613,7 +613,6 @@ void test_sort_unique(void);
 void test_sort_with_alloc(void);
 void test_stable_sort_guards(void);
 
-
 void test_predicate_helpers(void)
 {
     printf("Testing predicate helpers...\n");

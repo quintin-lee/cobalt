@@ -554,4 +554,3 @@ void test_treemap_generic_keys(void)
     cobalt_treemap_destroy(map);
     printf("  Custom comparator test passed\n");
 }
-

@@ -357,7 +357,7 @@ static int vfa_probe(char **out, const char *fmt, cobalt_allocator_t *alloc, ...
 void test_string_vformat_with_alloc(void)
 {
     printf("Testing cobalt_vformat_with_alloc (va_list + custom allocator)...\n");
-    cobalt_allocator_t *a = &mock_str_alloc_inst;
+    cobalt_allocator_t *a   = &mock_str_alloc_inst;
     char               *buf = NULL;
 
     /* NULL out / NULL fmt are rejected and allocate nothing */

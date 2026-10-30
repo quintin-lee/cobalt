@@ -20,10 +20,10 @@
 #include "cobalt/memory/pool.h"
 #include "cobalt/memory/slab.h"
 #include "test_framework.h"
+#include <stdalign.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdalign.h>
 #include <string.h>
 
 #define MOCK_ALLOC_SIZE 4096
@@ -45,10 +45,10 @@ static void *mock_alloc(cobalt_allocator_t *self, size_t size)
         return NULL;
     }
 
-    size_t align = alignof(max_align_t);
-    uintptr_t raw = (uintptr_t)&mock_buf[mock_offset];
+    size_t    align   = alignof(max_align_t);
+    uintptr_t raw     = (uintptr_t)&mock_buf[mock_offset];
     uintptr_t aligned = (raw + align - 1) & ~(uintptr_t)(align - 1);
-    size_t adjust = (size_t)(aligned - raw);
+    size_t    adjust  = (size_t)(aligned - raw);
 
     if (adjust > MOCK_ALLOC_SIZE - mock_offset) {
         return NULL;
@@ -106,10 +106,10 @@ static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
         return NULL;
     }
 
-    size_t align = alignof(max_align_t);
-    uintptr_t raw = (uintptr_t)&mock_buf[mock_offset];
+    size_t    align   = alignof(max_align_t);
+    uintptr_t raw     = (uintptr_t)&mock_buf[mock_offset];
     uintptr_t aligned = (raw + align - 1) & ~(uintptr_t)(align - 1);
-    size_t adjust = (size_t)(aligned - raw);
+    size_t    adjust  = (size_t)(aligned - raw);
 
     if (adjust > MOCK_ALLOC_SIZE - mock_offset) {
         return NULL;
@@ -120,7 +120,7 @@ static void *mock_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
         return NULL;
     }
 
-    void *new_ptr = (void *)aligned;
+    void  *new_ptr  = (void *)aligned;
     size_t old_size = new_size;
     memcpy(new_ptr, ptr, old_size);
     mock_offset += new_size;

@@ -1,5 +1,5 @@
-#include "cobalt/container/set.h"
 #include "cobalt/container/hashmap.h"
+#include "cobalt/container/set.h"
 #include "test_framework.h"
 #include <stdio.h>
 
@@ -248,4 +248,3 @@ void test_set_map_interface(void)
     map->destroy(map);
     printf("  Set map interface: PASS\n");
 }
-

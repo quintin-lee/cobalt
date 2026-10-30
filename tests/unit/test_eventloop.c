@@ -118,7 +118,7 @@ void test_eventloop_accept(void)
     cobalt_fd_t client_fd = socket(AF_UNIX, SOCK_STREAM, 0);
     TEST_ASSERT(client_fd >= 0);
     struct sockaddr_un cli_addr = {};
-    cli_addr.sun_family = AF_UNIX;
+    cli_addr.sun_family         = AF_UNIX;
     strncpy(cli_addr.sun_path, sock_path, sizeof(cli_addr.sun_path) - 1);
     TEST_ASSERT(connect(client_fd, (struct sockaddr *)&cli_addr, sizeof(cli_addr)) == 0);
 

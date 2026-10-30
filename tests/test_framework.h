@@ -76,7 +76,8 @@ static cobalt_allocator_t *cobalt_test_count_sys __attribute__((unused));
 static int                 cobalt_test_count_allocs __attribute__((unused));
 static int                 cobalt_test_count_frees __attribute__((unused));
 
-static void *cobalt_test_counting_alloc(cobalt_allocator_t *self, size_t size) __attribute__((unused));
+static void *cobalt_test_counting_alloc(cobalt_allocator_t *self, size_t size)
+    __attribute__((unused));
 static void *cobalt_test_counting_alloc(cobalt_allocator_t *self, size_t size)
 {
     (void)self;
@@ -92,19 +93,18 @@ static void cobalt_test_counting_free(cobalt_allocator_t *self, void *ptr)
     cobalt_test_count_sys->free(cobalt_test_count_sys, ptr);
 }
 
-static void *cobalt_test_counting_realloc(cobalt_allocator_t *self,
-                                          void          *ptr,
-                                          size_t         new_size) __attribute__((unused));
+static void *cobalt_test_counting_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
+    __attribute__((unused));
 static void *cobalt_test_counting_realloc(cobalt_allocator_t *self, void *ptr, size_t new_size)
 {
     (void)self;
     return cobalt_test_count_sys->realloc(cobalt_test_count_sys, ptr, new_size);
 }
 
-static cobalt_allocator_t cobalt_test_counting_v __attribute__((unused)) = {
-    .alloc = cobalt_test_counting_alloc,
-    .free = cobalt_test_counting_free,
-    .realloc = cobalt_test_counting_realloc};
+static cobalt_allocator_t cobalt_test_counting_v
+    __attribute__((unused)) = {.alloc   = cobalt_test_counting_alloc,
+                               .free    = cobalt_test_counting_free,
+                               .realloc = cobalt_test_counting_realloc};
 
 static void cobalt_test_counting_init(void) __attribute__((unused));
 static void cobalt_test_counting_init(void)

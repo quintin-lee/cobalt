@@ -199,7 +199,8 @@ void test_logger_log_direct(void)
 
     /* Direct function call: verifies the exact "[LEVEL] file:line: msg" line
        and the level boundary (DEBUG suppressed, WARNING/ERROR emitted). */
-    cobalt_logger_log(LOG_LEVEL_DEBUG, "virt.c", 99, "debug val=%d", 5); /* below threshold: suppressed */
+    cobalt_logger_log(
+        LOG_LEVEL_DEBUG, "virt.c", 99, "debug val=%d", 5); /* below threshold: suppressed */
     cobalt_logger_log(LOG_LEVEL_WARNING, "virt.c", 100, "warn val=%d", 21);
     cobalt_logger_log(LOG_LEVEL_ERROR, "virt.c", 101, "err");
 
