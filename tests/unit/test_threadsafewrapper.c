@@ -113,6 +113,75 @@ void test_threadsafewrapper_vector_allocator(void)
     printf("  Thread-safe vector custom allocator: OK\n");
 }
 
+void test_threadsafewrapper_ts_allocator_variants(void)
+{
+    printf("Testing thread-safe wrappers with custom allocator...\n");
+
+    /* Verified against threadsafewrapper.c: this family requires a non-NULL
+       allocator and returns NULL otherwise. That is the opposite of the
+       containers (arena/treemap/lfqueue), which also reject NULL, and of
+       taskgraph, which silently falls back to malloc. Any future change to
+       that contract breaks here. */
+    TEST_ASSERT(cobalt_tsdeque_create_with_allocator(NULL) == NULL);
+    TEST_ASSERT(cobalt_tshashmap_create_with_allocator(8, NULL) == NULL);
+    TEST_ASSERT(cobalt_tslist_create_with_allocator(NULL) == NULL);
+    TEST_ASSERT(cobalt_tsqueue_create_with_allocator(NULL) == NULL);
+    TEST_ASSERT(cobalt_tsset_create_with_allocator(8, NULL) == NULL);
+    TEST_ASSERT(cobalt_tsstack_create_with_allocator(NULL) == NULL);
+    TEST_ASSERT(cobalt_tstreemap_create_with_allocator(NULL) == NULL);
+
+    cobalt_allocator_t *sys = cobalt_allocator_get_system();
+    TEST_ASSERT(sys != NULL);
+
+    /* System-allocator round trips: create, exercise one op, destroy */
+    cobalt_tslist_t *list = cobalt_tslist_create_with_allocator(sys);
+    TEST_ASSERT(list != NULL);
+    int a = 1;
+    TEST_ASSERT(cobalt_tslist_push_back(list, &a) == 0);
+    TEST_EQUAL(cobalt_tslist_size(list), (size_t)1);
+    cobalt_tslist_destroy(list);
+
+    cobalt_tsstack_t *stk = cobalt_tsstack_create_with_allocator(sys);
+    TEST_ASSERT(stk != NULL);
+    TEST_ASSERT(cobalt_tsstack_push(stk, &a) == 0);
+    TEST_EQUAL(cobalt_tsstack_size(stk), (size_t)1);
+    cobalt_tsstack_destroy(stk);
+
+    cobalt_tsqueue_t *q = cobalt_tsqueue_create_with_allocator(sys);
+    TEST_ASSERT(q != NULL);
+    TEST_ASSERT(cobalt_tsqueue_enqueue(q, &a) == 0);
+    TEST_EQUAL(cobalt_tsqueue_size(q), (size_t)1);
+    cobalt_tsqueue_destroy(q);
+
+    cobalt_tsdeque_t *dq = cobalt_tsdeque_create_with_allocator(sys);
+    TEST_ASSERT(dq != NULL);
+    TEST_ASSERT(cobalt_tsdeque_push_back(dq, &a) == 0);
+    TEST_EQUAL(cobalt_tsdeque_size(dq), (size_t)1);
+    cobalt_tsdeque_destroy(dq);
+
+    cobalt_tshashmap_t *map = cobalt_tshashmap_create_with_allocator(8, sys);
+    TEST_ASSERT(map != NULL);
+    int v1 = 5;
+    TEST_ASSERT(cobalt_tshashmap_put(map, "k", &v1) == 0);
+    TEST_EQUAL(cobalt_tshashmap_size(map), (size_t)1);
+    cobalt_tshashmap_destroy(map);
+
+    cobalt_tsset_t *ss = cobalt_tsset_create_with_allocator(8, sys);
+    TEST_ASSERT(ss != NULL);
+    TEST_ASSERT(cobalt_tsset_insert(ss, "m") == 0);
+    TEST_EQUAL(cobalt_tsset_size(ss), (size_t)1);
+    cobalt_tsset_destroy(ss);
+
+    /* create_ext delegates through create(); verify the comparator path works */
+    cobalt_tstreemap_t *tm = cobalt_tstreemap_create_ext(NULL);
+    TEST_ASSERT(tm != NULL);
+    TEST_ASSERT(cobalt_tstreemap_put(tm, "k", &v1) == 0);
+    TEST_EQUAL(cobalt_tstreemap_size(tm), (size_t)1);
+    cobalt_tstreemap_destroy(tm);
+
+    printf("  Thread-safe wrapper allocator variants: OK\n");
+}
+
 void test_threadsafewrapper_hashmap_basic(void)
 {
     printf("Testing thread-safe hashmap basic operations...\n");
@@ -927,6 +996,7 @@ void test_threadsafewrapper(void)
     test_threadsafewrapper_vector_null();
     test_threadsafewrapper_vector_bounds();
     test_threadsafewrapper_vector_allocator();
+    test_threadsafewrapper_ts_allocator_variants();
     test_threadsafewrapper_hashmap_basic();
     test_threadsafewrapper_hashmap_null();
     test_threadsafewrapper_hashmap_semantics();

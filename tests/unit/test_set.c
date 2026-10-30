@@ -79,6 +79,93 @@ void test_set_empty(void)
 
 void test_set_map_interface(void);
 
+void test_set_ext_api(void)
+{
+    printf("Testing set extended (binary key) API...\n");
+
+    /* Verified against set.c: alloc is a required parameter, NULL returns NULL */
+    TEST_ASSERT(cobalt_set_create_ext_with_allocator(8, NULL, NULL, NULL) == NULL);
+
+    cobalt_set_t *set =
+        cobalt_set_create_ext_with_allocator(8, NULL, NULL, cobalt_allocator_get_system());
+    TEST_ASSERT(set != NULL);
+    TEST_ASSERT(cobalt_set_is_empty(set) == 1);
+
+    /* A struct key, so membership must use the length-aware path rather than
+       string hashing. Adding a distinguishing field beyond the tag proves the
+       whole struct is hashed, not just the first bytes. */
+    struct bin_key {
+        int  id;
+        char tag[4];
+    };
+    struct bin_key k1 = {7, "xyz"};
+    struct bin_key k2 = {9, "abc"};
+    /* Same tag, different id: must be a different member */
+    struct bin_key k3 = {8, "xyz"};
+
+    TEST_ASSERT(cobalt_set_insert_ext(set, &k1, sizeof(k1)) == 0);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &k1, sizeof(k1)) == 1);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &k2, sizeof(k2)) == 0);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &k3, sizeof(k3)) == 0);
+    TEST_EQUAL(cobalt_set_size(set), (size_t)1);
+
+    TEST_ASSERT(cobalt_set_insert_ext(set, &k3, sizeof(k3)) == 0);
+    TEST_EQUAL(cobalt_set_size(set), (size_t)2);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &k3, sizeof(k3)) == 1);
+
+    /* get() returns the map-interface sentinel for a present member, NULL for
+       an absent one. The sentinel is not the caller's pointer. */
+    TEST_ASSERT(cobalt_set_get(set, &k1) != NULL);
+    TEST_ASSERT(cobalt_set_get(set, &k2) == NULL);
+
+    /* Re-inserting an existing member is idempotent in size */
+    TEST_ASSERT(cobalt_set_insert_ext(set, &k1, sizeof(k1)) == 0);
+    TEST_EQUAL(cobalt_set_size(set), (size_t)2);
+
+    TEST_ASSERT(cobalt_set_remove_ext(set, &k1, sizeof(k1)) == 0);
+    TEST_EQUAL(cobalt_set_size(set), (size_t)1);
+    TEST_ASSERT(cobalt_set_contains_ext(set, &k1, sizeof(k1)) == 0);
+    /* Removing an absent member reports failure */
+    TEST_ASSERT(cobalt_set_remove_ext(set, &k1, sizeof(k1)) == -1);
+
+    /* NULL guards */
+    TEST_ASSERT(cobalt_set_insert_ext(NULL, &k1, sizeof(k1)) == -1);
+    TEST_ASSERT(cobalt_set_contains_ext(NULL, &k1, sizeof(k1)) == 0);
+    TEST_ASSERT(cobalt_set_remove_ext(NULL, &k1, sizeof(k1)) == -1);
+
+    cobalt_set_destroy(set);
+    printf("  Set ext API: OK\n");
+}
+
+void test_set_iterator_create(void)
+{
+    printf("Testing set iterator...\n");
+
+    cobalt_set_t *set = cobalt_set_create(8);
+    TEST_ASSERT(set != NULL);
+
+    TEST_ASSERT(cobalt_set_insert(set, "alpha") == 0);
+    TEST_ASSERT(cobalt_set_insert(set, "beta") == 0);
+    TEST_ASSERT(cobalt_set_insert(set, "gamma") == 0);
+
+    /* The set exposes its members through a map-compatible iterator; each
+       yielded pair's key is the member and value is the static sentinel. */
+    cobalt_map_iterator_t *it = cobalt_set_iterator_create(set);
+    TEST_ASSERT(it != NULL);
+
+    int seen = 0;
+    while (cobalt_map_iterator_has_next(it)) {
+        cobalt_map_pair_t pair = cobalt_map_iterator_next(it);
+        TEST_ASSERT(pair.key != NULL);
+        seen++;
+    }
+    TEST_EQUAL(seen, 3);
+
+    cobalt_map_iterator_destroy(it);
+    cobalt_set_destroy(set);
+    printf("  Set iterator: OK\n");
+}
+
 void test_set(void)
 {
     printf("Testing set...\n");
@@ -86,6 +173,8 @@ void test_set(void)
     test_set_duplicates();
     test_set_empty();
     test_set_map_interface();
+    test_set_ext_api();
+    test_set_iterator_create();
     printf("  Set tests completed\n");
 }
 
