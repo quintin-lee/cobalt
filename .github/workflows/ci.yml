@@ -394,6 +394,9 @@ jobs:
           else
             echo 'No baseline found, skipping regression check.'
           fi
+      - name: Compare against committed baseline
+        run: |
+          python3 tests/benchmark/compare_bench.py tests/benchmark/baseline.json .benchmarks/result.json
 
       - name: Upload benchmark baseline
         uses: actions/upload-artifact@v4
