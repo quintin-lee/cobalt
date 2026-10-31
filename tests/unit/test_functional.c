@@ -40,33 +40,14 @@ void test_predicates(void)
     printf("Testing predicate functions...\n");
 
     int a = 5, b = 5;
-    if (predicate_equal(&a, &b, (compare_func_t)simple_cmp)) {
-        printf("  Equal values: OK\n");
-    } else {
-        fprintf(stderr, "ERROR: Equal values should match\n");
-    }
+    TEST_ASSERT(predicate_equal(&a, &b, (compare_func_t)simple_cmp));
 
     int c = 10;
-    if (!predicate_equal(&a, &c, (compare_func_t)simple_cmp)) {
-        printf("  Different values not equal: OK\n");
-    } else {
-        fprintf(stderr, "ERROR: Different values should not be equal\n");
-    }
-
-    if (predicate_not_equal(&a, &c, (compare_func_t)simple_cmp)) {
-        printf("  Not equal works: OK\n");
-    }
+    TEST_ASSERT(!predicate_equal(&a, &c, (compare_func_t)simple_cmp));
 
     /* NULL predicates */
-    if (predicate_null(NULL)) {
-        printf("  NULL check true: OK\n");
-    } else {
-        fprintf(stderr, "ERROR: NULL should return true\n");
-    }
-
-    if (predicate_nonnull(&a)) {
-        printf("  Non-null check true: OK\n");
-    }
+    TEST_ASSERT(predicate_null(NULL));
+    TEST_ASSERT(predicate_nonnull(&a));
 }
 
 void test_functional_bsearch(void)
