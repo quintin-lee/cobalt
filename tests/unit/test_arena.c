@@ -2,7 +2,6 @@
  * @file test_arena.c
  * @Unit test for arena (region-based) allocator.
  */
-
 #include "cobalt/memory/arena.h"
 #include "test_framework.h"
 #include <stdalign.h>
@@ -16,10 +15,7 @@ void test_arena_create_destroy(void)
     printf("Testing arena create and destroy...\n");
 
     cobalt_arena_t *arena = cobalt_arena_create(1024);
-    if (!arena) {
-        fprintf(stderr, "ERROR: Failed to create arena\n");
-        return;
-    }
+    TEST_ASSERT(arena != NULL);
     printf("  Arena created with 1024 bytes\n");
 
     cobalt_arena_destroy(arena);
@@ -31,21 +27,16 @@ void test_arena_alloc_reset(void)
     printf("Testing arena allocation and reset...\n");
 
     cobalt_arena_t *arena = cobalt_arena_create(256);
-    if (!arena) {
-        fprintf(stderr, "ERROR: Failed to create arena\n");
-        return;
-    }
+    TEST_ASSERT(arena != NULL);
 
     /* Allocate several blocks */
     int  *a = (int *)cobalt_arena_alloc(arena, sizeof(int));
     int  *b = (int *)cobalt_arena_alloc(arena, sizeof(int) * 10);
     char *c = (char *)cobalt_arena_alloc(arena, 64);
 
-    if (!a || !b || !c) {
-        fprintf(stderr, "ERROR: Arena allocation failed\n");
-        cobalt_arena_destroy(arena);
-        return;
-    }
+    TEST_ASSERT(a != NULL);
+    TEST_ASSERT(b != NULL);
+    TEST_ASSERT(c != NULL);
 
     /* Write and verify data */
     *a = 42;
@@ -56,11 +47,7 @@ void test_arena_alloc_reset(void)
         c[i] = (char)(i + 'A');
     }
 
-    if (*a != 42) {
-        fprintf(stderr, "ERROR: Data corruption in arena\n");
-    } else {
-        printf("  First allocation preserved: OK\n");
-    }
+    TEST_EQUAL(*a, 42);
 
     /* Reset arena (should invalidate all allocations) */
     cobalt_arena_reset(arena);
@@ -68,13 +55,10 @@ void test_arena_alloc_reset(void)
 
     /* After reset, we should be able to allocate again from beginning */
     int *d = (int *)cobalt_arena_alloc(arena, sizeof(int));
-    if (!d) {
-        fprintf(stderr, "ERROR: Failed to allocate after reset\n");
-    } else {
-        *d = 99;
-        printf("  Post-reset allocation works: OK\n");
-        cobalt_arena_reset(arena); /* cleanup */
-    }
+    TEST_ASSERT(d != NULL);
+    *d = 99;
+    printf("  Post-reset allocation works: OK\n");
+    cobalt_arena_reset(arena); /* cleanup */
 
     cobalt_arena_destroy(arena);
     printf("  Arena tests passed\n");
@@ -86,20 +70,14 @@ void test_arena_boundary(void)
 
     /* Create small arena */
     cobalt_arena_t *arena = cobalt_arena_create(64);
-    if (!arena) {
-        fprintf(stderr, "ERROR: Failed to create arena\n");
-        return;
-    }
+    TEST_ASSERT(arena != NULL);
 
     /* Try to allocate more than arena can hold initially -
        implementation should grow via realloc */
     void *ptr = cobalt_arena_alloc(arena, 128);
-    if (ptr) {
-        printf("  Large allocation triggered growth: OK\n");
-        cobalt_arena_reset(arena);
-    } else {
-        printf("  Large allocation rejected (within design limits)\n");
-    }
+    TEST_ASSERT(ptr != NULL);
+    printf("  Large allocation triggered growth: OK\n");
+    cobalt_arena_reset(arena);
 
     cobalt_arena_destroy(arena);
 }
