@@ -1,0 +1,252 @@
+{
+  "benchmarks": [
+    {
+      "name": "vector_push",
+      "mean_ms": 1.165072,
+      "stddev_ms": 0.100486,
+      "min_ms": 1.060569,
+      "max_ms": 1.300723,
+      "iterations": 3
+    },
+    {
+      "name": "vector_get",
+      "mean_ms": 2.128507,
+      "stddev_ms": 0.119860,
+      "min_ms": 1.962967,
+      "max_ms": 2.242849,
+      "iterations": 3
+    },
+    {
+      "name": "hashmap_put",
+      "mean_ms": 70.013542,
+      "stddev_ms": 13.803341,
+      "min_ms": 58.283689,
+      "max_ms": 89.391657,
+      "iterations": 3
+    },
+    {
+      "name": "hashmap_get",
+      "mean_ms": 112.294691,
+      "stddev_ms": 12.118671,
+      "min_ms": 95.224482,
+      "max_ms": 122.152392,
+      "iterations": 3
+    },
+    {
+      "name": "treemap_put",
+      "mean_ms": 152.857210,
+      "stddev_ms": 23.968039,
+      "min_ms": 132.479660,
+      "max_ms": 186.503754,
+      "iterations": 3
+    },
+    {
+      "name": "treemap_get",
+      "mean_ms": 161.221790,
+      "stddev_ms": 42.383814,
+      "min_ms": 130.273835,
+      "max_ms": 221.150796,
+      "iterations": 3
+    },
+    {
+      "name": "list_push_back",
+      "mean_ms": 9.156819,
+      "stddev_ms": 0.446658,
+      "min_ms": 8.804967,
+      "max_ms": 9.787063,
+      "iterations": 3
+    },
+    {
+      "name": "deque_push_front",
+      "mean_ms": 14.847976,
+      "stddev_ms": 5.308773,
+      "min_ms": 9.259186,
+      "max_ms": 21.983877,
+      "iterations": 3
+    },
+    {
+      "name": "stack_push",
+      "mean_ms": 14.719026,
+      "stddev_ms": 5.970514,
+      "min_ms": 8.146334,
+      "max_ms": 22.595617,
+      "iterations": 3
+    },
+    {
+      "name": "queue_enqueue",
+      "mean_ms": 7.888042,
+      "stddev_ms": 0.617385,
+      "min_ms": 7.051361,
+      "max_ms": 8.522529,
+      "iterations": 3
+    },
+    {
+      "name": "set_insert",
+      "mean_ms": 3.218335,
+      "stddev_ms": 0.655866,
+      "min_ms": 2.623429,
+      "max_ms": 4.132072,
+      "iterations": 3
+    },
+    {
+      "name": "lfqueue",
+      "mean_ms": 3.088711,
+      "stddev_ms": 0.049623,
+      "min_ms": 3.039938,
+      "max_ms": 3.156795,
+      "iterations": 3
+    },
+    {
+      "name": "json_sax",
+      "mean_ms": 28.664246,
+      "stddev_ms": 1.034676,
+      "min_ms": 27.773687,
+      "max_ms": 30.115015,
+      "iterations": 3
+    },
+    {
+      "name": "json_dom",
+      "mean_ms": 33.986640,
+      "stddev_ms": 4.128120,
+      "min_ms": 28.779335,
+      "max_ms": 38.876129,
+      "iterations": 3
+    },
+    {
+      "name": "qsort_random",
+      "mean_ms": 35.726916,
+      "stddev_ms": 0.602352,
+      "min_ms": 34.999082,
+      "max_ms": 36.474155,
+      "iterations": 3
+    },
+    {
+      "name": "qsort_sorted",
+      "mean_ms": 16.874519,
+      "stddev_ms": 0.037426,
+      "min_ms": 16.824670,
+      "max_ms": 16.914850,
+      "iterations": 3
+    },
+    {
+      "name": "stable_sort_random",
+      "mean_ms": 36.215793,
+      "stddev_ms": 4.704196,
+      "min_ms": 29.649220,
+      "max_ms": 40.423350,
+      "iterations": 3
+    },
+    {
+      "name": "threadpool_throughput",
+      "mean_ms": 41.739243,
+      "stddev_ms": 7.508391,
+      "min_ms": 31.905083,
+      "max_ms": 50.124879,
+      "iterations": 3
+    },
+    {
+      "name": "threadpool_parallel_for",
+      "mean_ms": 26.654236,
+      "stddev_ms": 18.474999,
+      "min_ms": 4.483090,
+      "max_ms": 49.711384,
+      "iterations": 3
+    },
+    {
+      "name": "eventloop_tw",
+      "mean_ms": 11.235595,
+      "stddev_ms": 1.519652,
+      "min_ms": 9.275367,
+      "max_ms": 12.978692,
+      "iterations": 3
+    },
+    {
+      "name": "eventloop_post",
+      "mean_ms": 14.392575,
+      "stddev_ms": 0.015809,
+      "min_ms": 14.370297,
+      "max_ms": 14.405345,
+      "iterations": 3
+    },
+    {
+      "name": "buffer_throughput",
+      "mean_ms": 2.428347,
+      "stddev_ms": 0.095032,
+      "min_ms": 2.300921,
+      "max_ms": 2.529056,
+      "iterations": 3
+    },
+    {
+      "name": "parallel_qsort_random",
+      "mean_ms": 12.563533,
+      "stddev_ms": 0.595782,
+      "min_ms": 11.728336,
+      "max_ms": 13.077405,
+      "iterations": 3
+    },
+    {
+      "name": "parallel_stable_sort_random",
+      "mean_ms": 14.598770,
+      "stddev_ms": 2.925036,
+      "min_ms": 12.184677,
+      "max_ms": 18.714918,
+      "iterations": 3
+    },
+    {
+      "name": "taskgraph_dag",
+      "mean_ms": 203.334107,
+      "stddev_ms": 51.784555,
+      "min_ms": 153.328087,
+      "max_ms": 274.672942,
+      "iterations": 3
+    },
+    {
+      "name": "regex_redos",
+      "mean_ms": 5.946337,
+      "stddev_ms": 0.756366,
+      "min_ms": 5.351773,
+      "max_ms": 7.013687,
+      "iterations": 3
+    },
+    {
+      "name": "regex_email",
+      "mean_ms": 55.922936,
+      "stddev_ms": 0.471403,
+      "min_ms": 55.352802,
+      "max_ms": 56.507238,
+      "iterations": 3
+    },
+    {
+      "name": "regex_ipv4",
+      "mean_ms": 105.031916,
+      "stddev_ms": 3.149044,
+      "min_ms": 102.300123,
+      "max_ms": 109.443744,
+      "iterations": 3
+    },
+    {
+      "name": "lfskiplist_ops",
+      "mean_ms": 37.989937,
+      "stddev_ms": 11.256838,
+      "min_ms": 27.107198,
+      "max_ms": 53.493568,
+      "iterations": 3
+    },
+    {
+      "name": "shm_channel_ops",
+      "mean_ms": 3.550481,
+      "stddev_ms": 1.074175,
+      "min_ms": 2.142022,
+      "max_ms": 4.747622,
+      "iterations": 3
+    },
+    {
+      "name": "lfhashmap_ops",
+      "mean_ms": 51.442362,
+      "stddev_ms": 6.394116,
+      "min_ms": 44.440778,
+      "max_ms": 59.899003,
+      "iterations": 3
+    }
+  ]
+}
