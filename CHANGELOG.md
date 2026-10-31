@@ -127,6 +127,7 @@
 - **`test_sort` `cobalt_stable_sort` guard coverage**: the early-return
   guards (NULL base, `nmemb <= 1`, `size == 0`, NULL comparator) are pinned
   so a degenerate argument never mutates the input buffer.
+- **Benchmark regression gate (`tests/benchmark/compare_bench.py`, `tests/benchmark/baseline.json`)**: the CI `bench` job now compares `bench_runner --json` output against both the previous artifact baseline and a committed `baseline.json` snapshot; any benchmark regressing >5% fails the job, improvements >-5% are recorded. Adds `compare_bench.py` with regression/improvement/skip reporting.
 
 
 ### Fixed

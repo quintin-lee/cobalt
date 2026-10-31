@@ -117,7 +117,7 @@ target_link_libraries(myapp Cobalt::cobalt)
 
 ```bash
 cd build
-ctest --output-on-failure  # 44 unit suites + 17 benchmarks passing (100%)
+ctest --output-on-failure  # 45 unit suites + 18 benchmarks passing (100%)
 # or with verbose output
 ctest --verbose
 ```
@@ -166,18 +166,18 @@ cd build
 
 | Category | Count |
 |----------|-------|
-| Source files (`src/**/*.c`) | 42 |
-| Header files (`include/**/*.h`) | 44 |
-| Test files (`tests/**/*.c`) | 60 |
-| Benchmark files (`tests/benchmark/*.c`) | 17 |
+| Source files (`src/**/*.c`) | 48 |
+| Header files (`include/**/*.h`) | 50 |
+| Test files (`tests/**/*.c`) | 67 |
+| Benchmark files (`tests/benchmark/*.c`) | 20 |
 | Example files (`examples/*.c`) | 17 |
-| Documentation files (`docs/**/*.md`, `*.md`) | 45 |
+| Documentation files (`docs/**/*.md`, `*.md`) | 75 |
 
 | Metric | Value |
 |--------|-------|
 | Total lines of code (src + include) | ~23,000 |
 | Git commits | 470+ |
-| CTest status | 61/61 passing (100%: 44 unit suites + 17 benchmarks) |
+| CTest status | 63/63 passing (100%: 45 unit suites + 18 benchmarks) |
 | Sanitizer status | Clean (ASan/LSan 0 leaks, 0 errors) |
 
 
