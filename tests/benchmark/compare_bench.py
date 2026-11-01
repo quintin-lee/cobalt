@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare bench_runner --json output against a committed baseline.
 
-Exit 1 if any shared benchmark regresses by more than 5%.
+Exit 1 if any shared benchmark regresses by more than 3% or exceeds 500ms.
 Record improvements (>-5%) to stdout; do not fail on them.
 Exit 2 on parse/IO error.
 """
@@ -37,12 +37,17 @@ def main():
             skipped.append(name)
             continue
         pct = (cur_ms - base_ms) / base_ms * 100.0
-        if pct > 5.0:
-            regressed.append((name, base_ms, cur_ms, pct))
+        reason = ""
+        if cur_ms > 500.0:
+            regressed.append((name, base_ms, cur_ms, pct, "absolute_cap"))
+            reason = "absolute_cap"
+        elif pct > 3.0:
+            regressed.append((name, base_ms, cur_ms, pct, "pct_regression"))
+            reason = "pct_regression"
         elif pct < -5.0:
             improved.append((name, base_ms, cur_ms, pct))
-    for name, old_ms, new_ms, pct in regressed:
-        print(f"REGRESSION: {name}: {old_ms:.3f}ms -> {new_ms:.3f}ms (+{pct:.1f}%)")
+    for name, old_ms, new_ms, pct, reason in regressed:
+        print(f"REGRESSION: {name}: {old_ms:.3f}ms -> {new_ms:.3f}ms (+{pct:.1f}%) [{reason}]")
     for name, old_ms, new_ms, pct in improved:
         print(f"IMPROVEMENT: {name}: {old_ms:.3f}ms -> {new_ms:.3f}ms ({pct:+.1f}%)")
     for name in skipped:
