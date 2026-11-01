@@ -76,6 +76,18 @@ int cobalt_vector_push(cobalt_vector_t *vec, void *item);
 void *cobalt_vector_get(const cobalt_vector_t *vec, size_t index);
 
 /**
+ * @brief Get the element at the specified index without bounds checking
+ * @details Caller must ensure that @p vec is non-NULL and @p index is within
+ *          [0, cobalt_vector_size(vec)). No NULL or bounds validation is
+ *          performed; undefined behavior results from invalid input.
+ *
+ * @param vec Pointer to the target dynamic array
+ * @param index The index of the element to access (starting from 0)
+ * @return Returns the element pointer at the specified position.
+ */
+void *cobalt_vector_get_unchecked(const cobalt_vector_t *vec, size_t index);
+
+/**
  * @brief Set the element at the specified index
  *
  * @param vec Pointer to the target dynamic array

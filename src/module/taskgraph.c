@@ -163,21 +163,19 @@ int cobalt_taskgraph_add_edge(cobalt_taskgraph_t *graph,
         return -1;
     }
 
-    cobalt_task_node_t *from_node = (cobalt_task_node_t *)cobalt_vector_get(graph->nodes, from_id);
-    cobalt_task_node_t *to_node   = (cobalt_task_node_t *)cobalt_vector_get(graph->nodes, to_id);
-    if (!from_node || !to_node) {
-        cobalt_error_set(NULL, COBALT_ERROR_INVALID_ARGUMENT);
-        return -1;
-    }
+    cobalt_task_node_t *from_node =
+        (cobalt_task_node_t *)cobalt_vector_get_unchecked(graph->nodes, from_id);
+    cobalt_task_node_t *to_node =
+        (cobalt_task_node_t *)cobalt_vector_get_unchecked(graph->nodes, to_id);
 
     /* Deduplicate existing edge */
     size_t succ_count = cobalt_vector_size(from_node->successors);
     for (size_t i = 0; i < succ_count; i++) {
-        if ((cobalt_task_id_t)(uintptr_t)cobalt_vector_get(from_node->successors, i) == to_id) {
+        if ((cobalt_task_id_t)(uintptr_t)cobalt_vector_get_unchecked(from_node->successors, i) ==
+            to_id) {
             return 0;
         }
     }
-
     if (cobalt_vector_push(from_node->successors, (void *)(uintptr_t)to_id) != 0) {
         cobalt_error_set(NULL, COBALT_ERROR_OUT_OF_MEMORY);
         return -1;

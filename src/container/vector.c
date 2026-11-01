@@ -251,6 +251,11 @@ void *cobalt_vector_get(const cobalt_vector_t *vec, size_t index)
     }
     return impl->items[index];
 }
+void *cobalt_vector_get_unchecked(const cobalt_vector_t *vec, size_t index)
+{
+    cobalt_vector_impl_t *impl = (cobalt_vector_impl_t *)vec;
+    return impl->items[index];
+}
 
 /**
  * @brief Set the element at the specified index
