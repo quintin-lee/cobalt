@@ -127,7 +127,9 @@
 - **`test_sort` `cobalt_stable_sort` guard coverage**: the early-return
   guards (NULL base, `nmemb <= 1`, `size == 0`, NULL comparator) are pinned
   so a degenerate argument never mutates the input buffer.
-- **Benchmark regression gate (`tests/benchmark/compare_bench.py`, `tests/benchmark/baseline.json`)**: the CI `bench` job now compares `bench_runner --json` output against both the previous artifact baseline and a committed `baseline.json` snapshot; any benchmark regressing >5% fails the job, improvements >-5% are recorded. Adds `compare_bench.py` with regression/improvement/skip reporting.
+- **Benchmark regression gate (`tests/benchmark/compare_bench.py`, `tests/benchmark/baseline.json`)**: the CI `bench` job now compares `bench_runner --json` output against both the previous artifact baseline and a committed `baseline.json` snapshot; regression threshold lowered from >5% to >3%, plus an absolute-time hard cap of 500ms (any benchmark exceeding 500ms fails regardless of %); improvements >-5% are recorded. Adds `compare_bench.py` with regression/improvement/skip reporting.
+- **Test hardening: silent-branch elimination (`test_arena.c`, `test_functional.c`)**: replaced `if/printf` silent-pass branches with `TEST_ASSERT`/`TEST_EQUAL` from `test_framework.h`, so `ctest` now fails on assertion failure instead of silently passing. Arena create/alloc/null checks and functional predicate equality checks are covered.
+- **Performance: `cobalt_vector_get_unchecked()` (`include/cobalt/container/vector.h`, `src/container/vector.c`)**: new unchecked vector accessor (no NULL/bounds checks) used by `cobalt_taskgraph_add_edge` where indices are pre-validated. `cobalt_vector_get` was the hottest function at 20.59% of `taskgraph_dag` CPU time per perf. `taskgraph_dag`: 447.854ms → ~252ms (-43%); `vector_get`: 2.354ms → 0.6ms (-74%). All 63 ctest pass; `compare_bench.py` green vs baseline.
 
 
 ### Fixed
